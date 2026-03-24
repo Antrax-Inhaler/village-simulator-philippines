@@ -171,6 +171,20 @@
         <div class="fab-item" onclick="triggerLoad()"           data-label="I-load">📂</div>
       </div>
 
+      <!-- ── Mobile FAB tray (collapsed by default) ── -->
+      <div id="fab-gov-tray" class="fab-tray-closed" style="display:none">
+        <!-- Toggle trigger -->
+        <div id="fab-gov-toggle" class="fab-item" onclick="_fabTrayToggle()" data-label="Menu" style="border-color:#c49a4e;z-index:29;">⚙️</div>
+        <!-- Tray items (shown when open) -->
+        <div class="fab-item fab-tray-item fab-shop-btn" onclick="openShop();_fabTrayToggle()"          data-label="Tindahan">🏗️</div>
+        <div class="fab-item fab-tray-item" onclick="openSidePanel('trade');_fabTrayToggle()"           data-label="Kalakalan">⚓</div>
+        <div class="fab-item fab-tray-item" onclick="openSidePanel('policy');_fabTrayToggle()"          data-label="Patakaran">📜</div>
+        <div class="fab-item fab-tray-item" onclick="openSidePanel('tax');_fabTrayToggle()"             data-label="Buwis">💰</div>
+        <div class="fab-item fab-tray-item" onclick="openSidePanel('expand');_fabTrayToggle()"          data-label="Palawakin">🗺️</div>
+        <div class="fab-item fab-tray-item" onclick="triggerSave();_fabTrayToggle()"                    data-label="I-save">💾</div>
+        <div class="fab-item fab-tray-item" onclick="triggerLoad();_fabTrayToggle()"                    data-label="I-load">📂</div>
+      </div>
+
       <!-- ── FAB: Activity log ── -->
       <div id="fab-log" class="fab-toolbar fab-toolbar-log" style="bottom:calc(14px + 7*52px + 8px);">
         <div class="fab-item fab-log-btn" onclick="openSidePanel('log')" data-label="Talaan ng Buhay">
@@ -783,6 +797,66 @@ setInterval(function() {
   }
 }, 6000);
 
+  </script>
+
+  <!-- ══════════════════════════════════════════
+       MOBILE HELPERS
+  ══════════════════════════════════════════ -->
+  <script>
+    /* ── Audio widget hide/show button ──────────────────────── */
+    (function() {
+      var widget = document.getElementById('audioWidget');
+      if (!widget) return;
+      widget.style.position = 'fixed'; /* ensure positioning context */
+      var btn = document.createElement('button');
+      btn.id = 'audio-hide-btn';
+      btn.title = 'Itago ang musika';
+      btn.textContent = '◀';
+      var hidden = false;
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        hidden = !hidden;
+        widget.classList.toggle('aw-hidden', hidden);
+        btn.textContent = hidden ? '▶' : '◀';
+      });
+      widget.appendChild(btn);
+    })();
+
+    /* ── Mobile FAB tray toggle ───────────────────────────── */
+    window._fabTrayOpen = false;
+    window._fabTrayToggle = function() {
+      var tray   = document.getElementById('fab-gov-tray');
+      var toggle = document.getElementById('fab-gov-toggle');
+      if (!tray) return;
+      window._fabTrayOpen = !window._fabTrayOpen;
+      tray.classList.toggle('fab-tray-open',   window._fabTrayOpen);
+      tray.classList.toggle('fab-tray-closed', !window._fabTrayOpen);
+      if (toggle) toggle.textContent = window._fabTrayOpen ? '✕' : '⚙️';
+    };
+
+    /* On mobile landscape, show tray and hide desktop FAB */
+    (function applyFabMode() {
+      function check() {
+        var isMobileLandscape = window.innerHeight <= 480 &&
+                                window.innerWidth  >  window.innerHeight;
+        var gov   = document.getElementById('fab-gov');
+        var tray  = document.getElementById('fab-gov-tray');
+        var tog   = document.getElementById('fab-gov-toggle');
+        if (!gov || !tray) return;
+        if (isMobileLandscape) {
+          gov.style.display  = 'none';
+          tray.style.display = 'flex';
+          if (tog) tog.style.display = 'flex';
+        } else {
+          gov.style.display  = '';
+          tray.style.display = 'none';
+          if (tog) tog.style.display = 'none';
+        }
+      }
+      check();
+      window.addEventListener('resize',           check);
+      window.addEventListener('orientationchange', check);
+    })();
   </script>
 
   <!-- ══════════════════════════════════════════

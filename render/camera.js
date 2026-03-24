@@ -72,7 +72,8 @@ export function initCamera(vw, vh) {
 /* ── Centred reset (no lerp — used on first frame + resize) ── */
 export function camRecentre() {
   cam.x    = cam.tx    = _VW / 2;
-  cam.y    = cam.ty    = _VH / 2;
+  /* Start slightly above centre so buildings aren't crowded at bottom */
+  cam.y    = cam.ty    = _VH * 0.42;
   cam.zoom = cam.tzoom = MIN_ZOOM;
 }
 

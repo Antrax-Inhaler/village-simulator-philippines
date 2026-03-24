@@ -637,59 +637,59 @@ canvas.mode-view  { cursor: default;   }
 /* ── Top HUD bar ─────────────────────────────────────────── */
 #top-hud {
   position: absolute;
-  top: 10px;
-  right: 68px;
+  top: 8px;
+  right: 56px;
   z-index: 25;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   background: rgba(10,6,2,0.88);
   border: 1px solid #3a2010;
-  border-radius: 8px;
-  padding: 6px 14px;
+  border-radius: 6px;
+  padding: 4px 10px;
   pointer-events: all;
   backdrop-filter: blur(4px);
   box-shadow: 0 2px 12px rgba(0,0,0,0.5);
 }
 
 .hud-btn {
-  padding: 5px 12px;
+  padding: 4px 9px;
   background: #1a0f06;
   border: 1px solid #8a6030;
   color: var(--clr-accent);
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 11px;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 4px;
   transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;
 }
 .hud-btn:hover  { background: #2a1808; border-color: var(--clr-accent); }
 .hud-btn.active { background: #2a1808; border-color: var(--clr-accent); box-shadow: 0 0 6px rgba(245,200,66,0.3); }
 
-.hud-lbl  { color: var(--clr-text-dim); font-size: 11px; white-space: nowrap; }
-.hud-sub  { color: var(--clr-text-dim); font-size: 11px; font-style: italic; }
+.hud-lbl  { color: var(--clr-text-dim); font-size: 10px; white-space: nowrap; }
+.hud-sub  { color: var(--clr-text-dim); font-size: 10px; font-style: italic; }
 
 #hud-time {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 #barTimeStr {
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 13px;
   color: var(--clr-accent);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
 }
 #barTOD, #barDayStr {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--clr-text-dim);
 }
 #barDayStr { font-family: var(--font-mono); }
 
-#hud-election { display: flex; align-items: center; gap: 5px; }
-#hud-speed    { display: flex; align-items: center; gap: 3px; }
+#hud-election { display: flex; align-items: center; gap: 4px; }
+#hud-speed    { display: flex; align-items: center; gap: 2px; }
 
 /* ══════════════════════════════════════════════════════════════
    FAB TOOLBARS
@@ -703,6 +703,27 @@ canvas.mode-view  { cursor: default;   }
 .fab-item:active{transform:translateX(-2px) scale(.94);}
 .fab-active{background:#2a1808!important;border-color:var(--clr-accent)!important;box-shadow:0 0 12px rgba(245,200,66,.3)!important;}
 .fab-badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;background:#e74c3c;border-radius:9px;border:2px solid rgba(10,6,2,.9);font-family:var(--font-mono);font-size:10px;font-weight:bold;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 3px;pointer-events:none;}
+
+/* ── Mobile FAB: collapsed tray ─────────────────────────────
+   On touch screens the 7-item column is replaced with a single
+   ⚙️ toggle button that slides out a horizontal row of icons.  */
+#fab-gov-toggle{display:none;} /* hidden on desktop */
+#fab-gov-tray{
+  position:absolute;right:14px;bottom:14px;
+  display:flex;flex-direction:column;gap:6px;
+  z-index:28;align-items:flex-end;
+}
+#fab-gov-tray .fab-item{width:40px;height:40px;font-size:18px;}
+/* The items inside the tray animate in/out */
+#fab-gov-tray .fab-item.fab-tray-item{
+  transition:opacity .18s, transform .18s, background .18s, border-color .18s;
+}
+#fab-gov-tray.fab-tray-closed .fab-tray-item{
+  opacity:0; pointer-events:none; transform:translateY(8px);
+}
+#fab-gov-tray.fab-tray-open .fab-tray-item{
+  opacity:1; pointer-events:all; transform:translateY(0);
+}
 
 /* ══════════════════════════════════════════════════════════════
    UNIFIED SIDE PANEL
@@ -757,7 +778,7 @@ canvas.mode-view  { cursor: default;   }
    Hidden on desktop (always landscape) and mobile landscape.
 ══════════════════════════════════════════════════════════════ */
 #portrait-lock {
-  display: none; /* hidden by default; JS / media query shows it */
+  display: none;
   position: fixed;
   inset: 0;
   z-index: 9999;
@@ -790,109 +811,121 @@ canvas.mode-view  { cursor: default;   }
   100% { transform: rotate(0deg);   }
 }
 
-#portrait-lock-arrow {
-  font-size: 36px;
-  color: var(--clr-accent);
-  font-family: var(--font-display);
-}
+#portrait-lock-arrow { font-size: 36px; color: var(--clr-accent); font-family: var(--font-display); }
+#portrait-lock-msg   { font-family: var(--font-display); font-size: clamp(18px, 5vw, 26px); color: var(--clr-accent); letter-spacing: 0.06em; }
+#portrait-lock-sub   { font-size: clamp(13px, 3.5vw, 16px); color: var(--clr-text-dim); font-style: italic; margin-top: -8px; }
 
-#portrait-lock-msg {
-  font-family: var(--font-display);
-  font-size: clamp(18px, 5vw, 26px);
-  color: var(--clr-accent);
-  letter-spacing: 0.06em;
-}
-
-#portrait-lock-sub {
-  font-size: clamp(13px, 3.5vw, 16px);
-  color: var(--clr-text-dim);
-  font-style: italic;
-  margin-top: -8px;
-}
-
-/* Show overlay ONLY when a touch device is in portrait mode */
 @media (max-width: 767px) and (orientation: portrait) {
-  #portrait-lock {
-    display: flex;
-  }
-  /* Prevent scrolling/zooming on body while overlay is up */
-  body {
-    overflow: hidden;
-    touch-action: none;
-  }
+  #portrait-lock { display: flex; }
+  body { overflow: hidden; touch-action: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════
-   MOBILE LANDSCAPE — responsive tweaks
-   Applied when screen is narrow in landscape (phones).
-   Breakpoint: max-height 480px (typical phone landscape).
+   AUDIO WIDGET — collapsible hide button
+   The #audio-hide-btn is injected by the inline script in
+   index.html. When clicked it slides the widget off-screen.
+══════════════════════════════════════════════════════════════ */
+#audioWidget {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+#audioWidget.aw-hidden {
+  transform: translateX(calc(100% + 28px));
+  opacity: 0;
+  pointer-events: none;
+}
+#audio-hide-btn {
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 36px;
+  background: rgba(26,18,8,0.85);
+  border: 1px solid #c49a4e;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  color: #f5c842;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#audio-hide-btn:hover { background: rgba(42,24,8,0.95); }
+
+/* ══════════════════════════════════════════════════════════════
+   BOTTOM DRAWER — max-height cap so it never fills full screen
+   on desktop; on mobile it goes full-height via media query.
+══════════════════════════════════════════════════════════════ */
+#bottom-drawer {
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE LANDSCAPE — comprehensive responsive tweaks
 ══════════════════════════════════════════════════════════════ */
 @media (max-height: 480px) and (orientation: landscape) {
 
-  /* ── Top HUD — smaller, tighter ─────────────────────────── */
-  #top-hud {
-    top: 6px;
-    right: 56px;
-    padding: 4px 10px;
-    gap: 7px;
-    font-size: 11px;
-  }
-  #barTimeStr    { font-size: 12px; }
-  #barTOD,
-  #barDayStr     { font-size: 9px;  }
-  #hud-election  { gap: 3px; }
-  .bar-election-timer,
-  .bar-election-approval { font-size: 10px; }
-  .hud-lbl       { font-size: 9px; }
-  .speed-btn     { padding: 3px 6px; font-size: 11px; }
+  /* ── Top HUD ─────────────────────────────────────────────── */
+  #top-hud { top: 4px; right: 50px; padding: 3px 8px; gap: 5px; }
+  #barTimeStr { font-size: 11px; }
+  #barTOD, #barDayStr { font-size: 9px; }
+  .bar-election-timer, .bar-election-approval { font-size: 9px; }
+  .hud-lbl { font-size: 9px; }
+  .speed-btn { padding: 2px 5px; font-size: 10px; min-width: 26px; }
 
-  /* ── FAB toolbar — shrink buttons + tighten gap ─────────── */
-  .fab-toolbar   { right: 8px; bottom: 8px; gap: 5px; }
-  .fab-item      { width: 38px; height: 38px; font-size: 17px; }
-  .fab-toolbar-log { bottom: calc(8px + 6*46px + 5px); }
+  /* ── FAB: swap to collapsible tray ──────────────────────── */
+  #fab-gov { display: none !important; }         /* hide desktop column */
+  #fab-gov-toggle { display: flex !important; }  /* show mobile trigger  */
+  #fab-gov-tray { display: flex; }
 
-  /* Disable tooltip labels on mobile (they clip off screen) */
-  .fab-item:hover::before,
-  .fab-item:hover::after { display: none; }
+  /* Log FAB repositioned above the tray toggle */
+  #fab-log { bottom: calc(14px + 52px + 8px) !important; }
 
-  /* ── Side panel — slightly narrower ─────────────────────── */
-  #side-panel    { width: 260px; right: -264px; }
+  /* ── Side panel ──────────────────────────────────────────── */
+  #side-panel { width: min(260px, 80vw); right: calc(-1 * min(260px, 80vw) - 4px); }
 
-  /* ── Audio widget — compact ──────────────────────────────── */
-  .audio-widget  {
-    bottom: 8px;
-    right: 56px; /* keep clear of FAB column */
-    padding: 4px 8px;
-    gap: 6px;
-    font-size: 11px;
-  }
-  .audio-widget button  { width: 22px; height: 22px; font-size: 13px; }
-  .audio-widget .vol-slider { width: 50px; }
+  /* ── Audio widget: icon-only + hide btn ─────────────────── */
+  .audio-widget { bottom: 6px; right: 50px; padding: 4px 8px; gap: 5px; font-size: 10px; }
+  .audio-widget button  { width: 22px; height: 22px; font-size: 12px; }
+  .audio-widget .vol-slider { width: 44px; }
+  .audio-widget span:first-child { display: none; } /* hide 🎵 label */
 
-  /* ── Splash — scale down for landscape phones ────────────── */
-  #splash-deco   { font-size: 36px; }
-  #splash-title  { font-size: clamp(28px, 8vw, 48px); }
-  #splash-sub    { font-size: 12px; }
-  #splash-inner  { gap: 10px; padding: 16px; }
-  #btnStart,
-  #btnContinue   { padding: 10px 32px; font-size: 13px; }
+  /* ── Bottom drawer: full height on mobile ────────────────── */
+  #bottom-drawer { max-height: 100vh !important; }
+
+  /* ── Request panel cards: smaller ───────────────────────── */
+  /* (overrides injected by requestPanel.js via JS at runtime) */
+
+  /* ── Splash ──────────────────────────────────────────────── */
+  #splash-deco  { font-size: 34px; }
+  #splash-title { font-size: clamp(24px, 7vw, 44px); }
+  #splash-sub   { font-size: 11px; }
+  #splash-inner { gap: 8px; padding: 14px; }
+  #btnStart, #btnContinue { padding: 9px 28px; font-size: 12px; }
+
+  /* ── Left sidebar: slightly narrower ────────────────────── */
+  /* (sidebar uses its own injected styles — override width here) */
+  #left-sidebar { width: 200px !important; }
+  #left-sidebar.sb-collapsed { width: 42px !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════
-   TOUCH — remove hover-only effects that feel broken on touch
+   TOUCH — remove hover-only effects that feel broken on touch,
+   enlarge tap targets
 ══════════════════════════════════════════════════════════════ */
 @media (hover: none) and (pointer: coarse) {
-  /* Suppress ::before tooltip labels on true touch devices */
-  .fab-item:hover::before,
-  .fab-item:hover::after { display: none !important; }
-
-  /* Larger tap targets for speed buttons */
-  .speed-btn { padding: 6px 10px; min-width: 34px; }
-
-  /* Slightly bigger close buttons in panels */
-  .sp-close,
-  .edm-close { width: 32px; height: 32px; font-size: 15px; }
-
-  /* Canvas — prevent default touch scroll/zoom handled by input.js */
+  .fab-item:hover::before, .fab-item:hover::after { display: none !important; }
+  .speed-btn     { padding: 5px 9px; min-width: 32px; }
+  .sp-close, .edm-close { width: 32px; height: 32px; font-size: 15px; }
   canvas { touch-action: none; }
+
+  /* req-card smaller on touch */
+  .req-card { width: 180px !important; padding: 5px 7px 6px !important; }
+  .req-card-title { font-size: 12px !important; }
+  .req-card-body  { font-size: 13px !important; margin-bottom: 4px !important; }
+  .req-btn        { font-size: 11px !important; padding: 3px 3px !important; }
+  .req-btn small  { font-size: 10px !important; }
 }

@@ -215,11 +215,15 @@ export function toggleDashboard() { _toggleSidebar(); }
 /* ── Internal ─────────────────────────────────────────────── */
 function _toggleSidebar() {
   _sidebarOpen = !_sidebarOpen;
-  var sb  = document.getElementById('left-sidebar');
-  var btn = document.getElementById('sb-toggle-btn');
+  var sb    = document.getElementById('left-sidebar');
+  var btn   = document.getElementById('sb-toggle-btn');
+  var bBtn  = document.getElementById('sb-bottom-btn');
+  var arrow = document.getElementById('sb-bottom-arrow');
   if (!sb) return;
   sb.classList.toggle('sb-collapsed', !_sidebarOpen);
-  if (btn) btn.textContent = _sidebarOpen ? '‹' : '›';
+  if (btn)   btn.textContent   = _sidebarOpen ? '‹' : '›';
+  if (arrow) arrow.textContent = _sidebarOpen ? 'v' : '^';
+  if (bBtn)  bBtn.title        = _sidebarOpen ? 'Itago ang Dashboard' : 'Ipakita ang Dashboard';
 }
 
 function _toggleSection(key) {
@@ -330,6 +334,11 @@ function _buildDOM() {
   sb.innerHTML =
     /* Toggle button — sits on top-right edge of the panel */
     '<button id="sb-toggle-btn" onclick="window._sbToggleSidebar()" title="Itago/Ipakita">‹</button>' +
+
+    /* Bottom show/hide tab — always visible, anchored to bottom of sidebar */
+    '<button id="sb-bottom-btn" onclick="window._sbToggleSidebar()" title="Ipakita/Itago ang Dashboard">' +
+      '<span id="sb-bottom-arrow">^</span>' +
+    '</button>' +
 
     /* Icon strip — visible only when sidebar is collapsed */
     '<div id="sb-strip" class="sb-strip"></div>' +
@@ -450,6 +459,34 @@ function _injectStyles() {
   line-height: 1;
 }
 #sb-toggle-btn:hover { color: #f5c842; background: #1a0f06; }
+
+/* Bottom show/hide tab — always visible, sticks to bottom of sidebar */
+#sb-bottom-btn {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  background: rgba(10,6,2,0.97);
+  border: none;
+  border-top: 1px solid #2a1808;
+  border-radius: 0 0 8px 0;
+  color: #8a6030;
+  font-size: 11px;
+  font-family: monospace;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  transition: color .15s, background .15s;
+  flex-shrink: 0;
+  width: 100%;
+  letter-spacing: .1em;
+}
+#sb-bottom-btn:hover { color: #f5c842; background: #1a0f06; }
+/* Push sb-content up to leave room for the bottom btn */
+#sb-content { padding-bottom: 22px; }
 
 /* Icon strip (collapsed) */
 .sb-strip {
@@ -623,6 +660,26 @@ function _injectStyles() {
   white-space: nowrap;
   z-index: 50;
   text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+
+/* ── Mobile landscape sidebar compacting ─────────────────── */
+@media (max-height: 480px) and (orientation: landscape) {
+  #left-sidebar {
+    width: 200px !important;
+    max-height: calc(100vh - 36px);
+    bottom: 8px;
+  }
+  #left-sidebar.sb-collapsed { width: 40px !important; }
+  .sb-section-head  { padding: 4px 8px 4px; }
+  .sb-body          { padding: 2px 6px 5px; }
+  .sb-row           { margin-bottom: 2px; }
+  .sb-lbl           { font-size: 10px; width: 72px; }
+  .sb-val           { font-size: 10px; min-width: 42px; }
+  .sb-activity      { font-size: 9px; }
+  #sb-bottom-btn    { height: 18px; font-size: 10px; }
+  #sb-content       { padding-bottom: 18px; }
+  .sb-strip-item    { font-size: 13px; }
+  .sb-strip-item span { font-size: 8px; }
 }
   `;
   document.head.appendChild(s);

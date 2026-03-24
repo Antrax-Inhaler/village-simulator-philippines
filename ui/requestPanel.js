@@ -196,6 +196,21 @@ function _injectStyles() {
     '.req-ignore{ border-color:#aa4444; background:#1a0808; }',
     '.req-ignore:hover{ background:#2a1010; }',
 
+    /* Mobile landscape — tighter cards */
+    '@media (max-height:480px) and (orientation:landscape){',
+    '  #req-strip{ bottom:4px; gap:5px; }',
+    '  .req-card{ width:160px; padding:5px 7px 6px; }',
+    '  .req-card-title{ font-size:11px; }',
+    '  .req-card-body{ font-size:12px; margin-bottom:3px; }',
+    '  .req-btn{ font-size:10px; padding:3px 2px; }',
+    '  .req-btn small{ font-size:9px; }',
+    '}',
+    /* Touch devices — already smaller via style.css coarse pointer rule,
+       but ensure the strip doesn't block canvas tap targets */
+    '@media (hover:none) and (pointer:coarse){',
+    '  #req-strip{ max-width:96vw; }',
+    '}',
+
   ].join('\n');
   document.head.appendChild(s);
 }
