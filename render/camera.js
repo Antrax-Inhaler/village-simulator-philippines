@@ -41,28 +41,28 @@
 import { clamp, lerp } from '../utils/perspective.js';
 
 /* ── Constants ────────────────────────────────────────────── */
-var _BASE_VW  = 1280;  /* reference desktop width used to calibrate MIN_ZOOM  */
-var _BASE_VH  = 720;   /* reference desktop height                             */
-var MIN_ZOOM  = 2.4;   /* recalculated by initCamera() — do not mutate directly */
+/* Fixed logical world size — entities are always placed in this
+   coordinate space regardless of the actual device screen size.
+   The camera zooms/pans to map this world onto whatever viewport
+   the player has, so nothing ever compresses on mobile. */
+export var WORLD_W = 1280;
+export var WORLD_H = 720;
+
+var MIN_ZOOM  = 1.0;   /* recalculated by initCamera() — do not mutate directly */
 var MAX_ZOOM  = 4.0;
 
-/* ── Compute a responsive MIN_ZOOM so small screens show the
-      same world area as a 1280×720 desktop at 2.4×.
-   Formula: keep (VW / zoom) constant, i.e. zoom = VW / (BASE_VW / BASE_ZOOM).
-   We take the minimum of the width-based and height-based values so the
-   entire desktop viewport fits regardless of aspect ratio, then clamp to
-   [1.0, 2.4] so we never zoom out further than the desktop baseline and
-   never push mobile past the desktop value. ──────────────────────────────── */
+/* ── Compute MIN_ZOOM so the entire fixed world fits on screen.
+   We need: viewport_size / zoom >= world_size
+   i.e.     zoom >= viewport_size / world_size
+   Take the LARGER of the two axes so the whole world is always
+   visible, then clamp to [0.5, 2.4] as a reasonable range. ── */
 function _calcMinZoom(vw, vh) {
-  var BASE_ZOOM   = 2.4;
-  var worldW      = _BASE_VW / BASE_ZOOM;   /* world units visible on desktop */
-  var worldH      = _BASE_VH / BASE_ZOOM;
-  var zoomForW    = vw / worldW;
-  var zoomForH    = vh / worldH;
-  /* Use whichever axis is more constrained (smaller zoom needed) */
-  var responsive  = Math.min(zoomForW, zoomForH);
-  /* Never exceed the desktop baseline; never go below 1.0 */
-  return Math.min(BASE_ZOOM, Math.max(1.0, responsive));
+  var zoomForW = vw / WORLD_W;
+  var zoomForH = vh / WORLD_H;
+  /* Use the axis that needs MORE zoom to cover the world */
+  var responsive = Math.max(zoomForW, zoomForH);
+  /* Clamp: never below 0.5 (too far out), never above 2.4 (desktop baseline) */
+  return Math.min(2.4, Math.max(0.5, responsive));
 }
 
 /* ── Camera state (exported by reference) ─────────────────── */
@@ -97,42 +97,46 @@ export function initCamera(vw, vh) {
 
 /* ── Centred reset (no lerp — used on first frame + resize) ── */
 export function camRecentre() {
-  cam.x    = cam.tx    = _VW / 2;
-  /* Start slightly above centre so buildings aren't crowded at bottom */
-  cam.y    = cam.ty    = _VH * 0.42;
+  cam.x    = cam.tx    = WORLD_W / 2;
+  /* Start slightly above world centre so buildings aren't crowded at bottom */
+  cam.y    = cam.ty    = WORLD_H * 0.42;
   cam.zoom = cam.tzoom = MIN_ZOOM;
 }
 
 /* ── Clamp helpers ────────────────────────────────────────── */
 /*
-   World size == _VW × _VH (canvas units).
-   The visible half-extent at a given zoom = canvas_size / (2 * zoom).
+   World size == WORLD_W × WORLD_H (fixed logical units).
+   The visible half-extent in world units at a given zoom = viewport_size / (2 * zoom).
    Camera centre must stay inside [half_extent … world_size - half_extent]
    so the viewport never shows empty space outside the world.
    Guard: if the viewport is wider than the world (zoom < 1), just centre.
 */
-function _halfExtent(size, zoom) {
-  return size / (2 * zoom);
+function _halfExtent(viewportSize, zoom) {
+  return viewportSize / (2 * zoom);
 }
-function _clampAxis(val, size, zoom) {
-  var he = _halfExtent(size, zoom);
-  return (2 * he >= size) ? size / 2 : clamp(val, he, size - he);
+function _clampAxis(val, worldSize, viewportSize, zoom) {
+  var he = _halfExtent(viewportSize, zoom);
+  /* If the visible area is larger than the world, centre it */
+  return (2 * he >= worldSize) ? worldSize / 2 : clamp(val, he, worldSize - he);
 }
 
 function _clampTarget() {
   cam.tzoom = clamp(cam.tzoom, MIN_ZOOM, MAX_ZOOM);
-  cam.tx = _clampAxis(cam.tx, _VW, cam.tzoom);
-  cam.ty = _clampAxis(cam.ty, _VH, cam.tzoom);
+  cam.tx = _clampAxis(cam.tx, WORLD_W, _VW, cam.tzoom);
+  cam.ty = _clampAxis(cam.ty, WORLD_H, _VH, cam.tzoom);
 }
 
 export function clampCurrent() {
-  cam.x = _clampAxis(cam.x, _VW, cam.zoom);
-  cam.y = _clampAxis(cam.y, _VH, cam.zoom);
+  cam.x = _clampAxis(cam.x, WORLD_W, _VW, cam.zoom);
+  cam.y = _clampAxis(cam.y, WORLD_H, _VH, cam.zoom);
 }
 
 /* ══════════════════════════════════════════════════════════════
    camApply / camReset
    Wrap world-space draw calls.
+   Transform: translate viewport centre → scale by zoom → translate by -cam position.
+   Entity positions in world space (0..WORLD_W, 0..WORLD_H) are mapped
+   to screen pixels independently of the physical viewport size.
 ══════════════════════════════════════════════════════════════ */
 export function camApply(ctx) {
   ctx.save();
@@ -213,8 +217,8 @@ export function softPan(wx, wy, duration) {
     cam._softPanTimeout = setTimeout(function() {
       /* Only release if player hasn't manually panned or zoomed */
       if (!cam.focused) {
-        cam.tx = _VW / 2;
-        cam.ty = _VH / 2;
+        cam.tx = WORLD_W / 2;
+        cam.ty = WORLD_H * 0.42;
         _clampTarget();
       }
     }, duration * 1000);
@@ -244,3 +248,12 @@ export function updateCamera(dt) {
 export function getMinZoom() { return MIN_ZOOM; }
 export var CAMERA_MIN_ZOOM = MIN_ZOOM;
 export var CAMERA_MAX_ZOOM = MAX_ZOOM;
+
+/* ── expandWorld — called by expansionPanel when zones unlock ─
+   Grows the logical world coordinate space. Camera clamps and
+   MIN_ZOOM are recalculated on the next initCamera call.
+─────────────────────────────────────────────────────────────── */
+export function expandWorld(dw, dh) {
+  if (dw) WORLD_W += dw;
+  if (dh) WORLD_H += dh;
+}

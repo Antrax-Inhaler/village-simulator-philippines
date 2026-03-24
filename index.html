@@ -94,6 +94,42 @@
       .audio-widget button { width: 24px; height: 24px; font-size: 14px; }
       .audio-widget .vol-slider { width: 55px; }
     }
+
+    /* ── Centered Time/Day Display (no background) ── */
+    #center-time {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 26;
+      text-align: center;
+      pointer-events: none;
+      font-family: var(--font-display);
+    }
+    #center-time .time-main {
+      font-size: 24px;
+      color: #f5c842;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      letter-spacing: 0.08em;
+      font-weight: bold;
+      line-height: 1.2;
+    }
+    #center-time .day-sub {
+      font-size: 12px;
+      color: #c49a4e;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      letter-spacing: 0.05em;
+      font-family: var(--font-mono);
+    }
+    @media (min-width: 1024px) {
+      #center-time .time-main { font-size: 32px; }
+      #center-time .day-sub { font-size: 14px; }
+    }
+    @media (max-height: 480px) and (orientation: landscape) {
+      #center-time .time-main { font-size: 18px; }
+      #center-time .day-sub { font-size: 10px; }
+      #center-time { top: 6px; }
+    }
   </style>
 </head>
 <body>
@@ -136,29 +172,14 @@
     <div id="canvas-container">
       <canvas id="gameCanvas"></canvas>
 
-      <!-- ── Top HUD bar — time + election + speed only ── -->
-      <div id="top-hud">
-        <div id="hud-time">
-          <span id="barTimeStr">12:00 PM</span>
-          <span id="barTOD" class="hud-sub">Tanghali</span>
-          <span id="barDayStr" class="hud-sub">Araw 1</span>
-        </div>
-
-        <div id="hud-election">
-          <span class="hud-lbl">Eleksyon:</span>
-          <span id="barElectionTimer" class="bar-election-timer">—</span>
-          <span id="barElectionApproval" class="bar-election-approval">—</span>
-        </div>
-
-        <div id="hud-speed">
-          <button class="speed-btn active" id="spd1" onclick="setSpeed(1)">1×</button>
-          <button class="speed-btn"        id="spd2" onclick="setSpeed(2)">2×</button>
-          <button class="speed-btn"        id="spd4" onclick="setSpeed(4)">4×</button>
-        </div>
+      <!-- ── Centered Time/Day Display (no background) ── -->
+      <div id="center-time">
+        <div class="time-main" id="centerTimeStr">12:00 PM</div>
+        <div class="day-sub" id="centerDayStr">Araw 1</div>
       </div>
 
       <!-- waste display now inside #left-sidebar (dashboard.js) -->
-  </div>
+    </div>
 
       <!-- ── FAB: Government / Trade actions ── -->
       <div id="fab-gov" class="fab-toolbar">
@@ -857,6 +878,14 @@ setInterval(function() {
       window.addEventListener('resize',           check);
       window.addEventListener('orientationchange', check);
     })();
+
+    /* ── Update centered time display from main.js ── */
+    window.updateCenterTime = function(timeStr, dayStr) {
+      var timeEl = document.getElementById('centerTimeStr');
+      var dayEl = document.getElementById('centerDayStr');
+      if (timeEl) timeEl.textContent = timeStr;
+      if (dayEl) dayEl.textContent = dayStr;
+    };
   </script>
 
   <!-- ══════════════════════════════════════════

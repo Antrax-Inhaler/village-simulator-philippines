@@ -19,7 +19,7 @@ import { getTimeStr, getTimeOfDay, getOverlayColor, getSunMoonState } from '../u
 import { drawGroundSprite }         from '../utils/sprites.js';
 import { getMainHallLevel, getMainHallRules } from '../buildings/building.js';
 import { drawVillager }             from '../villagers/villager.js';
-import { cam, camApply, camReset, w2s } from './camera.js';
+import { cam, camApply, camReset, w2s, WORLD_W, WORLD_H } from './camera.js';
 import { getActiveCalamity } from '../government/events.js';
 import { getWasteStats }     from '../resources/economy.js';
 
@@ -99,48 +99,51 @@ export function updateWasteDisplay(VS) {
    drawGround
 ══════════════════════════════════════════════════════════════ */
 export function drawGround(ctx, VW, VH) {
-  var g = ctx.createLinearGradient(0, 0, 0, VH);
+  /* Always draw ground to cover the full fixed world space */
+  var WW = WORLD_W, WH = WORLD_H;
+  var g = ctx.createLinearGradient(0, 0, 0, WH);
   g.addColorStop(0,    '#4a7c5a');
   g.addColorStop(0.35, '#5d8c6b');
   g.addColorStop(0.7,  '#507860');
   g.addColorStop(1,    '#3d5e46');
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, VW, VH);
+  ctx.fillRect(0, 0, WW, WH);
 
   ctx.fillStyle = 'rgba(150,110,55,0.22)';
   ctx.beginPath();
-  ctx.moveTo(VW*0.46, 0);
-  ctx.bezierCurveTo(VW*0.49, VH*0.3,  VW*0.45, VH*0.5,  VW*0.5,  VH*0.43);
-  ctx.bezierCurveTo(VW*0.55, VH*0.36, VW*0.53, VH*0.65, VW*0.54, VH);
-  ctx.lineTo(VW*0.61, VH);
-  ctx.bezierCurveTo(VW*0.60, VH*0.65, VW*0.62, VH*0.36, VW*0.57, VH*0.43);
-  ctx.bezierCurveTo(VW*0.52, VH*0.5,  VW*0.56, VH*0.3,  VW*0.53, 0);
+  ctx.moveTo(WW*0.46, 0);
+  ctx.bezierCurveTo(WW*0.49, WH*0.3,  WW*0.45, WH*0.5,  WW*0.5,  WH*0.43);
+  ctx.bezierCurveTo(WW*0.55, WH*0.36, WW*0.53, WH*0.65, WW*0.54, WH);
+  ctx.lineTo(WW*0.61, WH);
+  ctx.bezierCurveTo(WW*0.60, WH*0.65, WW*0.62, WH*0.36, WW*0.57, WH*0.43);
+  ctx.bezierCurveTo(WW*0.52, WH*0.5,  WW*0.56, WH*0.3,  WW*0.53, 0);
   ctx.closePath();
   ctx.fill();
 
   ctx.fillStyle = 'rgba(150,110,55,0.16)';
   ctx.beginPath();
-  ctx.moveTo(0, VH*0.40);
-  ctx.bezierCurveTo(VW*0.25, VH*0.43, VW*0.45, VH*0.40, VW*0.5, VH*0.43);
-  ctx.bezierCurveTo(VW*0.55, VH*0.46, VW*0.75, VH*0.42, VW,     VH*0.44);
-  ctx.lineTo(VW, VH*0.50);
-  ctx.bezierCurveTo(VW*0.75, VH*0.48, VW*0.55, VH*0.52, VW*0.5, VH*0.49);
-  ctx.bezierCurveTo(VW*0.45, VH*0.46, VW*0.25, VH*0.49, 0,      VH*0.47);
+  ctx.moveTo(0, WH*0.40);
+  ctx.bezierCurveTo(WW*0.25, WH*0.43, WW*0.45, WH*0.40, WW*0.5, WH*0.43);
+  ctx.bezierCurveTo(WW*0.55, WH*0.46, WW*0.75, WH*0.42, WW,     WH*0.44);
+  ctx.lineTo(WW, WH*0.50);
+  ctx.bezierCurveTo(WW*0.75, WH*0.48, WW*0.55, WH*0.52, WW*0.5, WH*0.49);
+  ctx.bezierCurveTo(WW*0.45, WH*0.46, WW*0.25, WH*0.49, 0,      WH*0.47);
   ctx.closePath();
   ctx.fill();
 
+  /* Decorative dots — expressed as fractions of world size */
   ctx.fillStyle = 'rgba(38,90,38,0.28)';
   var dots = [
-    [80,95],[200,175],[420,60],[700,85],[950,195],[1100,135],
-    [280,510],[620,475],[880,520],[1050,555],[150,630],[800,618],
+    [0.063,0.132],[0.156,0.243],[0.328,0.083],[0.547,0.118],[0.742,0.271],[0.859,0.188],
+    [0.219,0.708],[0.484,0.660],[0.688,0.722],[0.820,0.771],[0.117,0.875],[0.625,0.858],
   ];
   dots.forEach(function(t) {
     ctx.beginPath();
-    ctx.ellipse(t[0], t[1], 7, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(t[0]*WW, t[1]*WH, 7, 3, 0, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  drawGroundSprite(ctx, 'grass', 0, 0, VW, VH);
+  drawGroundSprite(ctx, 'grass', 0, 0, WW, WH);
 }
 
 /* ══════════════════════════════════════════════════════════════

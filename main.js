@@ -42,7 +42,7 @@ import { tickNeeds, clearResolvedRequests, checkAndEmit }   from './villagers/ci
 import { tickPolitics, updateLeaders }                       from './villagers/politics.js';
 
 /* ── Render ───────────────────────────────────────────────── */
-import { cam, initCamera, camRecentre, updateCamera, zoomTo, zoomOut, softPan } from './render/camera.js';
+import { cam, initCamera, camRecentre, updateCamera, zoomTo, zoomOut, softPan, WORLD_W, WORLD_H } from './render/camera.js';
 import { renderFrame } from './render/renderer.js';
 
 /* ── Input ────────────────────────────────────────────────── */
@@ -75,7 +75,10 @@ import {
    CANVAS + DIMENSIONS
 ══════════════════════════════════════════════════════════════ */
 var canvas, ctx;
-var VW = 0, VH = 0;
+var VW = 0, VH = 0;   /* screen / canvas pixel size — changes on resize */
+/* WORLD_W / WORLD_H are imported from camera.js — always 1280×720.
+   All entity positions are in this fixed world space regardless of
+   what screen the player is on. The camera zoom maps world → screen. */
 var BAR_H = 0;   /* no bottom bar — canvas fills full viewport */
 
 /* ══════════════════════════════════════════════════════════════
@@ -160,8 +163,8 @@ function gameLoop(ts) {
     dayCount:         dayCount,
     shakeX:           _shakeX,
     shakeY:           _shakeY,
-    drawZoneGrid:     function(ctx, vw, vh, vs) { drawZoneGrid(ctx, vw, vh, vs); },
-    canBuildInZone:   function(bldType, wx, wy) { return canBuildInZone(bldType, wx, wy, VW, VH, VS); },
+    drawZoneGrid:     function(ctx, vw, vh, vs) { drawZoneGrid(ctx, WORLD_W, WORLD_H, vs); },
+    canBuildInZone:   function(bldType, wx, wy) { return canBuildInZone(bldType, wx, wy, WORLD_W, WORLD_H, VS); },
     gameMode:         gameMode,
     pendingBuildType: _pendingBuildType,
     activeBubbles:    activeBubbles,
@@ -361,9 +364,10 @@ export function initWaypoints() {
   VS.waypoints.all       = [];
   VS.waypoints.mines     = [];
   VS.waypoints.buildings = [];
+  /* Use fixed world dimensions so waypoints are consistent across screen sizes */
   for (var gy = 0.12; gy <= 0.88; gy += 0.13) {
     for (var gx = 0.08; gx <= 0.92; gx += 0.10) {
-      VS.waypoints.all.push({ wx: VW * gx, wy: VH * gy });
+      VS.waypoints.all.push({ wx: WORLD_W * gx, wy: WORLD_H * gy });
     }
   }
   VS.resourceNodes.forEach(function(n) {
@@ -437,7 +441,7 @@ window.softPan     = function(wx, wy, dur) { softPan(wx, wy, dur); };
 window.triggerProtest = function() { triggerProtestGathering(VS, activeBubbles); };
 window.openExpand = openExpansionPanel;
 window.purchaseZone = function(key) {
-  var r = purchaseZone(key, VS, showMsg, VW, VH);
+  var r = purchaseZone(key, VS, showMsg, WORLD_W, WORLD_H);
   if (!r.ok) showMsg(r.msg);
 };
 window._getRepairCost = getRepairCost;
@@ -525,10 +529,12 @@ function init() {
   initCamera(VW, VH);
   camRecentre();
 
-  VS.resourceNodes = createDefaultResourceNodes(VW, VH);
-  VS.buildings     = createDefaultBuildings(VW, VH);
-  /* Zone production bonus hook */
-  VS.getZoneMult = function(res, wx, wy) { return getZoneProductionMult(res, wx, wy, VW, VH, VS); };
+  /* Always create entities in fixed WORLD_W × WORLD_H space so the
+     layout is identical regardless of what screen size launched the game */
+  VS.resourceNodes = createDefaultResourceNodes(WORLD_W, WORLD_H);
+  VS.buildings     = createDefaultBuildings(WORLD_W, WORLD_H);
+  /* Zone production bonus hook — zones also use world dimensions */
+  VS.getZoneMult = function(res, wx, wy) { return getZoneProductionMult(res, wx, wy, WORLD_W, WORLD_H, VS); };
   initWaypoints();
   _recalcCaps();
   preloadSprites();
@@ -563,7 +569,7 @@ function init() {
       var r = canPlaceBuilding(k, blds, VS.unlockedZones);
       if (!r.ok) return r;
       if (wx !== undefined && wy !== undefined) {
-        var zr = canBuildInZone(k, wx, wy, VW, VH, VS);
+        var zr = canBuildInZone(k, wx, wy, WORLD_W, WORLD_H, VS);
         if (!zr.ok) return zr;
       }
       return r;
@@ -619,7 +625,7 @@ function init() {
       var r = canPlaceBuilding(k, blds, VS.unlockedZones);
       if (!r.ok) return r;
       if (wx !== undefined && wy !== undefined) {
-        var zr = canBuildInZone(k, wx, wy, VW, VH, VS);
+        var zr = canBuildInZone(k, wx, wy, WORLD_W, WORLD_H, VS);
         if (!zr.ok) return zr;
       }
       return r;
@@ -634,8 +640,8 @@ function init() {
     gameMode: gameMode, pendingBuildType: _pendingBuildType,
     activeBubbles: activeBubbles, drag: getDragState(),
     drawer: _drawer, BUILDING_DEFS: BUILDING_DEFS,
-    drawZoneGrid: function(ctx, vw, vh, vs) { drawZoneGrid(ctx, vw, vh, vs); },
-    canBuildInZone: function(bldType, wx, wy) { return canBuildInZone(bldType, wx, wy, VW, VH, VS); },
+    drawZoneGrid: function(ctx, vw, vh, vs) { drawZoneGrid(ctx, WORLD_W, WORLD_H, vs); },
+    canBuildInZone: function(bldType, wx, wy) { return canBuildInZone(bldType, wx, wy, WORLD_W, WORLD_H, VS); },
     s2w: function(sx, sy) {
       return { x: (sx - VW / 2) / cam.zoom + cam.x, y: (sy - VH / 2) / cam.zoom + cam.y };
     },
@@ -658,24 +664,18 @@ function _resize() {
   window._VW    = VW;
   window._VH    = VH;
 
-  /* NOTE: Entity positions are NOT rescaled here.
-     Buildings, villagers, and resource nodes live in a fixed
-     world-space coordinate system whose size matches the initial
-     VW × VH at game start. The camera's responsive MIN_ZOOM
-     (recalculated by initCamera below) zooms out enough on
-     small screens so the entire world fits — no position
-     squishing needed. Rescaling positions caused everything to
-     compress toward the centre on narrow viewports. */
+  /* Entity positions live in fixed WORLD_W × WORLD_H space — do NOT rescale.
+     The camera's responsive MIN_ZOOM (recalculated by initCamera) handles
+     showing the correct view on any screen size without squishing positions. */
 
-  /* Update getZoneMult with new dimensions */
-  VS.getZoneMult = function(res, wx, wy) { return getZoneProductionMult(res, wx, wy, VW, VH, VS); };
+  VS.getZoneMult = function(res, wx, wy) { return getZoneProductionMult(res, wx, wy, WORLD_W, WORLD_H, VS); };
 
   initCamera(VW, VH);
   if (!cam.focused) camRecentre();
   else {
     var hw = VW / (2 * cam.tzoom), hh = VH / (2 * cam.tzoom);
-    cam.tx = clamp(cam.tx, hw, VW - hw);
-    cam.ty = clamp(cam.ty, hh, VH - hh);
+    cam.tx = clamp(cam.tx, hw, WORLD_W - hw);
+    cam.ty = clamp(cam.ty, hh, WORLD_H - hh);
   }
   initWaypoints();
 }
