@@ -579,7 +579,7 @@ function _injectStyles() {
   var s = document.createElement('style');
   s.id  = 'bd-styles';
   s.textContent = [
-    '#bottom-drawer{position:absolute;left:0;right:0;bottom:0;height:180px;',
+    '#bottom-drawer{position:absolute;left:0;right:0;bottom:0;height:200px;',
     'background:#0e0905ee;border-top:2px solid #8a6030;display:none;flex-direction:column;',
     'z-index:30;pointer-events:all;transform:translateY(100%);',
     'transition:transform 0.28s cubic-bezier(.4,0,.2,1);}',
