@@ -59,12 +59,13 @@ import { drawSprite as drawFarmSprite }       from './sprites/farm.js';
 import { drawSprite as drawCuartelSprite }    from './sprites/cuartel.js';
 import { drawSprite as drawPaaralanSprite }  from './sprites/paaralan.js';
 import { drawSprite as drawTemploSprite }     from './sprites/templo.js';
+   import { drawSprite as drawPaaralanSprite }  from './sprites/paaralan.js';
+
 /*
    Future imports — uncomment as sprite files are created:
 
    
    
-   import { drawSprite as drawPaaralan Sprite }  from './sprites/paaralan.js';
    
    
    import { drawSprite as drawMoogSprite }       from './sprites/moog.js';
