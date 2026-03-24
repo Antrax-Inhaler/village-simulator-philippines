@@ -57,6 +57,8 @@ import { drawSprite as drawFarmSprite }       from './sprites/farm.js';
    import { drawSprite as drawMineSprite }       from './sprites/mine.js';
    import { drawSprite as drawMinalangisSprite } from './sprites/minalangis.js';
 import { drawSprite as drawCuartelSprite }    from './sprites/cuartel.js';
+import { drawSprite as drawPaaralanSprite }  from './sprites/paaralan.js';
+import { drawSprite as drawTemploSprite }     from './sprites/templo.js';
 /*
    Future imports — uncomment as sprite files are created:
 
@@ -64,7 +66,7 @@ import { drawSprite as drawCuartelSprite }    from './sprites/cuartel.js';
    
    import { drawSprite as drawPaaralan Sprite }  from './sprites/paaralan.js';
    
-   import { drawSprite as drawTemploSprite }     from './sprites/templo.js';
+   
    import { drawSprite as drawMoogSprite }       from './sprites/moog.js';
    import { drawSprite as drawKutaSprite }       from './sprites/kuta.js';
    import { drawSprite as drawBantayanSprite }   from './sprites/bantayan.js';
@@ -85,15 +87,17 @@ pulisya:    drawPulisyaSprite,
 farm:       drawFarmSprite,
  mine:       drawMineSprite,
  minalangis: drawMinalangisSprite,
+ paaralan:   drawPaaralanSprite,
  cuartel:    drawCuartelSprite,
+ templo:     drawTemploSprite,
   /*
   
   
  
   
-  paaralan:   drawPaaralan Sprite,
   
-  templo:     drawTemploSprite,
+  
+  
   moog:       drawMoogSprite,
   kuta:       drawKutaSprite,
   bantayan:   drawBantayanSprite,
