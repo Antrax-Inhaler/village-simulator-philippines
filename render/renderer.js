@@ -73,7 +73,7 @@ export function renderFrame(canvas, ctx, state) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawTimeOverlay(ctx, VW, VH, state.VS.time);
   drawHUD(ctx, state.VS, VW);
-  drawZoomBadge(ctx, VW);
+  drawZoomBadge(ctx, VW, VH);
   updateBarUI(state.VS, state.dayCount);
   updateBubblePositions(canvas, state.activeBubbles, state.VW, state.VH);
 
@@ -336,24 +336,38 @@ export function drawHUD(ctx, VS, VW) {
 
 /* ══════════════════════════════════════════════════════════════
    drawZoomBadge
+   Fixed positioning to avoid overlapping with UI elements.
+   Now positioned at bottom-left corner with proper spacing.
 ══════════════════════════════════════════════════════════════ */
-export function drawZoomBadge(ctx, VW) {
+export function drawZoomBadge(ctx, VW, VH) {
   if (cam.zoom < 1.15) return;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.shadowBlur = 0;
+  
+  // Position at bottom-left corner with safe margin
+  // Check if on mobile (narrow screen) to adjust position
+  var isMobile = VW < 768;
+  var bottomMargin = isMobile ? 70 : 80;  // Higher on mobile to avoid FAB buttons
+  var leftMargin = 12;
+  
+  var badgeWidth = 110;
+  var badgeHeight = 28;
+  var x = leftMargin;
+  var y = VH - bottomMargin;
+  
   ctx.fillStyle = 'rgba(13,8,4,0.82)';
-  rrect(ctx, 10, 10, 168, 28, 5);
+  rrect(ctx, x, y, badgeWidth, badgeHeight, 5);
   ctx.fill();
   ctx.strokeStyle = '#8a6030';
   ctx.lineWidth   = 1;
-  rrect(ctx, 10, 10, 168, 28, 5);
+  rrect(ctx, x, y, badgeWidth, badgeHeight, 5);
   ctx.stroke();
   ctx.fillStyle    = '#f5c842';
   ctx.font         = 'bold 14px "Oldenburg",serif';
   ctx.textAlign    = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('🔍 ' + cam.zoom.toFixed(1) + 'x  —  Esc para lumabas', 56, 24);
+  ctx.fillText('🔍 ' + cam.zoom.toFixed(1) + 'x', x + 10, y + badgeHeight/2);
   ctx.restore();
 }
 

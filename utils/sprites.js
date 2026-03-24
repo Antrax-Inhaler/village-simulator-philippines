@@ -38,6 +38,10 @@
      Resources:  x = -w/2 .. w/2,  y = -h*0.9 .. h*0.3
 ═══════════════════════════════════════════════════════════════ */
 
+/* ── SPRITE TOGGLE ───────────────────────────────────────────── */
+// SET THIS TO true TO ENABLE SPRITE IMAGES, false TO DISABLE
+var ENABLE_SPRITES = false;  // ← CHANGE THIS TO true TO TURN ON SPRITES
+
 /* ── Image cache  { path → HTMLImageElement | 'loading' | 'missing' } ── */
 var _cache = {};
 
@@ -48,6 +52,9 @@ var _cache = {};
  * Starts loading on first call.
  */
 function _load(path) {
+  // If sprites are disabled, immediately return null
+  if (!ENABLE_SPRITES) return null;
+  
   var entry = _cache[path];
 
   if (entry === 'missing')  return null;
@@ -212,6 +219,9 @@ function _resourceFrame(ratio) {
  * @param {number}  h      – scaled height (def.h * perspScale)
  */
 export function drawBuildingSprite(ctx, type, level, w, h) {
+  // If sprites are disabled, immediately return false
+  if (!ENABLE_SPRITES) return false;
+  
   var frames = BUILDING_SPRITES[type];
   if (!frames) return false;
 
@@ -246,6 +256,9 @@ export function drawBuildingSprite(ctx, type, level, w, h) {
  * @param {number}  h      – scaled height
  */
 export function drawResourceSprite(ctx, type, ratio, w, h) {
+  // If sprites are disabled, immediately return false
+  if (!ENABLE_SPRITES) return false;
+  
   var frames = RESOURCE_SPRITES[type];
   if (!frames) return false;
 
@@ -292,6 +305,9 @@ export var GROUND_SPRITES = {
  * @param {number} w, h  — width and height to fill
  */
 export function drawGroundSprite(ctx, key, x, y, w, h) {
+  // If sprites are disabled, immediately return false
+  if (!ENABLE_SPRITES) return false;
+  
   var path = GROUND_SPRITES[key];
   if (!path) return false;
   var img = _load(path);
@@ -304,6 +320,9 @@ export function drawGroundSprite(ctx, key, x, y, w, h) {
 }
 
 export function preloadAll() {
+  // Only preload if sprites are enabled
+  if (!ENABLE_SPRITES) return;
+  
   // Buildings
   Object.keys(BUILDING_SPRITES).forEach(function(type) {
     var frames = BUILDING_SPRITES[type];

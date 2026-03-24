@@ -27,7 +27,7 @@
    @param now      performance.now() timestamp for animations
 ──────────────────────────────────────────────────────────────── */
 export function drawSprite(ctx, sc, w, h, def, level, now) {
-  const t = now * 0.001;
+  const t = now ? now * 0.001 : 0;
 
   // Helper: draw shadow ellipse at ground level
   const drawShadow = (radiusX, radiusY) => {
@@ -56,7 +56,7 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
 
   // Helper: rose window (stained glass)
   const roseWindow = (cx, cy, r, animTime) => {
-    const tAnim = animTime * 0.001;
+    const tAnim = animTime || 0;
     // Outer ring
     ctx.fillStyle = '#1a1030';
     ctx.beginPath();
@@ -107,7 +107,7 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
 
   // Helper: gothic arch window
   const gothicWin = (x, y, winW, winH, lit, animTime) => {
-    const tAnim = animTime * 0.001;
+    const tAnim = animTime || 0;
     // Frame
     ctx.fillStyle = '#1a1430';
     ctx.fillRect(x - 1 * sc, y - 1 * sc, winW + 2 * sc, winH + 2 * sc);
@@ -153,7 +153,7 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
 
   // Helper: bell
   const bell = (cx, cy, r, animTime) => {
-    const tAnim = animTime * 0.001;
+    const tAnim = animTime || 0;
     const swing = Math.sin(tAnim * 3) * 0.18;
     ctx.save();
     ctx.translate(cx, cy);
@@ -204,10 +204,11 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
     }
   };
 
-  // Helper: cross
+  // Helper: cross (FIXED - ensures alpha is always a valid number)
   const cross = (cx, cy, crossH, crossW, glowColor, animTime) => {
-    const tAnim = animTime * 0.001;
-    const glow = 0.5 + Math.sin(tAnim * 1.5) * 0.2;
+    const tAnim = animTime || 0;
+    // Ensure glow is a valid number between 0.3 and 0.7
+    const glow = Math.min(0.7, Math.max(0.3, 0.5 + Math.sin(tAnim * 1.5) * 0.2));
     // Glow aura
     const gg = ctx.createRadialGradient(cx, cy, 1 * sc, cx, cy, crossH);
     gg.addColorStop(0, (glowColor || 'rgba(255,220,100,') + glow + ')');
@@ -228,7 +229,7 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
 
   // Helper: candle
   const candle = (x, y, animTime) => {
-    const tAnim = animTime * 0.001;
+    const tAnim = animTime || 0;
     // Body
     ctx.fillStyle = '#e8e0c0';
     ctx.fillRect(x - 2 * sc, y - 12 * sc, 4 * sc, 12 * sc);
@@ -303,7 +304,7 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
 
   // Helper: holy particles / stars
   const holyParticles = (cx, cy, r, animTime) => {
-    const tAnim = animTime * 0.001;
+    const tAnim = animTime || 0;
     for (let pi = 0; pi < 8; pi++) {
       const pa = pi * (Math.PI / 4) + tAnim * 0.3;
       const pr = r + Math.sin(tAnim * 1.5 + pi) * 4 * sc;

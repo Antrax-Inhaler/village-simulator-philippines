@@ -33,7 +33,7 @@ import { getMainHallLevel, getMainHallRules } from '../buildings/building.js';
 
 /* ── State ────────────────────────────────────────────────── */
 var _injected    = false;
-var _sidebarOpen = true;
+var _sidebarOpen = false;  /* Default: retracted (collapsed) */
 var _sections    = { nayon: true, gov: true, gobern: true, waste: true };
 var _prevValues  = {};
 var _floaters    = [];
@@ -49,6 +49,14 @@ export function initDashboard() {
   _injectStyles();
   _buildDOM();
   _injected = true;
+
+  /* Ensure sidebar starts collapsed (retracted) */
+  var sb = document.getElementById('left-sidebar');
+  var btn = document.getElementById('sb-toggle-btn');
+  var arrow = document.getElementById('sb-bottom-arrow');
+  if (sb) sb.classList.add('sb-collapsed');
+  if (btn) btn.textContent = '›';
+  if (arrow) arrow.textContent = '▶';
 
   /* Hook for renderer.js updateWasteDisplay — writes into sidebar */
   window.updateWasteDisplay = function(ws) {
@@ -222,8 +230,17 @@ function _toggleSidebar() {
   if (!sb) return;
   sb.classList.toggle('sb-collapsed', !_sidebarOpen);
   if (btn)   btn.textContent   = _sidebarOpen ? '‹' : '›';
-  if (arrow) arrow.textContent = _sidebarOpen ? 'v' : '^';
+  if (arrow) arrow.textContent = _sidebarOpen ? '◀' : '▶';
   if (bBtn)  bBtn.title        = _sidebarOpen ? 'Itago ang Dashboard' : 'Ipakita ang Dashboard';
+}
+
+/* When retracted, clicking anywhere on the sidebar strip opens it fully */
+function _handleStripClick(e) {
+  // Only trigger if sidebar is collapsed
+  var sb = document.getElementById('left-sidebar');
+  if (sb && sb.classList.contains('sb-collapsed')) {
+    _toggleSidebar();
+  }
 }
 
 function _toggleSection(key) {
@@ -332,12 +349,12 @@ function _buildDOM() {
   sb.id  = 'left-sidebar';
 
   sb.innerHTML =
-    /* Toggle button — sits on top-right edge of the panel */
+    /* Toggle button — sits on top-right edge of the panel, right side */
     '<button id="sb-toggle-btn" onclick="window._sbToggleSidebar()" title="Itago/Ipakita">‹</button>' +
 
-    /* Bottom show/hide tab — always visible, anchored to bottom of sidebar */
+    /* Bottom show/hide tab — on the RIGHT SIDE of the dashboard */
     '<button id="sb-bottom-btn" onclick="window._sbToggleSidebar()" title="Ipakita/Itago ang Dashboard">' +
-      '<span id="sb-bottom-arrow">^</span>' +
+      '<span id="sb-bottom-arrow">▶</span>' +
     '</button>' +
 
     /* Icon strip — visible only when sidebar is collapsed */
@@ -401,6 +418,12 @@ function _buildDOM() {
     '</div>';  /* end #sb-content */
 
   container.appendChild(sb);
+
+  /* Add click handler to the strip to open the sidebar when retracted */
+  var strip = document.getElementById('sb-strip');
+  if (strip) {
+    strip.addEventListener('click', _handleStripClick);
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -416,7 +439,7 @@ function _injectStyles() {
   position: absolute;
   bottom: 14px;
   left: 0;
-  width: 230px;
+  width: 260px;
   max-height: calc(100vh - 64px);   /* top gap for HUD */
   background: rgba(10,6,2,0.94);
   border: 1px solid #3a2010;
@@ -431,12 +454,49 @@ function _injectStyles() {
   font-family: monospace;
 }
 
+/* Desktop larger text */
+@media (min-width: 1024px) {
+  #left-sidebar {
+    width: 280px;
+  }
+  .sb-lbl {
+    font-size: 13px !important;
+    width: 95px !important;
+  }
+  .sb-val {
+    font-size: 14px !important;
+    min-width: 65px !important;
+  }
+  .sb-section-title {
+    font-size: 12px !important;
+  }
+  .sb-section-icon {
+    font-size: 15px !important;
+  }
+  .sb-activity {
+    font-size: 11px !important;
+  }
+  .sb-election-row .sb-lbl,
+  .sb-election-row .sb-val {
+    font-size: 13px !important;
+  }
+  .sb-section-sum {
+    font-size: 12px !important;
+  }
+  .sb-waste-warn {
+    font-size: 11px !important;
+  }
+}
+
 /* Collapsed — icon strip only */
-#left-sidebar.sb-collapsed { width: 48px; }
+#left-sidebar.sb-collapsed { width: 52px; }
+@media (min-width: 1024px) {
+  #left-sidebar.sb-collapsed { width: 56px; }
+}
 #left-sidebar.sb-collapsed #sb-content    { display: none; }
 #left-sidebar.sb-collapsed #sb-strip      { display: flex; }
 
-/* Toggle button — anchored to top-right of panel */
+/* Toggle button — anchored to top-right edge of panel, on the RIGHT side */
 #sb-toggle-btn {
   position: absolute;
   top: 8px;
@@ -460,35 +520,43 @@ function _injectStyles() {
 }
 #sb-toggle-btn:hover { color: #f5c842; background: #1a0f06; }
 
-/* Bottom show/hide tab — always visible, sticks to bottom of sidebar */
+/* Bottom show/hide tab — on the RIGHT SIDE of the dashboard */
 #sb-bottom-btn {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 22px;
-  background: rgba(10,6,2,0.97);
-  border: none;
-  border-top: 1px solid #2a1808;
-  border-radius: 0 0 8px 0;
-  color: #8a6030;
-  font-size: 11px;
-  font-family: monospace;
+  bottom: 20px;
+  right: -24px;
+  width: 24px;
+  height: 48px;
+  background: rgba(10,6,2,0.94);
+  border: 1px solid #3a2010;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  color: #f5c842;
+  font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 3;
-  transition: color .15s, background .15s;
+  transition: color .15s, background .15s, right .25s ease;
   flex-shrink: 0;
-  width: 100%;
-  letter-spacing: .1em;
+  padding: 0;
+  line-height: 1;
+  box-shadow: 2px 0 6px rgba(0,0,0,0.3);
 }
-#sb-bottom-btn:hover { color: #f5c842; background: #1a0f06; }
+#sb-bottom-btn:hover {
+  color: #ffcc66;
+  background: #1a0f06;
+  right: -20px;
+}
+/* When sidebar is collapsed, bottom button stays visible and accessible */
+#left-sidebar.sb-collapsed #sb-bottom-btn {
+  right: -24px;
+}
 /* Push sb-content up to leave room for the bottom btn */
 #sb-content { padding-bottom: 22px; }
 
-/* Icon strip (collapsed) */
+/* Icon strip (collapsed) — make it clickable to open */
 .sb-strip {
   display: none;
   flex-direction: column;
@@ -498,30 +566,46 @@ function _injectStyles() {
   overflow-y: auto;
   max-height: calc(100vh - 64px);
   scrollbar-width: none;
+  cursor: pointer;
 }
 .sb-strip::-webkit-scrollbar { display: none; }
 .sb-strip-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px 0;
-  font-size: 15px;
+  padding: 5px 0;
+  font-size: 18px;
   line-height: 1.2;
   width: 100%;
-  cursor: default;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sb-strip-item:hover {
+  background: rgba(245,200,66,0.15);
 }
 .sb-strip-item span {
-  font-size: 9px;
+  font-size: 10px;
   color: #e8c870;
   font-family: monospace;
   line-height: 1.2;
   text-align: center;
 }
+@media (min-width: 1024px) {
+  .sb-strip-item {
+    font-size: 20px;
+    padding: 6px 0;
+  }
+  .sb-strip-item span {
+    font-size: 11px;
+  }
+}
 .sb-strip-item.sb-strip-corrupt span { color: #e74c3c; }
 .sb-strip-sep {
-  width: 26px; height: 1px;
+  width: 32px;
+  height: 1px;
   background: #2a1808;
-  margin: 2px auto;
+  margin: 4px auto;
+  pointer-events: none;
 }
 
 /* Full content — scrolls upward from bottom */
@@ -545,46 +629,46 @@ function _injectStyles() {
 .sb-section-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px 5px;
+  gap: 8px;
+  padding: 8px 12px 7px;
   cursor: pointer;
   background: rgba(10,6,2,0.5);
   user-select: none;
   transition: background .15s;
 }
 .sb-section-head:hover { background: rgba(30,15,6,0.8); }
-.sb-section-icon  { font-size: 13px; flex-shrink: 0; }
+.sb-section-icon  { font-size: 14px; flex-shrink: 0; }
 .sb-section-title {
   font-family: 'Oldenburg', serif;
-  font-size: 10px;
+  font-size: 11px;
   color: #7a5028;
   letter-spacing: .08em;
   flex: 1;
 }
 .sb-section-sum {
-  font-size: 10px;
+  font-size: 11px;
   color: #a08040;
   font-family: monospace;
   white-space: nowrap;
-  margin-right: 2px;
+  margin-right: 4px;
 }
-.sb-section-toggle { font-size: 10px; color: #5a3a18; flex-shrink: 0; }
+.sb-section-toggle { font-size: 11px; color: #5a3a18; flex-shrink: 0; }
 
 /* Section body */
-.sb-body { padding: 3px 8px 7px; }
+.sb-body { padding: 5px 12px 9px; }
 
 /* Row */
 .sb-row {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-bottom: 4px;
+  gap: 8px;
+  margin-bottom: 6px;
   position: relative;
 }
 .sb-lbl {
-  font-size: 11px;
+  font-size: 12px;
   color: #6a5030;
-  width: 82px;
+  width: 88px;
   flex-shrink: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -592,7 +676,7 @@ function _injectStyles() {
 }
 .sb-bar-wrap {
   flex: 1;
-  height: 3px;
+  height: 4px;
   background: #1a1008;
   border-radius: 2px;
   overflow: hidden;
@@ -605,10 +689,10 @@ function _injectStyles() {
   transition: width .4s ease, background .4s ease;
 }
 .sb-val {
-  font-size: 12px;
+  font-size: 13px;
   color: #e8d4a0;
   text-align: right;
-  min-width: 50px;
+  min-width: 58px;
   white-space: nowrap;
 }
 .sb-corrupt-val   { color: #e74c3c; }
@@ -623,9 +707,13 @@ function _injectStyles() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 0 3px;
+  padding: 4px 0 5px;
   border-top: 1px solid #1a1008;
-  margin-top: 2px;
+  margin-top: 4px;
+}
+.sb-election-row .sb-lbl,
+.sb-election-row .sb-val {
+  font-size: 12px;
 }
 
 /* Activity / footer */
@@ -633,9 +721,9 @@ function _injectStyles() {
   font-size: 10px;
   color: #4a3820;
   line-height: 1.5;
-  padding: 2px 0 0;
+  padding: 4px 0 2px;
   border-top: 1px solid #1a1008;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 /* Waste warning */
@@ -645,8 +733,8 @@ function _injectStyles() {
   background: rgba(180,40,10,0.15);
   border: 1px solid #5a2010;
   border-radius: 3px;
-  padding: 4px 7px;
-  margin: 4px 0 2px;
+  padding: 5px 8px;
+  margin: 6px 0 3px;
   line-height: 1.5;
 }
 
@@ -669,16 +757,16 @@ function _injectStyles() {
     max-height: calc(100vh - 36px);
     bottom: 8px;
   }
-  #left-sidebar.sb-collapsed { width: 40px !important; }
+  #left-sidebar.sb-collapsed { width: 44px !important; }
   .sb-section-head  { padding: 4px 8px 4px; }
   .sb-body          { padding: 2px 6px 5px; }
   .sb-row           { margin-bottom: 2px; }
   .sb-lbl           { font-size: 10px; width: 72px; }
   .sb-val           { font-size: 10px; min-width: 42px; }
   .sb-activity      { font-size: 9px; }
-  #sb-bottom-btn    { height: 18px; font-size: 10px; }
+  #sb-bottom-btn    { height: 36px; width: 20px; right: -20px; bottom: 12px; font-size: 11px; }
   #sb-content       { padding-bottom: 18px; }
-  .sb-strip-item    { font-size: 13px; }
+  .sb-strip-item    { font-size: 14px; }
   .sb-strip-item span { font-size: 8px; }
 }
   `;

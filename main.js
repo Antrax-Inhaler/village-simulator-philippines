@@ -651,7 +651,6 @@ function init() {
 
 function _resize() {
   if (!_initialized) return;
-  var oldVW = VW, oldVH = VH;
   VW = window._VW || window.innerWidth;
   VH = window._VH || window.innerHeight;
   canvas.width  = VW;
@@ -659,13 +658,14 @@ function _resize() {
   window._VW    = VW;
   window._VH    = VH;
 
-  /* Rescale building and resource node positions proportionally */
-  if (oldVW > 0 && oldVH > 0 && (oldVW !== VW || oldVH !== VH)) {
-    var sx = VW / oldVW, sy = VH / oldVH;
-    VS.buildings.forEach(function(b) { b.x *= sx; b.y *= sy; });
-    VS.resourceNodes.forEach(function(n) { n.x *= sx; n.y *= sy; });
-    VS.villagers.forEach(function(v) { v.x *= sx; v.y *= sy; });
-  }
+  /* NOTE: Entity positions are NOT rescaled here.
+     Buildings, villagers, and resource nodes live in a fixed
+     world-space coordinate system whose size matches the initial
+     VW × VH at game start. The camera's responsive MIN_ZOOM
+     (recalculated by initCamera below) zooms out enough on
+     small screens so the entire world fits — no position
+     squishing needed. Rescaling positions caused everything to
+     compress toward the centre on narrow viewports. */
 
   /* Update getZoneMult with new dimensions */
   VS.getZoneMult = function(res, wx, wy) { return getZoneProductionMult(res, wx, wy, VW, VH, VS); };

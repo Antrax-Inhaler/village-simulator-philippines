@@ -41,8 +41,29 @@
 import { clamp, lerp } from '../utils/perspective.js';
 
 /* ── Constants ────────────────────────────────────────────── */
-var MIN_ZOOM = 2.4;   /* always-on base zoom — player cannot zoom out further */
-var MAX_ZOOM = 4.0;
+var _BASE_VW  = 1280;  /* reference desktop width used to calibrate MIN_ZOOM  */
+var _BASE_VH  = 720;   /* reference desktop height                             */
+var MIN_ZOOM  = 2.4;   /* recalculated by initCamera() — do not mutate directly */
+var MAX_ZOOM  = 4.0;
+
+/* ── Compute a responsive MIN_ZOOM so small screens show the
+      same world area as a 1280×720 desktop at 2.4×.
+   Formula: keep (VW / zoom) constant, i.e. zoom = VW / (BASE_VW / BASE_ZOOM).
+   We take the minimum of the width-based and height-based values so the
+   entire desktop viewport fits regardless of aspect ratio, then clamp to
+   [1.0, 2.4] so we never zoom out further than the desktop baseline and
+   never push mobile past the desktop value. ──────────────────────────────── */
+function _calcMinZoom(vw, vh) {
+  var BASE_ZOOM   = 2.4;
+  var worldW      = _BASE_VW / BASE_ZOOM;   /* world units visible on desktop */
+  var worldH      = _BASE_VH / BASE_ZOOM;
+  var zoomForW    = vw / worldW;
+  var zoomForH    = vh / worldH;
+  /* Use whichever axis is more constrained (smaller zoom needed) */
+  var responsive  = Math.min(zoomForW, zoomForH);
+  /* Never exceed the desktop baseline; never go below 1.0 */
+  return Math.min(BASE_ZOOM, Math.max(1.0, responsive));
+}
 
 /* ── Camera state (exported by reference) ─────────────────── */
 export var cam = {
@@ -67,6 +88,11 @@ var _VH = 0;
 export function initCamera(vw, vh) {
   _VW = vw;
   _VH = vh;
+  /* Recalculate the responsive floor zoom for this viewport */
+  MIN_ZOOM = _calcMinZoom(vw, vh);
+  /* If the current zoom is below the new floor, snap it up */
+  if (cam.zoom   < MIN_ZOOM) { cam.zoom   = MIN_ZOOM; }
+  if (cam.tzoom  < MIN_ZOOM) { cam.tzoom  = MIN_ZOOM; }
 }
 
 /* ── Centred reset (no lerp — used on first frame + resize) ── */
@@ -148,7 +174,8 @@ export function zoomTo(wx, wy, follow, showMsgFn) {
   cam.focused     = true;
   cam.followTarget = follow || null;
   _clampTarget();
-  if (showMsgFn) showMsgFn('Pinalapit — Esc para lumabas.');
+  // Removed "Esc para lumabas" message - just show zoom indicator only
+  if (showMsgFn) showMsgFn('Pinalapit');
 }
 
 export function zoomOut() {
@@ -214,5 +241,6 @@ export function updateCamera(dt) {
 }
 
 /* ── Expose MIN/MAX for input.js ──────────────────────────── */
+export function getMinZoom() { return MIN_ZOOM; }
 export var CAMERA_MIN_ZOOM = MIN_ZOOM;
 export var CAMERA_MAX_ZOOM = MAX_ZOOM;

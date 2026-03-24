@@ -19,9 +19,9 @@
       • triggerBirthAnnouncement() → soft pan to baby's position
         with a happy bubble above both parents
 
-   4. AI DIALOGUE (Gemini)
-      • Async generation with fallbacks
-      • Enriched prompts include hunger/health/anger state
+   4. AI DIALOGUE (Gemini) — CAN BE TOGGLED ON/OFF
+      • Set ENABLE_GEMINI = true to use Gemini API
+      • Set ENABLE_GEMINI = false to use fallback dialogues only
 ═══════════════════════════════════════════════════════════════ */
 
 import { perspScale, clamp, dist, randInt, randRange } from '../utils/perspective.js';
@@ -29,7 +29,11 @@ import { getTimeOfDay }    from '../utils/time.js';
 import { SpatialGrid }     from '../utils/collision.js';
 import { spawnPlayerQuip } from './villagerQuips.js';
 
-/* ── Obfuscated API key ───────────────────────────────────── */
+/* ── GEMINI TOGGLE ──────────────────────────────────────────── */
+// SET THIS TO true TO ENABLE GEMINI AI, false TO DISABLE
+var ENABLE_GEMINI = false;  // ← CHANGE THIS TO true TO TURN ON GEMINI
+
+/* ── Obfuscated API key (only used if ENABLE_GEMINI is true) ─ */
 const _0x4f7a = [
   '66','74','123','98','84','122','67','112','55','54',
   '72','117','103','81','91','77','57','51','110','103',
@@ -46,7 +50,7 @@ function _getModel() {
   return _model;
 }
 
-/* ── API throttle: 1 req / 3.5 s ─────────────────────────── */
+/* ── API throttle: 1 req / 3.5 s (only if Gemini enabled) ──── */
 var _lastReqAt = 0;
 function _canRequest() {
   var now = Date.now();
@@ -249,6 +253,7 @@ ChatBubble.prototype.draw = function(ctx) { /* DOM-rendered — no canvas draw *
 
 /* ══════════════════════════════════════════════════════════════
    AI DIALOGUE GENERATION
+   Uses Gemini API if ENABLE_GEMINI is true, otherwise fallbacks
 ══════════════════════════════════════════════════════════════ */
 function _stateDesc(v) {
   var parts = [];
@@ -262,19 +267,26 @@ function _stateDesc(v) {
 export async function generateDialogue(vA, vB, currentHour) {
   var tod   = getTimeOfDay(currentHour);
   var typeA = vA._typeDef || { role: 'Villager' };
+  
+  var styleA = ((vA.hunger||0) > 65 || (vA.anger||0) > 55) ? 'stressed' : '';
+  var styleB = ((vB?.hunger||0) > 65 || (vB?.anger||0) > 55) ? 'stressed' : '';
 
+  /* ── PLAYER GREETING (no Gemini needed) ─────────────────── */
   if (!vB) {
-    /* Player greeting — no API needed */
     var greet = PLAYER_GREETS[randInt(0, PLAYER_GREETS.length - 1)];
     return new ChatBubble(vA, null, greet, null, 'greet');
   }
 
+  /* ── GEMINI DISABLED — use fallback only ────────────────── */
+  if (!ENABLE_GEMINI) {
+    var fb = _fallback(vA);
+    return new ChatBubble(vA, vB, fb[0], fb[1], styleA, styleB);
+  }
+
+  /* ── GEMINI ENABLED — try API call ──────────────────────── */
   var typeB  = vB._typeDef || { role: 'Villager' };
   var stateA = _stateDesc(vA);
   var stateB = _stateDesc(vB);
-
-  var styleA = ((vA.hunger||0) > 65 || (vA.anger||0) > 55) ? 'stressed' : '';
-  var styleB = ((vB.hunger||0) > 65 || (vB.anger||0) > 55) ? 'stressed' : '';
 
   var prompt =
     'Two Filipino villagers talking in a simple village.\n' +
@@ -290,8 +302,8 @@ export async function generateDialogue(vA, vB, currentHour) {
 
   try {
     if (!_canRequest()) {
-      var fb = _fallback(vA);
-      return new ChatBubble(vA, vB, fb[0], fb[1], styleA, styleB);
+      var fb2 = _fallback(vA);
+      return new ChatBubble(vA, vB, fb2[0], fb2[1], styleA, styleB);
     }
     var result = await _getModel().generateContent(prompt);
     var raw    = result.response.text().trim();
@@ -310,8 +322,8 @@ export async function generateDialogue(vA, vB, currentHour) {
     );
   } catch(err) {
     console.warn('[aiInteraction] Gemini error:', err.message || err);
-    var fb2 = _fallback(vA);
-    return new ChatBubble(vA, vB, fb2[0], fb2[1], styleA, styleB);
+    var fb3 = _fallback(vA);
+    return new ChatBubble(vA, vB, fb3[0], fb3[1], styleA, styleB);
   }
 }
 
