@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="fil">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Bayan – Simulasyon ng Pilipinong Nayon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oldenburg:wght@400;700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oldenburg&family=Slackey&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    /* ── FAB: Tindahan button styling ───────────────────── */
+    .fab-shop-btn {
+      background: rgba(26,18,8,0.96) !important;
+      border-color: #c49a4e !important;
+      color: #f5c842;
+    }
+    .fab-shop-btn:hover {
+      background: #2a1a08 !important;
+      border-color: #f5c842 !important;
+    }
+    
+    /* ===== AUDIO WIDGET ===== */
+    .audio-widget {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(26, 18, 8, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid #c49a4e;
+      border-radius: 40px;
+      padding: 6px 12px 6px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Oldenburg', serif;
+      font-size: 13px;
+      color: #f5c842;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: opacity 0.2s;
+    }
+    .audio-widget button {
+      background: #2a1808;
+      border: none;
+      color: #f5c842;
+      font-size: 18px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      border: 1px solid #c49a4e;
+    }
+    .audio-widget button:hover {
+      background: #c49a4e;
+      color: #1a1208;
+      transform: scale(1.02);
+    }
+    .audio-widget span {
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+    .audio-widget .vol-slider {
+      width: 70px;
+      height: 3px;
+      -webkit-appearance: none;
+      background: #c49a4e;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    .audio-widget .vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #f5c842;
+      border: none;
+      cursor: pointer;
+    }
+    @media (max-width: 700px) {
+      .audio-widget { padding: 4px 8px 4px 12px; gap: 6px; }
+      .audio-widget button { width: 24px; height: 24px; font-size: 14px; }
+      .audio-widget .vol-slider { width: 55px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════
+       SPLASH
+  ══════════════════════════════════════════ -->
+  <div id="splash">
+    <div id="splash-inner">
+      <div id="splash-deco">🌴</div>
+      <h1 id="splash-title">Ating Bayan</h1>
+      <p id="splash-sub">Isang Nayon, Isang Puso — A Village, One Heart</p>
+      <button id="btnContinue" style="display:none">▶ Ituloy ang Laro</button>
+      <button id="btnStart">🌴 Bagong Laro</button>
+      <p id="splash-hint">I-click ang villager o gusali para makita ang impormasyon</p>
+      <p id="splash-save-info"></p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       GAME WRAPPER
+  ══════════════════════════════════════════ -->
+  <div id="game-wrap">
+
+    <div id="canvas-container">
+      <canvas id="gameCanvas"></canvas>
+
+      <!-- ── Top HUD bar — time + election + speed only ── -->
+      <div id="top-hud">
+        <div id="hud-time">
+          <span id="barTimeStr">12:00 PM</span>
+          <span id="barTOD" class="hud-sub">Tanghali</span>
+          <span id="barDayStr" class="hud-sub">Araw 1</span>
+        </div>
+
+        <div id="hud-election">
+          <span class="hud-lbl">Eleksyon:</span>
+          <span id="barElectionTimer" class="bar-election-timer">—</span>
+          <span id="barElectionApproval" class="bar-election-approval">—</span>
+        </div>
+
+        <div id="hud-speed">
+          <button class="speed-btn active" id="spd1" onclick="setSpeed(1)">1×</button>
+          <button class="speed-btn"        id="spd2" onclick="setSpeed(2)">2×</button>
+          <button class="speed-btn"        id="spd4" onclick="setSpeed(4)">4×</button>
+        </div>
+      </div>
+
+      <!-- waste display now inside #left-sidebar (dashboard.js) -->
+  </div>
+
+      <!-- ── FAB: Government / Trade actions ── -->
+      <div id="fab-gov" class="fab-toolbar">
+        <div class="fab-item fab-shop-btn" onclick="openShop()" data-label="Tindahan">🏗️</div>
+        <div class="fab-item" onclick="openSidePanel('trade')"  data-label="Kalakalan">⚓</div>
+        <div class="fab-item" onclick="openSidePanel('policy')" data-label="Patakaran">📜</div>
+        <div class="fab-item" onclick="openSidePanel('tax')"    data-label="Buwis">💰</div>
+        <div class="fab-item" onclick="openSidePanel('expand')" data-label="Palawakin">🗺️</div>
+        <div class="fab-item" onclick="triggerSave()"           data-label="I-save">💾</div>
+        <div class="fab-item" onclick="triggerLoad()"           data-label="I-load">📂</div>
+      </div>
+
+      <!-- ── FAB: Activity log ── -->
+      <div id="fab-log" class="fab-toolbar fab-toolbar-log" style="bottom:calc(14px + 7*52px + 8px);">
+        <div class="fab-item fab-log-btn" onclick="openSidePanel('log')" data-label="Talaan ng Buhay">
+          📋
+          <span id="fab-log-badge" class="fab-badge" style="display:none">0</span>
+        </div>
+      </div>
+
+      <!-- ── Unified right side panel ── -->
+      <div id="side-panel">
+        <div id="side-panel-inner"></div>
+      </div>
+
+    </div>
+
+  </div><!-- /#game-wrap -->
+
+  <!-- ══════════════════════════════════════════
+       BACKGROUND AUDIO PLAYER (welcome.mp3)
+  ══════════════════════════════════════════ -->
+  <div id="audioWidget" class="audio-widget">
+    <span>🎵</span>
+    <button id="audioPlayPauseBtn" aria-label="Play/Pause">⏸️</button>
+    <input type="range" id="audioVolumeSlider" class="vol-slider" min="0" max="1" step="0.01" value="0.5">
+    <span id="audioVolIcon">🔊</span>
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────
+    // Background Music Handler (audio/background/welcome.mp3)
+    // ─────────────────────────────────────────────────────────────
+    (function initBackgroundAudio() {
+      const audioSrc = "audio/background/welcome.mp3";
+      let bgAudio = null;
+      let isPlaying = false;
+      let userInteracted = false; // to comply with autoplay policies
+      
+      // DOM elements
+      const playPauseBtn = document.getElementById('audioPlayPauseBtn');
+      const volumeSlider = document.getElementById('audioVolumeSlider');
+      const volIconSpan = document.getElementById('audioVolIcon');
+      
+      // Create audio element only after first user gesture or game start
+      function createAudio() {
+        if (bgAudio) return bgAudio;
+        try {
+          const audio = new Audio(audioSrc);
+          audio.loop = true;
+          audio.volume = parseFloat(volumeSlider?.value) || 0.5;
+          audio.preload = "auto";
+          bgAudio = audio;
+          return bgAudio;
+        } catch(e) {
+          console.warn("[Audio] Failed to create audio element:", e);
+          return null;
+        }
+      }
+      
+      // Update UI based on playing state
+      function updatePlayPauseUI() {
+        if (!playPauseBtn) return;
+        if (isPlaying) {
+          playPauseBtn.textContent = "⏸️";
+          playPauseBtn.setAttribute("aria-label", "Pause");
+        } else {
+          playPauseBtn.textContent = "▶️";
+          playPauseBtn.setAttribute("aria-label", "Play");
+        }
+      }
+      
+      // Actually play music (must be triggered by user interaction)
+      function startPlayback() {
+        if (!bgAudio) return false;
+        bgAudio.play().then(() => {
+          isPlaying = true;
+          updatePlayPauseUI();
+        }).catch(err => {
+          console.warn("[Audio] Autoplay blocked or error:", err);
+          isPlaying = false;
+          updatePlayPauseUI();
+        });
+        return true;
+      }
+      
+      function pausePlayback() {
+        if (bgAudio) {
+          bgAudio.pause();
+          isPlaying = false;
+          updatePlayPauseUI();
+        }
+      }
+      
+      function togglePlayPause() {
+        if (!bgAudio) {
+          const newAudio = createAudio();
+          if (!newAudio) return;
+          bgAudio = newAudio;
+        }
+        if (isPlaying) {
+          pausePlayback();
+        } else {
+          startPlayback();
+        }
+      }
+      
+      // Volume control
+      function setVolume(value) {
+        if (bgAudio) bgAudio.volume = Math.min(1, Math.max(0, parseFloat(value)));
+        if (volumeSlider) volumeSlider.value = value;
+        if (volIconSpan) {
+          const vol = parseFloat(value);
+          if (vol === 0) volIconSpan.textContent = "🔇";
+          else if (vol < 0.3) volIconSpan.textContent = "🔈";
+          else if (vol < 0.7) volIconSpan.textContent = "🔉";
+          else volIconSpan.textContent = "🔊";
+        }
+      }
+      
+      // Connect UI events
+      if (playPauseBtn) {
+        playPauseBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          togglePlayPause();
+        });
+      }
+      if (volumeSlider) {
+        volumeSlider.addEventListener('input', (e) => {
+          setVolume(e.target.value);
+        });
+        // initial set
+        setVolume(volumeSlider.value);
+      }
+      
+      // Attempt to autoplay with a silent approach: we wait for any user click on splash or game
+      // Also try to play on first game interaction (btnStart / btnContinue)
+      function attemptAutoPlayOnUserGesture() {
+        if (userInteracted) return;
+        if (!bgAudio) createAudio();
+        if (bgAudio && bgAudio.paused) {
+          bgAudio.play().then(() => {
+            isPlaying = true;
+            updatePlayPauseUI();
+            userInteracted = true;
+          }).catch(() => {
+            // still blocked, but we'll try again on later click
+          });
+        }
+      }
+      
+      // Listen to global clicks (splash or game container) to enable audio if not started
+      const globalAudioStarter = () => {
+        if (!userInteracted) {
+          if (!bgAudio) createAudio();
+          if (bgAudio && bgAudio.paused) {
+            bgAudio.play().then(() => {
+              isPlaying = true;
+              updatePlayPauseUI();
+              userInteracted = true;
+              // remove listener after successful start
+              document.removeEventListener('click', globalAudioStarter);
+              document.removeEventListener('touchstart', globalAudioStarter);
+            }).catch(e => console.log("[Audio] still waiting for explicit user gesture"));
+          }
+        }
+      };
+      
+      // Also capture splash button clicks specifically for faster activation
+      const splashStartBtn = document.getElementById('btnStart');
+      const splashContinueBtn = document.getElementById('btnContinue');
+      function forceAudioOnGameStart() {
+        if (!bgAudio) createAudio();
+        if (bgAudio && bgAudio.paused) {
+          bgAudio.play().then(() => {
+            isPlaying = true;
+            updatePlayPauseUI();
+            userInteracted = true;
+          }).catch(e => console.warn("Audio blocked even on game start:", e));
+        }
+      }
+      if (splashStartBtn) splashStartBtn.addEventListener('click', forceAudioOnGameStart);
+      if (splashContinueBtn) splashContinueBtn.addEventListener('click', forceAudioOnGameStart);
+      
+      // Additional fallback: any click on document will try to start if not playing yet
+      document.addEventListener('click', globalAudioStarter);
+      document.addEventListener('touchstart', globalAudioStarter);
+      
+      // Create audio element early but don't play until user gesture
+      const preloadAudio = createAudio();
+      if (preloadAudio) {
+        // Preload but don't autoplay aggressively — we wait for gesture
+        preloadAudio.load();
+      }
+      
+      // Expose controls to global for debugging (optional)
+      window.__bgAudioControls = {
+        play: () => { if(bgAudio) bgAudio.play(); },
+        pause: () => { if(bgAudio) bgAudio.pause(); },
+        setVolume: (v) => setVolume(v)
+      };
+    })();
+  </script>
+
+  <!-- ══════════════════════════════════════════
+       SPLASH LOGIC
+  ══════════════════════════════════════════ -->
+  <script>
+  (function() {
+    var SAVE_KEY     = 'miniBayan_save';
+    var AUTOSAVE_KEY = 'miniBayan_autosave';
+    function _getSaveInfo(key) {
+      try { var r = localStorage.getItem(key); return r ? JSON.parse(r) : null; }
+      catch(e) { return null; }
+    }
+    var save   = _getSaveInfo(SAVE_KEY) || _getSaveInfo(AUTOSAVE_KEY);
+    var isAuto = !_getSaveInfo(SAVE_KEY) && !!_getSaveInfo(AUTOSAVE_KEY);
+    var btnCont = document.getElementById('btnContinue');
+    var infoEl  = document.getElementById('splash-save-info');
+    if (save && btnCont) {
+      btnCont.style.display = 'block';
+      var day  = save.dayCount || 1;
+      var date = save.savedAt ? new Date(save.savedAt).toLocaleDateString('fil-PH') : '';
+      if (infoEl) infoEl.textContent =
+        (isAuto ? 'Auto-save' : 'Naligtas') + ': Araw ' + day + (date ? '  •  ' + date : '');
+    }
+    function _launch(loadSave) {
+      var splash   = document.getElementById('splash');
+      var gameWrap = document.getElementById('game-wrap');
+      if (!splash || !gameWrap) return;
+      splash.style.opacity = '0';
+      splash.style.transition = 'opacity 0.6s';
+      setTimeout(function() {
+        splash.style.display = 'none';
+        gameWrap.classList.add('visible');
+        window._minibayanAutoLoad = loadSave;
+        if (window._minibayanInit) window._minibayanInit(loadSave);
+      }, 620);
+    }
+    document.getElementById('btnContinue').addEventListener('click', function() { _launch(true); });
+    document.getElementById('btnStart').addEventListener('click',    function() { _launch(false); });
+  })();
+  </script>
+
+  <!-- ══════════════════════════════════════════
+       WASTE PANEL TOGGLE
+  ══════════════════════════════════════════ -->
+  <script>
+  /* waste display handled by dashboard.js window.updateWasteDisplay */
+  </script>
+
+  <!-- ══════════════════════════════════════════
+       SIDE PANEL ENGINE
+  ══════════════════════════════════════════ -->
+  <script>
+var _activeSidePanel = null;
+var _seenLogCount    = 0;   /* watermark — entries seen when log was last opened */
+
+window.openSidePanel = function(key) {
+  if (key === 'trade') {
+    _closeSidePanel();
+    if (window.openTradePanel) window.openTradePanel();
+    return;
+  }
+  if (_activeSidePanel === key) { _closeSidePanel(); return; }
+  _activeSidePanel = key;
+  var inner = document.getElementById('side-panel-inner');
+  var panel = document.getElementById('side-panel');
+  if (!inner || !panel) return;
+  inner.innerHTML = _spRender(key);
+  panel.classList.add('open');
+  _spWire(key);
+  _spMarkActive(key);
+
+  /* Clear badge when log is opened */
+  if (key === 'log') {
+    var entries = _getLogEntries();
+    _seenLogCount = entries.length;
+    _updateLogBadge(0);
+  }
+};
+
+window.closeSidePanel = function() { _closeSidePanel(); };
+window.openPolicy     = function() { window.openSidePanel('policy'); };
+window.openTaxPanel   = function() { window.openSidePanel('tax'); };
+
+function _closeSidePanel() {
+  _activeSidePanel = null;
+  var panel = document.getElementById('side-panel');
+  if (panel) panel.classList.remove('open');
+  _spMarkActive(null);
+}
+
+function _spMarkActive(key) {
+  document.querySelectorAll('.fab-item').forEach(function(el) {
+    el.classList.remove('fab-active');
+  });
+  if (!key) return;
+  document.querySelectorAll('.fab-item').forEach(function(el) {
+    var h = el.getAttribute('onclick') || '';
+    if (h.indexOf("'" + key + "'") !== -1) el.classList.add('fab-active');
+    if (key === 'log' && el.classList.contains('fab-log-btn')) el.classList.add('fab-active');
+  });
+}
+
+/* ── Collect all log entries (events + election + trade) ──── */
+function _getLogEntries() {
+  var VS = window._VS;
+  var entries = [];
+  if (VS && VS.events && VS.events.log) {
+    VS.events.log.slice(0, 12).forEach(function(e) {
+      var icon = e.severity >= 3 ? '🚨' :
+                 e.category === 'natural'   ? '🌪️' :
+                 e.category === 'economic'  ? '📉' :
+                 e.category === 'political' ? '⚡' : '📌';
+      entries.push({ id: e.id, icon: icon, text: e.message, tag: e.category || 'default', detail: e.detail, severity: e.severity });
+    });
+  }
+  if (VS && VS.election && VS.election.lastVotesTotal > 0) {
+    var E   = VS.election;
+    var pct = Math.round(E.lastApproval * 100);
+    var bd  = E.lastBreakdown;
+    var detail = bd
+      ? ' (Tiwala:' + bd.trust + ' Kasiyahan:' + bd.happy + ' Pagkain:' + bd.food + ' Trabaho:' + bd.employ + '%)'
+      : '';
+    entries.push({ id: 'election', icon: '🗳️', text: 'Eleksyon Termino ' + ((E.termNumber-1)||1) + ': ' + pct + '% boto' + detail, tag: 'election', detail: null });
+  }
+  if (VS && VS.trade && VS.trade.history) {
+    VS.trade.history.slice(0, 6).forEach(function(h, i) {
+      var icon = h.success ? '✅' : '❌';
+      var text = (h.flag||'') + ' ' + (h.country||'Import') + ': ' +
+                 (h.success?'+':'') + h.amount + ' ' + ({rice:'🌾',gold:'🪙',langis:'💎'}[h.res]||h.res);
+      entries.push({ id: 'trade_' + i, icon: icon, text: text.trim(), tag: 'trade', detail: null });
+    });
+  }
+  if (VS && VS.activityLog) {
+    VS.activityLog.slice(0, 8).forEach(function(entry, i) {
+      entries.push({ id: 'waste_' + i, icon: '🗑️', text: entry.msg, tag: 'waste', detail: null });
+    });
+  }
+  return entries;
+}
+
+function _updateLogBadge(count) {
+  var badge = document.getElementById('fab-log-badge');
+  if (badge) {
+    badge.textContent   = Math.min(count, 99);
+    badge.style.display = count > 0 ? 'flex' : 'none';
+  }
+}
+
+/* ── Panel renderers ──────────────────────────────────────── */
+function _spRender(key) {
+  var VS = window._VS;
+  switch (key) {
+
+    case 'policy': {
+      var states = window.getPolicyState ? window.getPolicyState() : [];
+      if (!states.length) return _spShell('📜 Mga Patakaran', '<div class="sp-empty">Walang available na patakaran.</div>');
+      var html = states.map(function(p) {
+        var canAfford = VS && (VS.res.gold >= p.cost.gold) && (VS.res.rice >= (p.cost.rice||0));
+        var costStr   = p.cost.gold + '🪙' + (p.cost.rice ? ' ' + p.cost.rice + '🌾' : '');
+        var drainStr  = p.drainPerSec > 0 ? Math.round(p.drainPerSec * 60) + '🪙/min · ' : '';
+        return '<div class="sp-card' + (p.isActive ? ' sp-card-on' : '') + '">' +
+          '<div class="sp-card-head">' +
+            '<span class="sp-card-name">' + p.label + '</span>' +
+            (p.isActive ? '<span class="sp-pill sp-pill-on">AKTIBO</span>' : '') +
+          '</div>' +
+          '<div class="sp-card-desc">' + p.description + '</div>' +
+          '<div class="sp-card-meta">' + drainStr + 'Hall Lv' + p.minHallLevel + '</div>' +
+          '<div class="sp-card-foot">' +
+            (p.isActive
+              ? '<button class="sp-btn sp-btn-off" onclick="window.deactivatePolicy(\'' + p.key + '\');window.openSidePanel(\'policy\')">Ihinto</button>'
+              : '<button class="sp-btn sp-btn-on' + (canAfford ? '' : ' sp-btn-dim') + '" onclick="window.activatePolicy(\'' + p.key + '\');window.openSidePanel(\'policy\')">' +
+                'Isaaktibo · ' + costStr + '</button>'
+            ) +
+          '</div>' +
+        '</div>';
+      }).join('');
+      return _spShell('📜 Mga Patakaran', html);
+    }
+
+    case 'tax': {
+      var rate = window.getTaxRate ? Math.round(window.getTaxRate() * 100) : 25;
+      var happiness = VS ? _avg(VS.villagers, 'happiness') : 50;
+      var anger     = VS ? _avg(VS.villagers, 'anger')     : 0;
+      var govTrust  = VS ? _avg(VS.villagers, 'govTrust')  : 50;
+      return _spShell('💰 Buwis at Kita', [
+        '<div class="sp-stat-block">',
+          '<div class="sp-stat-row"><span class="sp-stat-lbl">Kasalukuyang buwis</span><span class="sp-stat-val" id="sp-tax-cur">' + rate + '%</span></div>',
+          '<div class="sp-stat-row"><span class="sp-stat-lbl">Avg Kasiyahan</span><span class="sp-stat-val" style="color:' + _rg(happiness) + '">' + Math.round(happiness) + '%</span></div>',
+          '<div class="sp-stat-row"><span class="sp-stat-lbl">Avg Galit</span><span class="sp-stat-val" style="color:' + _gr(anger) + '">' + Math.round(anger) + '%</span></div>',
+          '<div class="sp-stat-row"><span class="sp-stat-lbl">Tiwala sa Gobyerno</span><span class="sp-stat-val" style="color:' + _rg(govTrust) + '">' + Math.round(govTrust) + '%</span></div>',
+        '</div>',
+        '<div class="sp-section-lbl">Itakda ang Buwis</div>',
+        '<div class="sp-slider-row">',
+          '<input type="range" id="sp-tax-slider" min="5" max="80" value="' + rate + '" oninput="spTaxSlider(this.value)" />',
+          '<span class="sp-stat-val" id="sp-tax-val">' + rate + '%</span>',
+        '</div>',
+        '<div id="sp-tax-warn" class="sp-warn" style="display:' + (rate > 50 ? 'block' : 'none') + '">',
+          '⚠️ Ang mataas na buwis ay nagpapataas ng galit ng mamamayan!',
+        '</div>',
+        '<button class="sp-btn sp-btn-on" style="width:100%;margin-top:14px" onclick="spApplyTax()">Ilapat ang Bagong Buwis</button>',
+      ].join(''));
+    }
+
+    case 'expand': {
+      if (window.renderExpandContent) return _spShell('🗺️ Palawakin ang Nayon', window.renderExpandContent());
+      return _spShell('🗺️ Palawakin ang Nayon', '<div class="sp-empty">Mag-load muna ng laro.</div>');
+    }
+
+    case 'log': return _spRenderLog();
+
+    default: return _spShell('?', '<div class="sp-empty">Hindi kilala.</div>');
+  }
+}
+
+function _spRenderLog() {
+  var entries = _getLogEntries();
+
+  var body = entries.length === 0
+    ? '<div class="sp-empty">Walang naitalang kaganapan pa.</div>'
+    : entries.map(function(e) {
+        var hasDetail = e.detail && (
+          (e.detail.affectedBuildings && e.detail.affectedBuildings.length > 0) ||
+          e.detail.goldLost || e.detail.riceLost || e.detail.healthHit
+        );
+        var clickAttr = hasDetail
+          ? ' onclick="window.showEventModal(' + JSON.stringify(e).replace(/"/g, '&quot;') + ')" style="cursor:pointer"'
+          : '';
+        var hint = hasDetail ? '<span class="sp-log-hint">Tap para sa detalye ›</span>' : '';
+        return '<div class="sp-log-row sp-log-' + e.tag + '"' + clickAttr + '>' +
+          '<span class="sp-log-icon">' + e.icon + '</span>' +
+          '<span class="sp-log-text">' + e.text + hint + '</span>' +
+        '</div>';
+      }).join('');
+
+  return _spShell('📋 Talaan ng Buhay', body);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   showEventModal
+   Rich calamity/event detail modal. Called from log row click.
+══════════════════════════════════════════════════════════════ */
+window.showEventModal = function(entry) {
+  var existing = document.getElementById('event-detail-modal');
+  if (existing) existing.remove();
+
+  var d   = entry.detail || {};
+  var bld = d.affectedBuildings || [];
+
+  /* Build affected buildings list */
+  var bldHTML = bld.length === 0
+    ? '<div class="edm-none">Walang gusali ang nasira.</div>'
+    : '<div class="edm-bld-list">' +
+        bld.map(function(b) {
+          return '<div class="edm-bld-row">' +
+            '<span class="edm-bld-name">🏚️ ' + b.label + '</span>' +
+            '<span class="edm-bld-lvl">Lv' + b.fromLevel + ' → Lv' + b.toLevel + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+
+  /* Build stat impact rows */
+  var impacts = [];
+  if (d.goldLost   > 0) impacts.push(['🪙 Ginto nawala',   '-' + d.goldLost,   'bad']);
+  if (d.goldLost   < 0) impacts.push(['🪙 Ginto nakuha',   '+' + (-d.goldLost), 'good']);
+  if (d.riceLost   > 0) impacts.push(['🌾 Bigas nawala',   '-' + d.riceLost,   'bad']);
+  if (d.riceLost   < 0) impacts.push(['🌾 Bigas nakuha',   '+' + (-d.riceLost), 'good']);
+  if (d.healthHit  > 0) impacts.push(['❤️ Kalusugan',       '-' + d.healthHit + '%', 'bad']);
+  if (d.trustLoss  > 0) impacts.push(['🏛️ Tiwala',          '-' + d.trustLoss + '%', 'bad']);
+  if (d.foodLost   > 0) impacts.push(['🍚 Pagkain nawala', '-' + d.foodLost,   'bad']);
+
+  var impactHTML = impacts.length === 0
+    ? ''
+    : '<div class="edm-impacts">' +
+        impacts.map(function(row) {
+          return '<div class="edm-impact-row">' +
+            '<span class="edm-impact-label">' + row[0] + '</span>' +
+            '<span class="edm-impact-val edm-' + row[2] + '">' + row[1] + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+
+  var icon = entry.icon || '⚠️';
+  var sevColor = (entry.severity >= 3) ? '#e74c3c' : (entry.severity === 2) ? '#e67e22' : '#f5c842';
+
+  var modal = document.createElement('div');
+  modal.id  = 'event-detail-modal';
+  modal.innerHTML =
+    '<div class="edm-backdrop" onclick="document.getElementById(\'event-detail-modal\').remove()"></div>' +
+    '<div class="edm-box">' +
+      '<div class="edm-header" style="border-color:' + sevColor + '">' +
+        '<span class="edm-icon">' + icon + '</span>' +
+        '<span class="edm-title">' + entry.text + '</span>' +
+        '<button class="edm-close" onclick="document.getElementById(\'event-detail-modal\').remove()">✕</button>' +
+      '</div>' +
+      '<div class="edm-body">' +
+        (impacts.length > 0 ? '<div class="edm-section-label">Epekto</div>' + impactHTML : '') +
+        (bld.length > 0 ? '<div class="edm-section-label">Mga Nasiring Gusali (' + bld.length + ')</div>' + bldHTML : '') +
+        (bld.length === 0 && impacts.length === 0 ? '<div class="edm-none">Walang nakitang detalye.</div>' : '') +
+      '</div>' +
+      '<button class="edm-ok" onclick="document.getElementById(\'event-detail-modal\').remove()">Naiintindihan</button>' +
+    '</div>';
+
+  var container = document.getElementById('canvas-container') || document.body;
+  container.appendChild(modal);
+  _ensureEventModalStyles();
+};
+
+function _ensureEventModalStyles() {
+  if (document.getElementById('edm-styles')) return;
+  var s = document.createElement('style');
+  s.id  = 'edm-styles';
+  s.textContent = [
+    '#event-detail-modal{position:absolute;inset:0;z-index:95;pointer-events:all;}',
+    '.edm-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.68);}',
+    '.edm-box{',
+    '  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);',
+    '  width:min(420px,92vw);max-height:80vh;overflow-y:auto;',
+    '  background:linear-gradient(160deg,#1a1208,#0e0905);',
+    '  border:1.5px solid #8a6030;border-radius:12px;',
+    '  padding:0 0 16px;box-shadow:0 8px 40px rgba(0,0,0,0.7);',
+    '  animation:edmPop .25s ease;',
+    '}',
+    '@keyframes edmPop{from{opacity:0;transform:translate(-50%,-48%)}to{opacity:1;transform:translate(-50%,-50%)}}',
+    '.edm-header{',
+    '  display:flex;align-items:flex-start;gap:10px;',
+    '  padding:16px 16px 14px;border-bottom:1.5px solid #3a2010;',
+    '  border-top:4px solid #e67e22;border-radius:10px 10px 0 0;',
+    '}',
+    '.edm-icon{font-size:26px;flex-shrink:0;line-height:1;}',
+    '.edm-title{flex:1;font-family:"Oldenburg",serif;font-size:14px;color:#f5c842;line-height:1.4;}',
+    '.edm-close{',
+    '  background:#2a1808;border:1px solid #8a6030;color:#f5c842;',
+    '  border-radius:50%;width:26px;height:26px;font-size:13px;',
+    '  cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;',
+    '}',
+    '.edm-body{padding:12px 16px 0;}',
+    '.edm-section-label{',
+    '  font-family:"Oldenburg",serif;font-size:11px;color:#7a5030;',
+    '  letter-spacing:.08em;text-transform:uppercase;',
+    '  border-bottom:1px solid #2a1808;padding-bottom:4px;margin-bottom:8px;margin-top:12px;',
+    '}',
+    '.edm-section-label:first-child{margin-top:0;}',
+    '.edm-impacts{display:flex;flex-direction:column;gap:4px;}',
+    '.edm-impact-row{display:flex;justify-content:space-between;font-family:monospace;font-size:13px;padding:2px 0;}',
+    '.edm-impact-label{color:#8a6040;}',
+    '.edm-impact-val{font-weight:bold;}',
+    '.edm-bad{color:#e74c3c;}.edm-good{color:#88dd88;}',
+    '.edm-bld-list{display:flex;flex-direction:column;gap:5px;}',
+    '.edm-bld-row{',
+    '  display:flex;justify-content:space-between;align-items:center;',
+    '  background:#1a1208;border:1px solid #2a1808;border-radius:4px;',
+    '  padding:5px 8px;font-size:13px;',
+    '}',
+    '.edm-bld-name{color:#e8c87a;font-family:"Crimson Pro",serif;}',
+    '.edm-bld-lvl{color:#e74c3c;font-family:monospace;font-size:12px;font-weight:bold;}',
+    '.edm-none{color:#5a4030;font-family:monospace;font-size:13px;padding:6px 0;}',
+    '.edm-ok{',
+    '  display:block;margin:16px auto 0;padding:9px 32px;',
+    '  font-family:"Oldenburg",serif;font-size:13px;',
+    '  background:#2a1808;border:1.5px solid #f5c842;color:#f5c842;',
+    '  border-radius:6px;cursor:pointer;transition:background .15s;',
+    '}',
+    '.edm-ok:hover{background:#3a2810;}',
+    '.sp-log-row{cursor:default;}',
+    '.sp-log-hint{display:block;font-size:10px;color:#5a4030;margin-top:2px;letter-spacing:.04em;}',
+  ].join('\n');
+  document.head.appendChild(s);
+}
+
+/* ── Helpers ──────────────────────────────────────────────── */
+function _avg(villagers, field) {
+  if (!villagers || !villagers.length) return 0;
+  var s = 0; villagers.forEach(function(v) { s += (v[field] || 0); });
+  return s / villagers.length;
+}
+function _rg(v) { return v > 60 ? '#44aa44' : v > 40 ? '#f5c842' : '#e74c3c'; }
+function _gr(v) { return v < 30 ? '#44aa44' : v < 60 ? '#e67e22' : '#e74c3c'; }
+
+function _spShell(title, body) {
+  return '<div class="sp-header"><span class="sp-title">' + title + '</span>' +
+         '<button class="sp-close" onclick="closeSidePanel()">✕</button></div>' +
+         '<div class="sp-body">' + body + '</div>';
+}
+
+function _spWire(key) {
+  if (key !== 'tax') return;
+  window.spTaxSlider = function(val) {
+    var v = document.getElementById('sp-tax-val');
+    var w = document.getElementById('sp-tax-warn');
+    if (v) v.textContent = val + '%';
+    if (w) w.style.display = val > 50 ? 'block' : 'none';
+  };
+  window.spApplyTax = function() {
+    var s = document.getElementById('sp-tax-slider');
+    if (!s || !window.setTaxRate) return;
+    window.setTaxRate(parseInt(s.value) / 100);
+    window.openSidePanel('tax');
+  };
+}
+
+/* Badge update interval — only counts NEW entries since last open */
+setInterval(function() {
+  var entries  = _getLogEntries();
+  var newCount = Math.max(0, entries.length - _seenLogCount);
+  _updateLogBadge(newCount);
+  if (_activeSidePanel === 'log') {
+    var inner = document.getElementById('side-panel-inner');
+    if (inner) inner.innerHTML = _spRenderLog();
+  }
+}, 6000);
+
+  </script>
+
+  <!-- ══════════════════════════════════════════
+       ERROR SURFACE
+  ══════════════════════════════════════════ -->
+  <script type="module">
+    window.addEventListener('error', function(e) {
+      console.error('[Mini Bayan] Uncaught error:', e.message, e.filename, e.lineno);
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      console.error('[Mini Bayan] Unhandled promise rejection:', e.reason);
+    });
+  </script>
+
+  <script type="module" src="main.js"></script>
+
+</body>
+</html>

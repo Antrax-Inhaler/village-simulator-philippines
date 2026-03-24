@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Currency Converter</title>
+</head>
+<body>
+
+  <h2>Exchange Rate Converter</h2>
+
+  <input type="number" id="amount" placeholder="Enter amount" />
+
+  <select id="from"></select>
+  <select id="to"></select>
+
+  <button onclick="convert()">Convert</button>
+
+  <h3 id="result"></h3>
+
+  <script>
+    const API_URL = "https://open.er-api.com/v6/latest/";
+
+    // Load currencies on page load
+    window.onload = async () => {
+      const res = await fetch(API_URL + "USD");
+      const data = await res.json();
+
+      const currencies = Object.keys(data.rates);
+      const fromSelect = document.getElementById("from");
+      const toSelect = document.getElementById("to");
+
+      currencies.forEach(currency => {
+        const option1 = new Option(currency, currency);
+        const option2 = new Option(currency, currency);
+        fromSelect.add(option1);
+        toSelect.add(option2);
+      });
+
+      // Default values
+      fromSelect.value = "USD";
+      toSelect.value = "PHP";
+    };
+
+    async function convert() {
+      const amount = document.getElementById('amount').value;
+      const from = document.getElementById('from').value;
+      const to = document.getElementById('to').value;
+      const resultEl = document.getElementById('result');
+
+      if (!amount || amount <= 0) {
+        resultEl.innerText = "Please enter a valid amount.";
+        return;
+      }
+
+      try {
+        const res = await fetch(API_URL + from);
+        const data = await res.json();
+
+        const rate = data.rates[to];
+
+        if (!rate) {
+          resultEl.innerText = "Currency not supported.";
+          return;
+        }
+
+        const converted = amount * rate;
+
+        resultEl.innerText =
+          `${amount} ${from} = ${converted.toFixed(2)} ${to}`;
+      } catch (err) {
+        resultEl.innerText = "Error fetching exchange rates.";
+        console.error(err);
+      }
+    }
+  </script>
+
+</body>
+</html>

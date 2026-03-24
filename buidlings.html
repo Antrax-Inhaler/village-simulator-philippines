@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="fil">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Bayan — Bahay Upgrade Levels</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,500;0,700;1,300&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: #0b0f14;
+  font-family: 'DM Sans', sans-serif;
+  color: #e8eaf0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events:none; z-index:0;
+}
+header {
+  position:relative; z-index:1;
+  padding: 3rem 2rem 2rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+header h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  letter-spacing: 0.18em;
+  background: linear-gradient(135deg, #fff 30%, #7eb8ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+header p {
+  margin-top:0.5rem;
+  font-size:0.82rem;
+  font-weight:300;
+  color: rgba(255,255,255,0.3);
+  letter-spacing:0.12em;
+  text-transform: uppercase;
+}
+.era-tag {
+  display:inline-block;
+  margin-top:0.7rem;
+  font-size:0.7rem;
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  padding: 0.25rem 0.9rem;
+  border: 1px solid rgba(126,184,255,0.2);
+  border-radius:99px;
+  color: rgba(126,184,255,0.6);
+}
+.timeline {
+  position:relative; z-index:1;
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:flex-end;
+  justify-content:center;
+  padding: 3rem 1rem 4rem;
+  gap: 0;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.timeline::before {
+  content:'';
+  position:absolute;
+  bottom: calc(4rem - 8px);
+  left: 8%; right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg,transparent,rgba(126,184,255,0.3) 20%,rgba(126,184,255,0.3) 80%,transparent);
+}
+.card-wrap {
+  flex:1; min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap: 1rem;
+  padding: 0 0.5rem;
+  opacity:0;
+  transform:translateY(20px);
+  animation: fadeUp 0.5s forwards;
+}
+.card-wrap:nth-child(1){animation-delay:0.05s}
+.card-wrap:nth-child(2){animation-delay:0.15s}
+.card-wrap:nth-child(3){animation-delay:0.25s}
+.card-wrap:nth-child(4){animation-delay:0.35s}
+.card-wrap:nth-child(5){animation-delay:0.45s}
+@keyframes fadeUp { to{opacity:1;transform:translateY(0)} }
+.card {
+  position:relative;
+  border-radius:10px;
+  overflow:hidden;
+  width:100%; max-width:210px;
+  background:linear-gradient(170deg,#161c26 0%,#0e1218 100%);
+  transition:transform 0.28s cubic-bezier(.22,.68,0,1.2), box-shadow 0.28s;
+  cursor:default;
+}
+.card:hover { transform:translateY(-12px) scale(1.03); }
+.card-border {
+  position:absolute; inset:0;
+  border-radius:10px;
+  pointer-events:none; z-index:3;
+}
+.card-shine {
+  position:absolute; inset:0;
+  border-radius:10px;
+  pointer-events:none; z-index:2;
+  opacity:0;
+  transition:opacity 0.28s;
+}
+.card:hover .card-shine { opacity:1; }
+canvas { display:block; width:100%; }
+.info {
+  padding:0.85rem 0.9rem 1rem;
+  position:relative; z-index:4;
+}
+.lv-pill {
+  display:inline-flex; align-items:center; gap:0.3rem;
+  font-size:0.62rem; font-weight:700;
+  letter-spacing:0.16em; text-transform:uppercase;
+  padding:0.18rem 0.55rem; border-radius:99px;
+  margin-bottom:0.5rem;
+}
+.bldg-name {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.1rem; letter-spacing:0.07em; line-height:1;
+  margin-bottom:0.18rem;
+}
+.bldg-era {
+  font-size:0.68rem; font-weight:300;
+  font-style:italic; opacity:0.45;
+  margin-bottom:0.75rem;
+}
+.stat-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:0.3rem;
+}
+.stat {
+  background:rgba(255,255,255,0.035);
+  border-radius:5px; padding:0.3rem 0.45rem;
+}
+.stat-k {
+  font-size:0.55rem; letter-spacing:0.1em;
+  text-transform:uppercase; opacity:0.35; margin-bottom:0.08rem;
+}
+.stat-v { font-size:0.78rem; font-weight:700; }
+.upg-cost {
+  margin-top:0.65rem; padding:0.38rem 0.55rem;
+  border-radius:5px; font-size:0.67rem;
+  font-weight:500; text-align:center; letter-spacing:0.04em;
+}
+.dot {
+  width:9px; height:9px; border-radius:50%;
+  border:2px solid; flex-shrink:0;
+  position:relative; z-index:1;
+}
+
+/* Level color themes */
+.lv1 .card-border{border:1px solid rgba(160,125,75,0.4)}
+.lv1 .card-shine{box-shadow:inset 0 0 50px rgba(160,125,75,0.07),0 0 40px rgba(160,125,75,0.1)}
+.lv1 .lv-pill{background:rgba(160,125,75,0.14);color:#d4a870;border:1px solid rgba(160,125,75,0.28)}
+.lv1 .bldg-name{color:#d4a870} .lv1 .stat-v{color:#c8a068}
+.lv1 .upg-cost{background:rgba(160,125,75,0.09);color:#c8a068;border:1px solid rgba(160,125,75,0.18)}
+.lv1 .dot{color:#c8a068;border-color:#c8a068;box-shadow:0 0 8px rgba(200,160,104,0.5)}
+
+.lv2 .card-border{border:1px solid rgba(155,155,155,0.3)}
+.lv2 .card-shine{box-shadow:inset 0 0 50px rgba(155,155,155,0.05),0 0 35px rgba(155,155,155,0.08)}
+.lv2 .lv-pill{background:rgba(155,155,155,0.1);color:#b8b8b8;border:1px solid rgba(155,155,155,0.22)}
+.lv2 .bldg-name{color:#c8c8c8} .lv2 .stat-v{color:#b4b4b4}
+.lv2 .upg-cost{background:rgba(155,155,155,0.07);color:#aaa;border:1px solid rgba(155,155,155,0.16)}
+.lv2 .dot{color:#b4b4b4;border-color:#b4b4b4;box-shadow:0 0 8px rgba(180,180,180,0.4)}
+
+.lv3 .card-border{border:1px solid rgba(80,160,220,0.32)}
+.lv3 .card-shine{box-shadow:inset 0 0 50px rgba(80,160,220,0.06),0 0 40px rgba(80,160,220,0.1)}
+.lv3 .lv-pill{background:rgba(80,160,220,0.1);color:#7eb8ff;border:1px solid rgba(80,160,220,0.26)}
+.lv3 .bldg-name{color:#9aceff} .lv3 .stat-v{color:#7eb8ff}
+.lv3 .upg-cost{background:rgba(80,160,220,0.07);color:#7eb8ff;border:1px solid rgba(80,160,220,0.18)}
+.lv3 .dot{color:#7eb8ff;border-color:#7eb8ff;box-shadow:0 0 8px rgba(126,184,255,0.5)}
+
+.lv4 .card-border{border:1px solid rgba(90,200,170,0.32)}
+.lv4 .card-shine{box-shadow:inset 0 0 50px rgba(90,200,170,0.06),0 0 40px rgba(90,200,170,0.1)}
+.lv4 .lv-pill{background:rgba(90,200,170,0.1);color:#68d8c0;border:1px solid rgba(90,200,170,0.26)}
+.lv4 .bldg-name{color:#80e8d0} .lv4 .stat-v{color:#68d8c0}
+.lv4 .upg-cost{background:rgba(90,200,170,0.07);color:#68d8c0;border:1px solid rgba(90,200,170,0.18)}
+.lv4 .dot{color:#68d8c0;border-color:#68d8c0;box-shadow:0 0 8px rgba(104,216,192,0.5)}
+
+.lv5 .card-border{border:1px solid rgba(170,130,255,0.38)}
+.lv5 .card-shine{box-shadow:inset 0 0 60px rgba(170,130,255,0.09),0 0 55px rgba(170,130,255,0.16)}
+.lv5 .lv-pill{background:rgba(170,130,255,0.13);color:#c0a0ff;border:1px solid rgba(170,130,255,0.32)}
+.lv5 .bldg-name{color:#d0b8ff} .lv5 .stat-v{color:#c0a0ff}
+.lv5 .upg-cost{background:rgba(170,130,255,0.09);color:#c0a0ff;border:1px solid rgba(170,130,255,0.22)}
+.lv5 .dot{color:#c0a0ff;border-color:#c0a0ff;box-shadow:0 0 10px rgba(192,160,255,0.6)}
+
+@media(max-width:860px){
+  .timeline{flex-direction:column;align-items:center;gap:1.5rem}
+  .timeline::before{display:none}
+  .card{max-width:300px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>BAHAY — Upgrade Levels</h1>
+  <p>buildings/building.js · Residential · Level 1–5</p>
+  <div class="era-tag">Rural Nipa Hut → Glass Condo Tower</div>
+</header>
+<div class="timeline" id="timeline"></div>
+<script>
+var DATA = [
+  {lv:1,cls:'lv1',name:'Bahay Kubo',era:'Nipa Hut · Rural',pop:4,storage:50,hp:30,cost:'🪙80g 🌾20r',upg:'⬆ 150g · 40r'},
+  {lv:2,cls:'lv2',name:'Bahay na Bato',era:'Concrete Bungalow · 1960s',pop:8,storage:100,hp:60,cost:'⬆ 150g · 40r',upg:'⬆ 600g · 80r'},
+  {lv:3,cls:'lv3',name:'Townhouse',era:'3-Storey Rowhouse · 1990s',pop:12,storage:150,hp:90,cost:'⬆ 600g · 80r',upg:'⬆ 1350g · 120r'},
+  {lv:4,cls:'lv4',name:'Apartment Blg.',era:'Modern Mid-Rise · 2010s',pop:16,storage:200,hp:120,cost:'⬆ 1350g · 120r',upg:'⬆ 2400g · 160r'},
+  {lv:5,cls:'lv5',name:'Condo Tower',era:'Glass High-Rise · Future',pop:20,storage:250,hp:150,cost:'⬆ 2400g · 160r',upg:'✦ MAX LEVEL'},
+];
+var CVH=[175,205,235,265,310];
+
+/* ═══════════════ DRAW LV1 — Nipa Hut ═══════════════ */
+function drawLv1(ctx,W,H,now){
+  var t=now*.001, cx=W/2, gnd=H*.84;
+  var g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#28180a');g.addColorStop(1,'#4a2e12');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // stars
+  ctx.fillStyle='rgba(255,240,200,0.6)';
+  [[.15,.08],[.7,.12],[.35,.05],[.85,.2],[.5,.15]].forEach(function(s){
+    var br=Math.sin(t*1.5+s[0]*10)*.3+.7;
+    ctx.globalAlpha=br*.5;
+    ctx.beginPath();ctx.arc(s[0]*W,s[1]*H,.8,0,Math.PI*2);ctx.fill();
+  });
+  ctx.globalAlpha=1;
+  // ground
+  ctx.fillStyle='#3d5c18';ctx.fillRect(0,gnd,W,H-gnd);
+  ctx.fillStyle='#4a7020';ctx.fillRect(0,gnd,W,3);
+  var sc=W/180;
+  ctx.save();ctx.translate(cx,gnd);
+  // stilts
+  ctx.strokeStyle='#7a5228';ctx.lineWidth=2.5*sc;
+  [[-26,-14],[26,-14],[-14,-14],[14,-14]].forEach(function(p){
+    ctx.beginPath();ctx.moveTo(p[0]*sc,0);ctx.lineTo(p[0]*sc,-36*sc);ctx.stroke();
+  });
+  // floor
+  ctx.fillStyle='#9a7038';ctx.fillRect(-32*sc,-40*sc,64*sc,5*sc);
+  for(var i=0;i<7;i++){ctx.strokeStyle='rgba(50,25,5,.3)';ctx.lineWidth=.5*sc;ctx.beginPath();ctx.moveTo((-32+i*10)*sc,-40*sc);ctx.lineTo((-32+i*10)*sc,-35*sc);ctx.stroke();}
+  // walls — bamboo weave
+  ctx.fillStyle='#c8a04a';ctx.fillRect(-28*sc,-76*sc,56*sc,36*sc);
+  ctx.strokeStyle='rgba(90,60,15,.32)';ctx.lineWidth=.7*sc;
+  for(var wi=0;wi<5;wi++){ctx.beginPath();ctx.moveTo(-28*sc,(-76+wi*9)*sc);ctx.lineTo(28*sc,(-76+wi*9)*sc);ctx.stroke();}
+  for(var wj=0;wj<5;wj++){ctx.beginPath();ctx.moveTo((-28+wj*14)*sc,-76*sc);ctx.lineTo((-28+wj*14)*sc,-40*sc);ctx.stroke();}
+  // roof
+  ctx.fillStyle='#8a4e1e';
+  ctx.beginPath();
+  ctx.moveTo(-50*sc,-76*sc);ctx.quadraticCurveTo(-42*sc,-66*sc,-38*sc,-76*sc);
+  ctx.lineTo(38*sc,-76*sc);ctx.quadraticCurveTo(42*sc,-66*sc,50*sc,-76*sc);
+  ctx.lineTo(22*sc,-112*sc);ctx.lineTo(-22*sc,-112*sc);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#5e3210';
+  ctx.beginPath();ctx.moveTo(-26*sc,-108*sc);ctx.lineTo(0,-124*sc);ctx.lineTo(26*sc,-108*sc);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(45,22,4,.28)';ctx.lineWidth=.6*sc;
+  for(var ri=0;ri<7;ri++){var ry=(-76-ri*5)*sc;ctx.beginPath();ctx.moveTo(-50*sc+ri*3*sc,ry);ctx.lineTo(50*sc-ri*3*sc,ry);ctx.stroke();}
+  // door
+  ctx.fillStyle='rgba(45,22,4,.88)';ctx.fillRect(-8*sc,-72*sc,16*sc,24*sc);
+  ctx.strokeStyle='#6b3a10';ctx.lineWidth=.8*sc;ctx.strokeRect(-8*sc,-72*sc,16*sc,24*sc);
+  ctx.beginPath();ctx.moveTo(0,-72*sc);ctx.lineTo(0,-48*sc);ctx.stroke();
+  // window
+  ctx.fillStyle='rgba(255,200,100,.5)';ctx.fillRect(-24*sc,-68*sc,11*sc,8*sc);
+  // sway palm
+  var sw=Math.sin(t*1.1)*3*sc;
+  ctx.strokeStyle='#4a8a28';ctx.lineWidth=1.8*sc;
+  ctx.beginPath();ctx.moveTo(40*sc,0);ctx.quadraticCurveTo(42*sc,-32*sc,40*sc+sw,-62*sc);ctx.stroke();
+  ctx.fillStyle='#5aaa32';
+  [0,55,110,165,220].forEach(function(a){var ar=a*Math.PI/180+sw/18;ctx.beginPath();ctx.ellipse(40*sc+sw+Math.cos(ar)*13*sc,-62*sc+Math.sin(ar)*7*sc,13*sc,3*sc,ar,0,Math.PI*2);ctx.fill();});
+  ctx.restore();
+}
+
+/* ═══════════════ DRAW LV2 — Concrete Bungalow ═══════════════ */
+function drawLv2(ctx,W,H,now){
+  var t=now*.001,cx=W/2,gnd=H*.82;
+  var g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1a2232');g.addColorStop(1,'#252e3e');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#1e2818';ctx.fillRect(0,gnd,W,H-gnd);
+  ctx.fillStyle='#2a3620';ctx.fillRect(0,gnd,W,3);
+  var sc=W/180;
+  ctx.save();ctx.translate(cx,gnd);
+  // slab
+  ctx.fillStyle='#7a7870';ctx.fillRect(-50*sc,-7*sc,100*sc,7*sc);
+  // walls
+  ctx.fillStyle='#c2baaa';ctx.fillRect(-46*sc,-62*sc,92*sc,55*sc);
+  var sg=ctx.createLinearGradient(-46*sc,0,46*sc,0);sg.addColorStop(0,'rgba(0,0,0,0)');sg.addColorStop(.8,'rgba(0,0,0,0)');sg.addColorStop(1,'rgba(0,0,0,.2)');
+  ctx.fillStyle=sg;ctx.fillRect(-46*sc,-62*sc,92*sc,55*sc);
+  ctx.strokeStyle='rgba(100,90,80,.14)';ctx.lineWidth=.5*sc;
+  for(var i=0;i<4;i++){ctx.beginPath();ctx.moveTo(-46*sc,(-62+i*14)*sc);ctx.lineTo(46*sc,(-62+i*14)*sc);ctx.stroke();}
+  // flat roof + parapet
+  ctx.fillStyle='#9a9288';ctx.fillRect(-50*sc,-66*sc,100*sc,5*sc);
+  ctx.fillStyle='#b0a898';ctx.fillRect(-54*sc,-70*sc,108*sc,5*sc);
+  // water tank
+  ctx.fillStyle='#7a7a7a';ctx.fillRect(18*sc,-82*sc,20*sc,14*sc);
+  ctx.fillStyle='#686868';ctx.fillRect(20*sc,-84*sc,16*sc,4*sc);
+  // door
+  ctx.fillStyle='#523416';ctx.fillRect(-11*sc,-52*sc,22*sc,45*sc);
+  ctx.fillStyle='#6a4422';ctx.fillRect(-10*sc,-51*sc,9*sc,18*sc);ctx.fillRect(1*sc,-51*sc,9*sc,18*sc);
+  ctx.fillStyle='#c8903a';ctx.beginPath();ctx.arc(9*sc,-27*sc,2*sc,0,Math.PI*2);ctx.fill();
+  // windows + awnings
+  ctx.fillStyle='#a0c4d4';ctx.fillRect(-43*sc,-54*sc,22*sc,15*sc);ctx.fillRect(21*sc,-54*sc,22*sc,15*sc);
+  ctx.strokeStyle='#888';ctx.lineWidth=1.2*sc;ctx.strokeRect(-43*sc,-54*sc,22*sc,15*sc);ctx.strokeRect(21*sc,-54*sc,22*sc,15*sc);
+  ctx.fillStyle='rgba(70,50,15,.78)';ctx.fillRect(-45*sc,-57*sc,26*sc,5*sc);ctx.fillRect(19*sc,-57*sc,26*sc,5*sc);
+  ctx.strokeStyle='rgba(120,155,175,.55)';ctx.lineWidth=.7*sc;
+  ctx.beginPath();ctx.moveTo(-32*sc,-54*sc);ctx.lineTo(-32*sc,-39*sc);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(32*sc,-54*sc);ctx.lineTo(32*sc,-39*sc);ctx.stroke();
+  // fence
+  ctx.strokeStyle='#7a6040';ctx.lineWidth=.9*sc;
+  for(var fi=-4;fi<=4;fi++){ctx.beginPath();ctx.moveTo(fi*12*sc,0);ctx.lineTo(fi*12*sc,-9*sc);ctx.stroke();}
+  ctx.beginPath();ctx.moveTo(-48*sc,-7*sc);ctx.lineTo(48*sc,-7*sc);ctx.stroke();
+  ctx.restore();
+}
+
+/* ═══════════════ DRAW LV3 — Townhouse 3F ═══════════════ */
+function drawLv3(ctx,W,H,now){
+  var t=now*.001,cx=W/2,gnd=H*.83;
+  var g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#0e1828');g.addColorStop(1,'#1a2838');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(25,40,60,.55)';ctx.fillRect(0,gnd-18,W,18);
+  ctx.fillStyle='#181e12';ctx.fillRect(0,gnd,W,H-gnd);
+  var sc=W/180;
+  ctx.save();ctx.translate(cx,gnd);
+  // bg buildings
+  ctx.fillStyle='rgba(18,30,48,.85)';ctx.fillRect(-90*sc,-85*sc,22*sc,85*sc);ctx.fillRect(68*sc,-65*sc,18*sc,65*sc);
+  // foundation
+  ctx.fillStyle='#606060';ctx.fillRect(-42*sc,-7*sc,84*sc,7*sc);
+  // wall helper
+  function flr(y0,y1,c){ctx.fillStyle=c;ctx.fillRect(-38*sc,y1*sc,76*sc,(y0-y1)*sc);}
+  flr(0,-55,'#bdbab0');flr(-55,-105,'#c5c2b8');flr(-105,-150,'#cac7be');
+  var sg=ctx.createLinearGradient(-38*sc,0,38*sc,0);sg.addColorStop(0,'rgba(0,0,0,0)');sg.addColorStop(.82,'rgba(0,0,0,0)');sg.addColorStop(1,'rgba(0,0,0,.17)');
+  ctx.fillStyle=sg;ctx.fillRect(-38*sc,-150*sc,76*sc,150*sc);
+  // floor bands
+  ctx.fillStyle='#6a6858';ctx.fillRect(-42*sc,-57*sc,84*sc,4*sc);ctx.fillRect(-42*sc,-107*sc,84*sc,4*sc);
+  // window fn
+  function win(x,y,ww,wh,lit,ac){
+    ctx.fillStyle='#5a5a5a';ctx.fillRect((x-2)*sc,(y-2)*sc,(ww+4)*sc,(wh+4)*sc);
+    ctx.fillStyle=lit?'rgba(165,215,235,.72)':'rgba(35,60,85,.55)';ctx.fillRect(x*sc,y*sc,ww*sc,wh*sc);
+    ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=.7*sc;
+    ctx.beginPath();ctx.moveTo((x+ww/2)*sc,y*sc);ctx.lineTo((x+ww/2)*sc,(y+wh)*sc);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x*sc,(y+wh*.45)*sc);ctx.lineTo((x+ww)*sc,(y+wh*.45)*sc);ctx.stroke();
+    if(ac){ctx.fillStyle='#888';ctx.fillRect(x*sc,(y+wh-5)*sc,ww*sc,5*sc);}
+  }
+  win(-35,-49,20,13,true,false);win(15,-49,20,13,true,false);
+  win(-35,-99,20,13,Math.sin(t*.4+1)>.1,true);win(15,-99,20,13,Math.sin(t*.4+2)>.1,true);
+  win(-35,-144,20,13,Math.sin(t*.4+3)>0,false);win(15,-144,20,13,Math.sin(t*.4+4)>0,false);
+  // door
+  ctx.fillStyle='#2e2e2e';ctx.fillRect(-9*sc,-50*sc,18*sc,50*sc);
+  ctx.fillStyle='#484848';ctx.fillRect(-8*sc,-49*sc,7*sc,19*sc);ctx.fillRect(1*sc,-49*sc,7*sc,19*sc);
+  ctx.fillStyle='#c8c000';ctx.beginPath();ctx.arc(7.5*sc,-29*sc,1.8*sc,0,Math.PI*2);ctx.fill();
+  // rooftop
+  ctx.fillStyle='#808070';ctx.fillRect(-42*sc,-152*sc,84*sc,4*sc);
+  ctx.fillStyle='#8a8878';ctx.fillRect(-46*sc,-156*sc,92*sc,5*sc);
+  // railing
+  ctx.strokeStyle='#525040';ctx.lineWidth=.9*sc;
+  for(var ri=-4;ri<=4;ri++){ctx.beginPath();ctx.moveTo(ri*10*sc,-149*sc);ctx.lineTo(ri*10*sc,-160*sc);ctx.stroke();}
+  ctx.beginPath();ctx.moveTo(-42*sc,-160*sc);ctx.lineTo(42*sc,-160*sc);ctx.stroke();
+  ctx.restore();
+}
+
+/* ═══════════════ DRAW LV4 — Modern Apartment ═══════════════ */
+function drawLv4(ctx,W,H,now){
+  var t=now*.001,cx=W/2,gnd=H*.85;
+  var g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#090d18');g.addColorStop(1,'#121a28');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  var sc=W/180;
+  ctx.save();ctx.translate(cx,gnd);
+  // BG city
+  var bgb=[{x:-95,w:28,h:130,c:'rgba(18,32,52,.9)'},{x:-68,w:18,h:95,c:'rgba(16,28,45,.9)'},{x:48,w:26,h:115,c:'rgba(18,32,52,.9)'},{x:74,w:16,h:78,c:'rgba(16,28,45,.9)'}];
+  bgb.forEach(function(b){ctx.fillStyle=b.c;ctx.fillRect(b.x*sc,-b.h*sc,b.w*sc,b.h*sc);});
+  // road
+  ctx.fillStyle='#181c22';ctx.fillRect(-W/2,-7,W,7);
+  ctx.strokeStyle='rgba(255,255,100,.2)';ctx.lineWidth=1.2*sc;ctx.setLineDash([10*sc,8*sc]);
+  ctx.beginPath();ctx.moveTo(-W/2,0);ctx.lineTo(W/2,0);ctx.stroke();ctx.setLineDash([]);
+  // podium
+  var bW=76*sc;
+  ctx.fillStyle='#3e424e';ctx.fillRect(-bW/2,-55*sc,bW,55*sc);
+  ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(bW/2-7*sc,-55*sc,7*sc,55*sc);
+  // tower body
+  ctx.fillStyle='#32363f';ctx.fillRect(-bW/2,-180*sc,bW,125*sc);
+  ctx.fillStyle='rgba(0,0,0,.22)';ctx.fillRect(bW/2-7*sc,-180*sc,7*sc,125*sc);
+  // window grid
+  var wc=4,wr=7,wW=12*sc,wH=16*sc,gx=5*sc,gy=5*sc;
+  var tw=(wc*(wW+gx))-gx,sx=-tw/2,sy=-180*sc+10*sc;
+  for(var r=0;r<wr;r++){
+    for(var c=0;c<wc;c++){
+      var wx=sx+c*(wW+gx),wy=sy+r*(wH+gy);
+      var lit=Math.sin(t*.28+r*1.05+c*.8)>-.2;
+      ctx.fillStyle=lit?'rgba(195,228,255,.62)':'rgba(30,58,90,.5)';ctx.fillRect(wx,wy,wW,wH);
+      if(lit){ctx.fillStyle='rgba(255,255,255,.1)';ctx.fillRect(wx,wy,wW,wH*.3);}
+      ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=.5*sc;ctx.strokeRect(wx,wy,wW,wH);
+    }
+  }
+  // floor lines
+  ctx.strokeStyle='rgba(255,255,255,.05)';ctx.lineWidth=.8*sc;
+  for(var fl=0;fl<wr;fl++){var fy=sy+fl*(wH+gy)-gy/2;ctx.beginPath();ctx.moveTo(-bW/2,fy);ctx.lineTo(bW/2,fy);ctx.stroke();}
+  // lobby
+  ctx.fillStyle='#181c28';ctx.fillRect(-21*sc,-50*sc,42*sc,50*sc);
+  ctx.fillStyle='rgba(120,190,250,.12)';ctx.fillRect(-19*sc,-48*sc,38*sc,48*sc);
+  ctx.strokeStyle='rgba(180,220,255,.35)';ctx.lineWidth=1.2*sc;ctx.strokeRect(-19*sc,-48*sc,38*sc,48*sc);
+  ctx.strokeStyle='rgba(180,220,255,.5)';ctx.lineWidth=.9*sc;
+  ctx.beginPath();ctx.moveTo(0,-48*sc);ctx.lineTo(0,0);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-19*sc,-28*sc);ctx.lineTo(19*sc,-28*sc);ctx.stroke();
+  ctx.fillStyle='rgba(255,225,140,.15)';ctx.beginPath();ctx.arc(0,-24*sc,18*sc,0,Math.PI*2);ctx.fill();
+  // podium windows
+  ctx.fillStyle='rgba(140,200,235,.52)';
+  ctx.fillRect(-bW/2+7*sc,-44*sc,15*sc,18*sc);ctx.fillRect(bW/2-22*sc,-44*sc,15*sc,18*sc);
+  // roof
+  ctx.fillStyle='#262a34';ctx.fillRect(-bW/2,-180*sc,bW,9*sc);
+  // blink light
+  var bl=Math.sin(t*2.8)>0;
+  ctx.fillStyle=bl?'rgba(255,50,50,1)':'rgba(255,50,50,.1)';
+  ctx.beginPath();ctx.arc(0,-180*sc+4*sc,3*sc,0,Math.PI*2);ctx.fill();
+  // antenna
+  ctx.strokeStyle='#777';ctx.lineWidth=1.2*sc;
+  ctx.beginPath();ctx.moveTo(28*sc,-180*sc);ctx.lineTo(28*sc,-200*sc);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(28*sc,-200*sc);ctx.lineTo(36*sc,-194*sc);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(28*sc,-200*sc);ctx.lineTo(20*sc,-194*sc);ctx.stroke();
+  ctx.restore();
+}
+
+/* ═══════════════ DRAW LV5 — Glass Condo Tower ═══════════════ */
+function drawLv5(ctx,W,H,now){
+  var t=now*.001,cx=W/2,gnd=H*.87;
+  var g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#04060e');g.addColorStop(.7,'#080e1a');g.addColorStop(1,'#0c1222');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // stars
+  var seed=99991;
+  function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
+  for(var si=0;si<50;si++){
+    var sx=rnd()*W,sy=rnd()*(H*.55),sa=(Math.sin(t*.8+si)*.25+.75)*(rnd()*.5+.3);
+    ctx.fillStyle='rgba(255,255,255,'+sa+')';
+    ctx.beginPath();ctx.arc(sx,sy,rnd()*.9+.2,0,Math.PI*2);ctx.fill();
+  }
+  var sc=W/180;
+  ctx.save();ctx.translate(cx,gnd);
+  // city bg
+  var bgb2=[{x:-105,w:26,h:155},{x:-80,w:16,h:110},{x:-65,w:12,h:85},{x:52,w:24,h:140},{x:76,w:16,h:95},{x:92,w:14,h:65}];
+  bgb2.forEach(function(b){
+    ctx.fillStyle='rgba(12,22,40,.92)';ctx.fillRect(b.x*sc,-b.h*sc,b.w*sc,b.h*sc);
+    for(var bx2=b.x+2;bx2<b.x+b.w-4;bx2+=7){
+      for(var by2=-b.h+4;by2<-5;by2+=11){
+        if(Math.sin(bx2*17+by2*7)>.1){ctx.fillStyle='rgba(255,220,100,.18)';ctx.fillRect(bx2*sc,by2*sc,4*sc,7*sc);}
+      }
+    }
+  });
+  // road
+  ctx.fillStyle='#0e1216';ctx.fillRect(-W/2,-6,W,6);
+  ctx.strokeStyle='rgba(255,255,100,.15)';ctx.lineWidth=1*sc;ctx.setLineDash([9*sc,7*sc]);
+  ctx.beginPath();ctx.moveTo(-W/2,0);ctx.lineTo(W/2,0);ctx.stroke();ctx.setLineDash([]);
+  // tower dims
+  var tW=64*sc,tH=265*sc;
+  var tX=-tW/2;
+  // glow halo
+  var halo=ctx.createRadialGradient(0,-tH*.5,5*sc,0,-tH*.5,tW*.9);
+  halo.addColorStop(0,'rgba(90,160,255,.07)');halo.addColorStop(1,'rgba(90,160,255,0)');
+  ctx.fillStyle=halo;ctx.fillRect(tX-25*sc,-tH-25*sc,tW+50*sc,tH+25*sc);
+  // main body — slight taper top 40%
+  ctx.fillStyle='#181e2c';
+  ctx.beginPath();
+  ctx.moveTo(tX,0);ctx.lineTo(tX,-tH);ctx.lineTo(-tX-6*sc,-tH);ctx.lineTo(-tX,0);ctx.closePath();ctx.fill();
+  // right shadow
+  ctx.fillStyle='rgba(0,0,0,.3)';
+  ctx.beginPath();ctx.moveTo(-tX-6*sc,0);ctx.lineTo(-tX-6*sc,-tH);ctx.lineTo(-tX-6*sc+8*sc,-tH);ctx.lineTo(-tX+8*sc,0);ctx.closePath();ctx.fill();
+  // curtain wall windows
+  var wc2=5,wr2=20,wW2=8*sc,wH2=10*sc,gx2=3*sc,gy2=3*sc;
+  var tw2=(wc2*(wW2+gx2))-gx2,sx2=-tw2/2,sy2=-tH+14*sc;
+  for(var r2=0;r2<wr2;r2++){
+    for(var c2=0;c2<wc2;c2++){
+      var wx2=sx2+c2*(wW2+gx2),wy2=sy2+r2*(wH2+gy2);
+      var ph=Math.sin(t*.2+r2*.38+c2*1.05);
+      var lit2=ph>-.25;
+      var warm=Math.sin(t*.1+r2*.22+c2*.6)>.4;
+      ctx.fillStyle=lit2?(warm?'rgba(255,238,175,.7)':'rgba(185,222,255,.65)'):'rgba(18,38,65,.55)';
+      ctx.fillRect(wx2,wy2,wW2,wH2);
+      if(lit2){ctx.fillStyle='rgba(255,255,255,.12)';ctx.fillRect(wx2,wy2,wW2,wH2*.3);}
+      ctx.strokeStyle='rgba(255,255,255,.05)';ctx.lineWidth=.4*sc;ctx.strokeRect(wx2,wy2,wW2,wH2);
+    }
+  }
+  // floor spandrels
+  ctx.fillStyle='rgba(255,255,255,.03)';
+  for(var fb=0;fb<wr2;fb++){var fy2=sy2+fb*(wH2+gy2)-gy2/2;ctx.fillRect(tX,fy2,tW-6*sc,gy2);}
+  // vertical fins
+  ctx.strokeStyle='rgba(120,180,255,.07)';ctx.lineWidth=1*sc;
+  for(var vf=1;vf<wc2;vf++){
+    var vx=sx2+vf*(wW2+gx2)-gx2/2;
+    ctx.beginPath();ctx.moveTo(vx,-tH);ctx.lineTo(vx,0);ctx.stroke();
+  }
+  // podium
+  ctx.fillStyle='#222838';ctx.fillRect(-tW/2-10*sc,-58*sc,tW+20*sc,58*sc);
+  ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(tW/2+3*sc,-58*sc,7*sc,58*sc);
+  // glass lobby
+  ctx.fillStyle='rgba(80,160,255,.06)';ctx.fillRect(-22*sc,-55*sc,44*sc,55*sc);
+  ctx.strokeStyle='rgba(160,210,255,.32)';ctx.lineWidth=1*sc;
+  for(var ml=-2;ml<=2;ml++){ctx.beginPath();ctx.moveTo(ml*11*sc,-55*sc);ctx.lineTo(ml*11*sc,0);ctx.stroke();}
+  ctx.beginPath();ctx.moveTo(-22*sc,-32*sc);ctx.lineTo(22*sc,-32*sc);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-22*sc,-55*sc);ctx.lineTo(22*sc,-55*sc);ctx.stroke();
+  ctx.fillStyle='rgba(255,220,130,.12)';ctx.beginPath();ctx.arc(0,-28*sc,26*sc,0,Math.PI*2);ctx.fill();
+  // crown
+  ctx.fillStyle='#1e2438';ctx.fillRect(-tW/2,-tH,tW-6*sc,10*sc);
+  ctx.fillStyle='#16182a';ctx.fillRect(-6*sc,-tH-28*sc,12*sc,28*sc);
+  ctx.fillStyle='#12141e';ctx.fillRect(-3*sc,-tH-56*sc,6*sc,28*sc);
+  // spire tip
+  ctx.fillStyle='#c0d8ff';
+  ctx.beginPath();ctx.moveTo(-2.5*sc,-tH-56*sc);ctx.lineTo(0,-tH-70*sc);ctx.lineTo(2.5*sc,-tH-56*sc);ctx.closePath();ctx.fill();
+  // blink
+  var bl2=Math.sin(t*3.2)>0;
+  ctx.fillStyle=bl2?'rgba(255,50,50,1)':'rgba(255,50,50,.08)';
+  ctx.beginPath();ctx.arc(0,-tH-68*sc,2.5*sc,0,Math.PI*2);ctx.fill();
+  if(bl2){ctx.fillStyle='rgba(255,50,50,.18)';ctx.beginPath();ctx.arc(0,-tH-68*sc,7*sc,0,Math.PI*2);ctx.fill();}
+  // reflection
+  ctx.save();ctx.globalAlpha=.06;ctx.scale(1,-.14);
+  ctx.fillStyle='#7eb8ff';ctx.fillRect(tX,5*sc,tW,tH);ctx.restore();
+  ctx.restore();
+}
+
+/* ═══════════════ BUILD DOM ═══════════════ */
+var drawFns=[null,drawLv1,drawLv2,drawLv3,drawLv4,drawLv5];
+var canvases=[];
+var timeline=document.getElementById('timeline');
+
+DATA.forEach(function(d,i){
+  var wrap=document.createElement('div');
+  wrap.className='card-wrap '+d.cls;
+  var card=document.createElement('div');
+  card.className='card';
+  var shine=document.createElement('div');shine.className='card-shine';
+  var border=document.createElement('div');border.className='card-border';
+  var cvs=document.createElement('canvas');
+  cvs.width=200;cvs.height=CVH[i];cvs.style.height=CVH[i]+'px';
+  var info=document.createElement('div');info.className='info';
+  var pill=document.createElement('div');pill.className='lv-pill';pill.textContent='LEVEL '+d.lv;
+  var name=document.createElement('div');name.className='bldg-name';name.textContent=d.name;
+  var era=document.createElement('div');era.className='bldg-era';era.textContent=d.era;
+  var sg=document.createElement('div');sg.className='stat-grid';
+  sg.innerHTML='<div class="stat"><div class="stat-k">Population</div><div class="stat-v">+'+d.pop+'</div></div>'+
+    '<div class="stat"><div class="stat-k">Rice Storage</div><div class="stat-v">+'+d.storage+'</div></div>'+
+    '<div class="stat"><div class="stat-k">Defence HP</div><div class="stat-v">'+d.hp+'</div></div>'+
+    '<div class="stat"><div class="stat-k">Workers</div><div class="stat-v">0 slots</div></div>';
+  var uc=document.createElement('div');uc.className='upg-cost';uc.textContent=d.upg;
+  info.appendChild(pill);info.appendChild(name);info.appendChild(era);info.appendChild(sg);info.appendChild(uc);
+  card.appendChild(shine);card.appendChild(border);card.appendChild(cvs);card.appendChild(info);
+  var dot=document.createElement('div');dot.className='dot';
+  wrap.appendChild(card);wrap.appendChild(dot);
+  timeline.appendChild(wrap);
+  canvases.push({cvs:cvs,lv:d.lv});
+});
+
+function loop(){
+  var now=performance.now();
+  canvases.forEach(function(c){drawFns[c.lv](c.cvs.getContext('2d'),c.cvs.width,c.cvs.height,now);});
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
