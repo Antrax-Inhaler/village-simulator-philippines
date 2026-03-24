@@ -95,7 +95,7 @@
       .audio-widget .vol-slider { width: 55px; }
     }
 
-    /* ── Centered Time/Day Display (no background) ── */
+    /* ── Centered Time/Day Display ── */
     #center-time {
       position: absolute;
       top: 12px;
@@ -105,30 +105,77 @@
       text-align: center;
       pointer-events: none;
       font-family: var(--font-display);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    #center-time .time-main {
-      font-size: 24px;
+    #center-time .day-sub {
+      font-size: 18px;
       color: #f5c842;
       text-shadow: 0 2px 8px rgba(0,0,0,0.5);
       letter-spacing: 0.08em;
       font-weight: bold;
       line-height: 1.2;
+      font-family: var(--font-display);
+      margin-bottom: 2px;
     }
-    #center-time .day-sub {
-      font-size: 12px;
+    #center-time .time-main {
+      font-size: 14px;
       color: #c49a4e;
       text-shadow: 0 1px 4px rgba(0,0,0,0.4);
       letter-spacing: 0.05em;
       font-family: var(--font-mono);
     }
     @media (min-width: 1024px) {
-      #center-time .time-main { font-size: 32px; }
-      #center-time .day-sub { font-size: 14px; }
+      #center-time .day-sub { font-size: 24px; }
+      #center-time .time-main { font-size: 16px; }
     }
     @media (max-height: 480px) and (orientation: landscape) {
-      #center-time .time-main { font-size: 18px; }
-      #center-time .day-sub { font-size: 10px; }
-      #center-time { top: 6px; }
+      #center-time .day-sub { font-size: 14px; }
+      #center-time .time-main { font-size: 10px; }
+      #center-time { top: 4px; }
+    }
+
+    /* ── Settings Button (Top Right) ─────────────────────────── */
+    #settings-btn-container {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 24;
+      pointer-events: all;
+    }
+
+    .settings-btn {
+      width: 40px;
+      height: 40px;
+      background: rgba(10,6,2,0.85);
+      border: 1.5px solid #c49a4e;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      color: #f5c842;
+    }
+
+    .settings-btn:hover {
+      background: rgba(42,24,12,0.95);
+      transform: scale(1.05);
+      border-color: #f5c842;
+    }
+
+    @media (max-width: 768px) {
+      .settings-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+        top: 8px;
+        right: 8px;
+      }
     }
   </style>
 </head>
@@ -136,7 +183,6 @@
 
   <!-- ══════════════════════════════════════════
        PORTRAIT LOCK OVERLAY
-       Shown only on mobile portrait orientation.
   ══════════════════════════════════════════ -->
   <div id="portrait-lock" aria-hidden="true">
     <div id="portrait-lock-inner">
@@ -172,53 +218,56 @@
     <div id="canvas-container">
       <canvas id="gameCanvas"></canvas>
 
-      <!-- ── Centered Time/Day Display (no background) ── -->
+      <!-- Centered Time/Day Display -->
       <div id="center-time">
-        <div class="time-main" id="centerTimeStr">12:00 PM</div>
         <div class="day-sub" id="centerDayStr">Araw 1</div>
+        <div class="time-main" id="centerTimeStr">12:00 PM</div>
       </div>
-
-      <!-- waste display now inside #left-sidebar (dashboard.js) -->
     </div>
 
-      <!-- ── FAB: Government / Trade actions ── -->
-      <div id="fab-gov" class="fab-toolbar">
-        <div class="fab-item fab-shop-btn" onclick="openShop()" data-label="Tindahan">🏗️</div>
-        <div class="fab-item" onclick="openSidePanel('trade')"  data-label="Kalakalan">⚓</div>
-        <div class="fab-item" onclick="openSidePanel('policy')" data-label="Patakaran">📜</div>
-        <div class="fab-item" onclick="openSidePanel('tax')"    data-label="Buwis">💰</div>
-        <div class="fab-item" onclick="openSidePanel('expand')" data-label="Palawakin">🗺️</div>
-        <div class="fab-item" onclick="triggerSave()"           data-label="I-save">💾</div>
-        <div class="fab-item" onclick="triggerLoad()"           data-label="I-load">📂</div>
-      </div>
+    <!-- Settings Button (Top Right) -->
+    <div id="settings-btn-container">
+      <div id="settings-btn" class="settings-btn" onclick="openSettingsPanel()">⚙️</div>
+    </div>
 
-      <!-- ── Mobile FAB tray (collapsed by default) ── -->
-      <div id="fab-gov-tray" class="fab-tray-closed" style="display:none">
-        <!-- Toggle trigger -->
-        <div id="fab-gov-toggle" class="fab-item" onclick="_fabTrayToggle()" data-label="Menu" style="border-color:#c49a4e;z-index:29;">⚙️</div>
-        <!-- Tray items (shown when open) -->
-        <div class="fab-item fab-tray-item fab-shop-btn" onclick="openShop();_fabTrayToggle()"          data-label="Tindahan">🏗️</div>
-        <div class="fab-item fab-tray-item" onclick="openSidePanel('trade');_fabTrayToggle()"           data-label="Kalakalan">⚓</div>
-        <div class="fab-item fab-tray-item" onclick="openSidePanel('policy');_fabTrayToggle()"          data-label="Patakaran">📜</div>
-        <div class="fab-item fab-tray-item" onclick="openSidePanel('tax');_fabTrayToggle()"             data-label="Buwis">💰</div>
-        <div class="fab-item fab-tray-item" onclick="openSidePanel('expand');_fabTrayToggle()"          data-label="Palawakin">🗺️</div>
-        <div class="fab-item fab-tray-item" onclick="triggerSave();_fabTrayToggle()"                    data-label="I-save">💾</div>
-        <div class="fab-item fab-tray-item" onclick="triggerLoad();_fabTrayToggle()"                    data-label="I-load">📂</div>
-      </div>
-
-      <!-- ── FAB: Activity log ── -->
-      <div id="fab-log" class="fab-toolbar fab-toolbar-log" style="bottom:calc(14px + 7*52px + 8px);">
-        <div class="fab-item fab-log-btn" onclick="openSidePanel('log')" data-label="Talaan ng Buhay">
-          📋
-          <span id="fab-log-badge" class="fab-badge" style="display:none">0</span>
+    <!-- Settings Panel (Modal) -->
+    <div id="settings-panel" class="settings-modal">
+      <div class="settings-modal-content">
+        <div class="settings-modal-header">
+          <span class="settings-modal-title">⚙️ MGA SETTING</span>
+          <button class="settings-modal-close" onclick="closeSettingsPanel()">✕</button>
+        </div>
+        <div class="settings-modal-body">
+          <button class="settings-action-btn" onclick="triggerSave()">💾 I-save ang Laro</button>
+          <button class="settings-action-btn" onclick="triggerLoad()">📂 I-load ang Laro</button>
+          <div class="settings-sound-row">
+            <span>🔊 Tunog</span>
+            <input type="range" id="settings-volume-slider" class="settings-volume-slider" min="0" max="1" step="0.01" value="0.5">
+            <span id="settings-vol-icon">🔊</span>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- ── Unified right side panel ── -->
-      <div id="side-panel">
-        <div id="side-panel-inner"></div>
+    <!-- FAB: Government actions (stacked above Tindahan) -->
+    <div id="fab-gov" class="fab-toolbar">
+      <div class="fab-item" onclick="openSidePanel('log')" data-label="Talaan ng Buhay">📋</div>
+      <div class="fab-item" onclick="openSidePanel('policy')" data-label="Mga Patakaran">📜</div>
+      <div class="fab-item" onclick="openSidePanel('tax')" data-label="Buwis">💰</div>
+      <div class="fab-item" onclick="openSidePanel('trade')" data-label="Kalakalan">⚓</div>
+    </div>
+
+    <!-- Tindahan Button (Bottom Right, Large) -->
+    <div id="shop-btn-container">
+      <div id="shop-btn" class="shop-btn" onclick="openShop()">
+        <div class="shop-btn-icon">🏗️</div>
+        <div class="shop-btn-text">TINDAHAN</div>
       </div>
+    </div>
 
+    <!-- Unified right side panel -->
+    <div id="side-panel">
+      <div id="side-panel-inner"></div>
     </div>
 
   </div><!-- /#game-wrap -->
@@ -235,20 +284,20 @@
 
   <script>
     // ─────────────────────────────────────────────────────────────
-    // Background Music Handler (audio/background/welcome.mp3)
+    // Background Music Handler
     // ─────────────────────────────────────────────────────────────
     (function initBackgroundAudio() {
       const audioSrc = "audio/background/welcome.mp3";
       let bgAudio = null;
       let isPlaying = false;
-      let userInteracted = false; // to comply with autoplay policies
+      let userInteracted = false;
       
-      // DOM elements
       const playPauseBtn = document.getElementById('audioPlayPauseBtn');
       const volumeSlider = document.getElementById('audioVolumeSlider');
       const volIconSpan = document.getElementById('audioVolIcon');
+      const settingsVolumeSlider = document.getElementById('settings-volume-slider');
+      const settingsVolIcon = document.getElementById('settings-vol-icon');
       
-      // Create audio element only after first user gesture or game start
       function createAudio() {
         if (bgAudio) return bgAudio;
         try {
@@ -264,7 +313,6 @@
         }
       }
       
-      // Update UI based on playing state
       function updatePlayPauseUI() {
         if (!playPauseBtn) return;
         if (isPlaying) {
@@ -276,7 +324,6 @@
         }
       }
       
-      // Actually play music (must be triggered by user interaction)
       function startPlayback() {
         if (!bgAudio) return false;
         bgAudio.play().then(() => {
@@ -311,20 +358,23 @@
         }
       }
       
-      // Volume control
       function setVolume(value) {
-        if (bgAudio) bgAudio.volume = Math.min(1, Math.max(0, parseFloat(value)));
-        if (volumeSlider) volumeSlider.value = value;
-        if (volIconSpan) {
-          const vol = parseFloat(value);
-          if (vol === 0) volIconSpan.textContent = "🔇";
-          else if (vol < 0.3) volIconSpan.textContent = "🔈";
-          else if (vol < 0.7) volIconSpan.textContent = "🔉";
-          else volIconSpan.textContent = "🔊";
-        }
+        const vol = Math.min(1, Math.max(0, parseFloat(value)));
+        if (bgAudio) bgAudio.volume = vol;
+        if (volumeSlider) volumeSlider.value = vol;
+        if (settingsVolumeSlider) settingsVolumeSlider.value = vol;
+        
+        const updateIcon = (iconSpan) => {
+          if (!iconSpan) return;
+          if (vol === 0) iconSpan.textContent = "🔇";
+          else if (vol < 0.3) iconSpan.textContent = "🔈";
+          else if (vol < 0.7) iconSpan.textContent = "🔉";
+          else iconSpan.textContent = "🔊";
+        };
+        updateIcon(volIconSpan);
+        updateIcon(settingsVolIcon);
       }
       
-      // Connect UI events
       if (playPauseBtn) {
         playPauseBtn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -335,44 +385,15 @@
         volumeSlider.addEventListener('input', (e) => {
           setVolume(e.target.value);
         });
-        // initial set
-        setVolume(volumeSlider.value);
+      }
+      if (settingsVolumeSlider) {
+        settingsVolumeSlider.addEventListener('input', (e) => {
+          setVolume(e.target.value);
+        });
       }
       
-      // Attempt to autoplay with a silent approach: we wait for any user click on splash or game
-      // Also try to play on first game interaction (btnStart / btnContinue)
-      function attemptAutoPlayOnUserGesture() {
-        if (userInteracted) return;
-        if (!bgAudio) createAudio();
-        if (bgAudio && bgAudio.paused) {
-          bgAudio.play().then(() => {
-            isPlaying = true;
-            updatePlayPauseUI();
-            userInteracted = true;
-          }).catch(() => {
-            // still blocked, but we'll try again on later click
-          });
-        }
-      }
+      setVolume(volumeSlider?.value || 0.5);
       
-      // Listen to global clicks (splash or game container) to enable audio if not started
-      const globalAudioStarter = () => {
-        if (!userInteracted) {
-          if (!bgAudio) createAudio();
-          if (bgAudio && bgAudio.paused) {
-            bgAudio.play().then(() => {
-              isPlaying = true;
-              updatePlayPauseUI();
-              userInteracted = true;
-              // remove listener after successful start
-              document.removeEventListener('click', globalAudioStarter);
-              document.removeEventListener('touchstart', globalAudioStarter);
-            }).catch(e => console.log("[Audio] still waiting for explicit user gesture"));
-          }
-        }
-      };
-      
-      // Also capture splash button clicks specifically for faster activation
       const splashStartBtn = document.getElementById('btnStart');
       const splashContinueBtn = document.getElementById('btnContinue');
       function forceAudioOnGameStart() {
@@ -388,24 +409,44 @@
       if (splashStartBtn) splashStartBtn.addEventListener('click', forceAudioOnGameStart);
       if (splashContinueBtn) splashContinueBtn.addEventListener('click', forceAudioOnGameStart);
       
-      // Additional fallback: any click on document will try to start if not playing yet
-      document.addEventListener('click', globalAudioStarter);
-      document.addEventListener('touchstart', globalAudioStarter);
-      
-      // Create audio element early but don't play until user gesture
       const preloadAudio = createAudio();
-      if (preloadAudio) {
-        // Preload but don't autoplay aggressively — we wait for gesture
-        preloadAudio.load();
-      }
+      if (preloadAudio) preloadAudio.load();
       
-      // Expose controls to global for debugging (optional)
       window.__bgAudioControls = {
         play: () => { if(bgAudio) bgAudio.play(); },
         pause: () => { if(bgAudio) bgAudio.pause(); },
         setVolume: (v) => setVolume(v)
       };
     })();
+    
+    // Settings Panel Functions (Modal)
+    window.openSettingsPanel = function() {
+      var panel = document.getElementById('settings-panel');
+      if (panel) panel.classList.add('open');
+    };
+    
+    window.closeSettingsPanel = function() {
+      var panel = document.getElementById('settings-panel');
+      if (panel) panel.classList.remove('open');
+    };
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', function(e) {
+      var panel = document.getElementById('settings-panel');
+      if (panel && panel.classList.contains('open')) {
+        if (e.target === panel) {
+          closeSettingsPanel();
+        }
+      }
+    });
+    
+    // Update centered time display
+    window.updateCenterTime = function(timeStr, dayStr) {
+      var timeEl = document.getElementById('centerTimeStr');
+      var dayEl = document.getElementById('centerDayStr');
+      if (timeEl) timeEl.textContent = timeStr;
+      if (dayEl) dayEl.textContent = dayStr;
+    };
   </script>
 
   <!-- ══════════════════════════════════════════
@@ -449,18 +490,11 @@
   </script>
 
   <!-- ══════════════════════════════════════════
-       WASTE PANEL TOGGLE
-  ══════════════════════════════════════════ -->
-  <script>
-  /* waste display handled by dashboard.js window.updateWasteDisplay */
-  </script>
-
-  <!-- ══════════════════════════════════════════
        SIDE PANEL ENGINE
   ══════════════════════════════════════════ -->
   <script>
 var _activeSidePanel = null;
-var _seenLogCount    = 0;   /* watermark — entries seen when log was last opened */
+var _seenLogCount    = 0;
 
 window.openSidePanel = function(key) {
   if (key === 'trade') {
@@ -478,7 +512,6 @@ window.openSidePanel = function(key) {
   _spWire(key);
   _spMarkActive(key);
 
-  /* Clear badge when log is opened */
   if (key === 'log') {
     var entries = _getLogEntries();
     _seenLogCount = entries.length;
@@ -509,7 +542,6 @@ function _spMarkActive(key) {
   });
 }
 
-/* ── Collect all log entries (events + election + trade) ──── */
 function _getLogEntries() {
   var VS = window._VS;
   var entries = [];
@@ -555,7 +587,6 @@ function _updateLogBadge(count) {
   }
 }
 
-/* ── Panel renderers ──────────────────────────────────────── */
 function _spRender(key) {
   var VS = window._VS;
   switch (key) {
@@ -644,10 +675,6 @@ function _spRenderLog() {
   return _spShell('📋 Talaan ng Buhay', body);
 }
 
-/* ══════════════════════════════════════════════════════════════
-   showEventModal
-   Rich calamity/event detail modal. Called from log row click.
-══════════════════════════════════════════════════════════════ */
 window.showEventModal = function(entry) {
   var existing = document.getElementById('event-detail-modal');
   if (existing) existing.remove();
@@ -655,7 +682,6 @@ window.showEventModal = function(entry) {
   var d   = entry.detail || {};
   var bld = d.affectedBuildings || [];
 
-  /* Build affected buildings list */
   var bldHTML = bld.length === 0
     ? '<div class="edm-none">Walang gusali ang nasira.</div>'
     : '<div class="edm-bld-list">' +
@@ -667,7 +693,6 @@ window.showEventModal = function(entry) {
         }).join('') +
       '</div>';
 
-  /* Build stat impact rows */
   var impacts = [];
   if (d.goldLost   > 0) impacts.push(['🪙 Ginto nawala',   '-' + d.goldLost,   'bad']);
   if (d.goldLost   < 0) impacts.push(['🪙 Ginto nakuha',   '+' + (-d.goldLost), 'good']);
@@ -776,7 +801,6 @@ function _ensureEventModalStyles() {
   document.head.appendChild(s);
 }
 
-/* ── Helpers ──────────────────────────────────────────────── */
 function _avg(villagers, field) {
   if (!villagers || !villagers.length) return 0;
   var s = 0; villagers.forEach(function(v) { s += (v[field] || 0); });
@@ -807,7 +831,6 @@ function _spWire(key) {
   };
 }
 
-/* Badge update interval — only counts NEW entries since last open */
 setInterval(function() {
   var entries  = _getLogEntries();
   var newCount = Math.max(0, entries.length - _seenLogCount);
@@ -817,18 +840,16 @@ setInterval(function() {
     if (inner) inner.innerHTML = _spRenderLog();
   }
 }, 6000);
-
   </script>
 
   <!-- ══════════════════════════════════════════
        MOBILE HELPERS
   ══════════════════════════════════════════ -->
   <script>
-    /* ── Audio widget hide/show button ──────────────────────── */
     (function() {
       var widget = document.getElementById('audioWidget');
       if (!widget) return;
-      widget.style.position = 'fixed'; /* ensure positioning context */
+      widget.style.position = 'fixed';
       var btn = document.createElement('button');
       btn.id = 'audio-hide-btn';
       btn.title = 'Itago ang musika';
@@ -842,50 +863,6 @@ setInterval(function() {
       });
       widget.appendChild(btn);
     })();
-
-    /* ── Mobile FAB tray toggle ───────────────────────────── */
-    window._fabTrayOpen = false;
-    window._fabTrayToggle = function() {
-      var tray   = document.getElementById('fab-gov-tray');
-      var toggle = document.getElementById('fab-gov-toggle');
-      if (!tray) return;
-      window._fabTrayOpen = !window._fabTrayOpen;
-      tray.classList.toggle('fab-tray-open',   window._fabTrayOpen);
-      tray.classList.toggle('fab-tray-closed', !window._fabTrayOpen);
-      if (toggle) toggle.textContent = window._fabTrayOpen ? '✕' : '⚙️';
-    };
-
-    /* On mobile landscape, show tray and hide desktop FAB */
-    (function applyFabMode() {
-      function check() {
-        var isMobileLandscape = window.innerHeight <= 480 &&
-                                window.innerWidth  >  window.innerHeight;
-        var gov   = document.getElementById('fab-gov');
-        var tray  = document.getElementById('fab-gov-tray');
-        var tog   = document.getElementById('fab-gov-toggle');
-        if (!gov || !tray) return;
-        if (isMobileLandscape) {
-          gov.style.display  = 'none';
-          tray.style.display = 'flex';
-          if (tog) tog.style.display = 'flex';
-        } else {
-          gov.style.display  = '';
-          tray.style.display = 'none';
-          if (tog) tog.style.display = 'none';
-        }
-      }
-      check();
-      window.addEventListener('resize',           check);
-      window.addEventListener('orientationchange', check);
-    })();
-
-    /* ── Update centered time display from main.js ── */
-    window.updateCenterTime = function(timeStr, dayStr) {
-      var timeEl = document.getElementById('centerTimeStr');
-      var dayEl = document.getElementById('centerDayStr');
-      if (timeEl) timeEl.textContent = timeStr;
-      if (dayEl) dayEl.textContent = dayStr;
-    };
   </script>
 
   <!-- ══════════════════════════════════════════

@@ -125,6 +125,15 @@ var _drawer = {
   get movingBuilding() { return isMovingBuilding(); },
 };
 
+/* ── Update centered time display (no time of day text, just time string) ── */
+function updateCenterTimeDisplay() {
+  var timeStr = getTimeStr(VS.time);
+  // Removed getTimeOfDay - only show time (e.g., "12:00 PM")
+  if (window.updateCenterTime) {
+    window.updateCenterTime(timeStr, 'Araw ' + dayCount);
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════
    GAME LOOP
 ══════════════════════════════════════════════════════════════ */
@@ -179,6 +188,7 @@ function gameLoop(ts) {
   });
 
   updateDashboard(VS, dayCount);
+  updateCenterTimeDisplay();  /* Update centered time display every frame */
   _updateElectionBar();
 
   requestAnimationFrame(gameLoop);
@@ -515,12 +525,23 @@ window.triggerLoad = function() {
 /* ══════════════════════════════════════════════════════════════
    INIT
 ══════════════════════════════════════════════════════════════ */
+function _getViewportSize() {
+  /* visualViewport is the most accurate API on mobile — it excludes the
+     browser chrome (address bar, nav bar) and reports the real drawable area.
+     Fall back to innerWidth/Height for desktop and older browsers. */
+  if (window.visualViewport) {
+    return { w: window.visualViewport.width, h: window.visualViewport.height };
+  }
+  return { w: window.innerWidth, h: window.innerHeight };
+}
+
 function init() {
   canvas = document.getElementById('gameCanvas');
   ctx    = canvas.getContext('2d');
 
-  VW = window.innerWidth;
-  VH = window.innerHeight;
+  var vp = _getViewportSize();
+  VW = vp.w;
+  VH = vp.h;
   canvas.width  = VW;
   canvas.height = VH;
   window._VW    = VW;
@@ -647,6 +668,7 @@ function init() {
     },
   });
 
+  /* Standard resize covers desktop and orientation-change on older mobile */
   window.addEventListener('resize', _resize);
   lastTime     = performance.now();
   _initialized = true;
@@ -657,12 +679,20 @@ function init() {
 
 function _resize() {
   if (!_initialized) return;
-  VW = window._VW || window.innerWidth;
-  VH = window._VH || window.innerHeight;
+  /* If the expansion panel has set explicit overrides, respect them.
+     Otherwise use visualViewport for accurate mobile dimensions. */
+  if (window._VW && window._VH && (window._VW !== window.innerWidth || window._VH !== window.innerHeight)) {
+    VW = window._VW;
+    VH = window._VH;
+  } else {
+    var vp = _getViewportSize();
+    VW = vp.w;
+    VH = vp.h;
+    window._VW = VW;
+    window._VH = VH;
+  }
   canvas.width  = VW;
   canvas.height = VH;
-  window._VW    = VW;
-  window._VH    = VH;
 
   /* Entity positions live in fixed WORLD_W × WORLD_H space — do NOT rescale.
      The camera's responsive MIN_ZOOM (recalculated by initCamera) handles
@@ -689,8 +719,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function _start(loadSave) {
     gameWrap.classList.add('visible');
-    init();
-    if (loadSave) setTimeout(function() { window.triggerLoad(); }, 120);
+    /* Defer init to the next animation frame so the browser has finished
+       its initial layout and visualViewport/innerWidth report correct
+       mobile dimensions (avoids the squish-on-fresh-mobile-load bug). */
+    requestAnimationFrame(function() {
+      init();
+      /* Also listen on visualViewport resize for mobile (handles address
+         bar show/hide, keyboard open/close, orientation change). */
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', _resize);
+      }
+      if (loadSave) setTimeout(function() { window.triggerLoad(); }, 120);
+    });
   }
 
   window._minibayanInit = _start;

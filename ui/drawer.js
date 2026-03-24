@@ -228,7 +228,6 @@ function _renderWreckInfo(b) {
       '<div class="bd-btn upgrade' + (canAfford ? '' : ' disabled') + '" id="bd-repair">' +
         (canAfford ? 'Ayusin<br><small>' + costStr + '</small>' : 'Kulang') +
       '</div>' +
-      '<div class="bd-btn danger" id="bd-close-info">Isara</div>' +
     '</div>' +
   '</div>';
 }
@@ -243,7 +242,6 @@ function _renderBuildingInfo() {
   var mhLv  = _d.getMainHallLevel(_d.VS.buildings);
   var st    = b.getStats();
   var cost  = b.getUpgradeCost();
-  var sb    = st.storageBonus;
   var canUp = b.level < maxLv;
 
   /* If mainHall is under construction, show timer instead of upgrade button */
@@ -261,9 +259,12 @@ function _renderBuildingInfo() {
 
   var rows = [['Level', b.level + ' / ' + maxLv, b.level >= maxLv ? 'bad' : 'good']];
   if (st.productionRate > 0) rows.push(['Produksyon', st.productionRate.toFixed(1) + '/s', 'gold']);
-  if (sb.gold)   rows.push(['Storage+Ginto',  '+' + sb.gold,   'gold']);
-  if (sb.rice)   rows.push(['Storage+Bigas',  '+' + sb.rice,   'good']);
-  if (sb.langis) rows.push(['Storage+Langis', '+' + sb.langis, '']);
+  if (st.storageBonus) {
+    var sb = st.storageBonus;
+    if (sb.gold)   rows.push(['Storage+Ginto',  '+' + sb.gold,   'gold']);
+    if (sb.rice)   rows.push(['Storage+Bigas',  '+' + sb.rice,   'good']);
+    if (sb.langis) rows.push(['Storage+Langis', '+' + sb.langis, '']);
+  }
   if (bdef.isHome) {
     var occ = b.getOccupancy(), cap = b.getCapacity();
     rows.push(['Natutulog', occ + '/' + cap, occ >= cap ? 'bad' : 'good']);
@@ -288,7 +289,6 @@ function _renderBuildingInfo() {
     '<div id="bd-info-right">' +
       '<div class="bd-btn upgrade' + (canUp && !isBuilding ? '' : ' disabled') + '" id="bd-upgrade">' + upLabel + '</div>' +
       '<div class="bd-btn move' + (isBuilding ? ' disabled' : '') + '" id="bd-move">' + moveLabel + '</div>' +
-      '<div class="bd-btn danger" id="bd-close-info">Isara</div>' +
     '</div>' +
   '</div>';
 }
@@ -422,7 +422,6 @@ function _wireButtons() {
   var repairBtn = document.getElementById('bd-repair');
   var moveBtn   = document.getElementById('bd-move');
   var relBtn    = document.getElementById('bd-release');
-  var closeBtn  = document.getElementById('bd-close-info');
 
   if (repairBtn && !repairBtn.classList.contains('disabled')) {
     repairBtn.addEventListener('click', function() {
@@ -495,7 +494,6 @@ function _wireButtons() {
     });
   }
   if (relBtn)   relBtn.addEventListener('click',   closeDrawer);
-  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
 }
 
 /* ── DOM setup ────────────────────────────────────────────── */
@@ -629,6 +627,36 @@ function _injectStyles() {
     '.bd-btn.danger{background:#2a0a0a;border-color:#aa4444;}',
     '.bd-btn.disabled{opacity:.4;cursor:not-allowed;pointer-events:none;}',
     '.bd-train-student.selected-stud{border-color:#44aa44 !important;background:#1a2a0a !important;}',
+    /* Mobile drawer height reduction */
+    '@media (max-width: 768px) {',
+    '  #bottom-drawer { height: 140px !important; }',
+    '  .bd-card { width: 110px !important; height: 110px !important; }',
+    '  .bd-card-swatch { height: 38px !important; font-size: 18px !important; }',
+    '  .bd-card-name { font-size: 12px !important; }',
+    '  .bd-card-stats { font-size: 10px !important; }',
+    '  .bd-card-cost { font-size: 10px !important; }',
+    '  .bd-tab { padding: 4px 12px !important; font-size: 12px !important; }',
+    '  #bd-info-left { width: 52px !important; }',
+    '  #bd-info-swatch { width: 40px !important; height: 40px !important; font-size: 20px !important; }',
+    '  #bd-info-role { font-size: 11px !important; }',
+    '  #bd-info-title { font-size: 13px !important; }',
+    '  .bd-row-label { font-size: 11px !important; }',
+    '  .bd-row-val { font-size: 11px !important; }',
+    '  #bd-info-right { width: 110px !important; }',
+    '  .bd-btn { padding: 5px 0 !important; font-size: 11px !important; }',
+    '  #bd-close { width: 24px !important; height: 24px !important; font-size: 12px !important; top: 6px !important; right: 10px !important; }',
+    '  #bd-tabs { padding: 0 38px 0 6px !important; }',
+    '}',
+    '@media (max-height: 480px) and (orientation: landscape) {',
+    '  #bottom-drawer { height: 127px !important; }',
+    '  .bd-card { width: 90px !important; height: 90px !important; }',
+    '  .bd-card-swatch { height: 32px !important; font-size: 16px !important; }',
+    '  .bd-card-name { font-size: 10px !important; }',
+    '  .bd-card-stats { font-size: 9px !important; }',
+    '  .bd-tab { padding: 3px 8px !important; font-size: 10px !important; }',
+    '  .bd-btn { padding: 4px 0 !important; font-size: 10px !important; }',
+    '  #bd-info-right { width: 90px !important; }',
+    '}',
   ].join('');
   document.head.appendChild(s);
 }

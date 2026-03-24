@@ -11,6 +11,11 @@
 
 import { clamp } from '../utils/perspective.js';
 import { spawnWrecksForZone } from '../buildings/wreckBuildings.js';
+import { WORLD_W, WORLD_H } from '../render/camera.js';
+
+/* Use fixed world dimensions for all zone calculations */
+var _WW = WORLD_W;
+var _WH = WORLD_H;
 
 export var ZONE_DEFS = {
 
@@ -115,8 +120,9 @@ export var ZONE_DEFS = {
 
 /* ── Get which zone a world point falls into ──────────────── */
 export function getZoneAt(wx, wy, VW, VH) {
-  var col = clamp(Math.floor(wx / (VW / 3)), 0, 2);
-  var row = clamp(Math.floor(wy / (VH / 3)), 0, 2);
+  /* Always use fixed world dimensions — passed VW/VH kept for API compat */
+  var col = clamp(Math.floor(wx / (_WW / 3)), 0, 2);
+  var row = clamp(Math.floor(wy / (_WH / 3)), 0, 2);
   for (var key in ZONE_DEFS) {
     var z = ZONE_DEFS[key];
     if (z.col === col && z.row === row) return key;
@@ -164,9 +170,7 @@ export function purchaseZone(key, VS, notifyFn, VW, VH) {
   VS.unlockedZones.push(key);
 
   /* Spawn 2–3 wreck buildings inside the newly unlocked zone */
-  var vw = VW || (typeof window !== 'undefined' ? window._VW : 1200) || 1200;
-  var vh = VH || (typeof window !== 'undefined' ? window._VH : 700) || 700;
-  var wreckCount = spawnWrecksForZone(key, VS, vw, vh);
+  var wreckCount = spawnWrecksForZone(key, VS, _WW, _WH);
 
   var msg = def.icon + ' ' + def.label + ' na-unlock! ' +
             wreckCount + ' na sirang gusali ang natagpuan.';
@@ -176,18 +180,23 @@ export function purchaseZone(key, VS, notifyFn, VW, VH) {
 
 /* ── Apply zone resource bonus to production ──────────────── */
 export function getZoneProductionMult(res, wx, wy, VW, VH, VS) {
-  var key = getZoneAt(wx, wy, VW, VH);
+  /* Always resolve zones against fixed world dimensions */
+  var key = getZoneAt(wx, wy, _WW, _WH);
   if (!isZoneUnlocked(key, VS)) return 1.0;
   var z = ZONE_DEFS[key];
   return (z && z.resourceBonus && z.resourceBonus[res]) ? z.resourceBonus[res] : 1.0;
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   drawZoneGrid — canvas overlay, called from renderer each frame
+   drawZoneGrid — canvas overlay, called from renderer each frame.
+   Always draws in fixed world space (WORLD_W × WORLD_H).
+   The camera transform already maps world → screen, so we just
+   draw at world coordinates and the camera handles the rest.
 ═══════════════════════════════════════════════════════════════ */
 export function drawZoneGrid(ctx, VW, VH, VS) {
-  var zW = VW / 3;
-  var zH = VH / 3;
+  /* Use fixed world dimensions — VW/VH kept for API compat only */
+  var zW = _WW / 3;
+  var zH = _WH / 3;
 
   /* ── Helper: is the zone at (col, row) owned? ───────────── */
   function _ownedAt(col, row) {
@@ -273,14 +282,14 @@ export function drawZoneGrid(ctx, VW, VH, VS) {
     var x = z.col * zW, y = z.row * zH;
     ctx.strokeStyle = z.borderColor;
     ctx.lineWidth   = 2;
-    /* Top edge of canvas */
+    /* Top edge of world */
     if (z.row === 0) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + zW, 0); ctx.stroke(); }
-    /* Bottom edge of canvas */
-    if (z.row === 2) { ctx.beginPath(); ctx.moveTo(x, VH); ctx.lineTo(x + zW, VH); ctx.stroke(); }
-    /* Left edge of canvas */
+    /* Bottom edge of world */
+    if (z.row === 2) { ctx.beginPath(); ctx.moveTo(x, _WH); ctx.lineTo(x + zW, _WH); ctx.stroke(); }
+    /* Left edge of world */
     if (z.col === 0) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(0, y + zH); ctx.stroke(); }
-    /* Right edge of canvas */
-    if (z.col === 2) { ctx.beginPath(); ctx.moveTo(VW, y); ctx.lineTo(VW, y + zH); ctx.stroke(); }
+    /* Right edge of world */
+    if (z.col === 2) { ctx.beginPath(); ctx.moveTo(_WW, y); ctx.lineTo(_WW, y + zH); ctx.stroke(); }
   });
 
   ctx.restore();
