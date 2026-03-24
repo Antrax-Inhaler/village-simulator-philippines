@@ -55,7 +55,7 @@ import { drawSprite as drawMainHallSprite }   from './sprites/mainHall.js';
 import { drawSprite as drawPulisyaSprite }    from './sprites/pulisya.js';
 import { drawSprite as drawFarmSprite }       from './sprites/farm.js';
    import { drawSprite as drawMineSprite }       from './sprites/mine.js';
-   import { drawSprite as drawMinalangisSprite } from './sprites/mine.js';
+   import { drawSprite as drawMinalangisSprite } from './sprites/minalangis.js';
 import { drawSprite as drawCuartelSprite }    from './sprites/cuartel.js';
 /*
    Future imports — uncomment as sprite files are created:
