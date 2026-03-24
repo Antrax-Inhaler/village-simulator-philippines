@@ -31,6 +31,21 @@ var DOUBLE_TAP_PX  = 30;
 
 var _hoveredVillager = null;
 
+/* ── Touch state ────────────────────────────────────────────── */
+var _touch = {
+  active:      false,
+  count:       0,         /* number of active touch points */
+  /* single-finger pan / tap */
+  id0:         null,      /* primary touch identifier */
+  startSX:     0, startSY: 0,
+  startCamX:   0, startCamY: 0,
+  moved:       false,
+  /* pinch-zoom */
+  id1:         null,      /* secondary touch identifier */
+  pinchStartDist: 0,
+  pinchStartZoom: 1,
+};
+
 export function initInput(canvas, deps) {
   _canvas = canvas;
   _deps   = deps;
@@ -41,6 +56,12 @@ export function initInput(canvas, deps) {
   canvas.addEventListener('wheel',       _onWheel, { passive: false });
   window.addEventListener('mouseup',     _onMouseUp);
   window.addEventListener('keydown',     _onKeyDown);
+
+  /* ── Touch events ───────────────────────────────────────── */
+  canvas.addEventListener('touchstart',  _onTouchStart,  { passive: false });
+  canvas.addEventListener('touchmove',   _onTouchMove,   { passive: false });
+  canvas.addEventListener('touchend',    _onTouchEnd,    { passive: false });
+  canvas.addEventListener('touchcancel', _onTouchCancel, { passive: false });
 }
 
 export function getMousePos()        { return { x: _mouseX, y: _mouseY }; }
@@ -395,4 +416,214 @@ function _onWheel(e) {
   var hh = window._VH / (2 * cam.tzoom);
   cam.tx = (2 * hw >= window._VW) ? window._VW / 2 : clamp(cam.tx, hw, window._VW - hw);
   cam.ty = (2 * hh >= window._VH) ? window._VH / 2 : clamp(cam.ty, hh, window._VH - hh);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOUCH HANDLERS
+   Strategy:
+   • 1 finger  → pan (mirrors mouse drag) + tap / double-tap
+   • 2 fingers → pinch-zoom centred on midpoint
+   • 3+ fingers → ignored
+══════════════════════════════════════════════════════════════ */
+
+/* Helper: find a touch by identifier inside a TouchList */
+function _getTouch(list, id) {
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].identifier === id) return list[i];
+  }
+  return null;
+}
+
+/* Helper: canvas-relative position from a Touch point */
+function _touchPos(touch) {
+  var rect = _canvas.getBoundingClientRect();
+  return {
+    x: touch.clientX - rect.left,
+    y: touch.clientY - rect.top,
+  };
+}
+
+/* Helper: distance between two Touch points */
+function _touchDist(t0, t1) {
+  var dx = t0.clientX - t1.clientX;
+  var dy = t0.clientY - t1.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/* ── touchstart ─────────────────────────────────────────────── */
+function _onTouchStart(e) {
+  e.preventDefault();
+
+  var touches = e.touches;
+  _touch.count = touches.length;
+
+  if (touches.length === 1) {
+    /* Single finger — begin pan / tap tracking */
+    var t   = touches[0];
+    var pos = _touchPos(t);
+
+    _touch.active    = true;
+    _touch.id0       = t.identifier;
+    _touch.startSX   = pos.x;
+    _touch.startSY   = pos.y;
+    _touch.startCamX = cam.tx;
+    _touch.startCamY = cam.ty;
+    _touch.moved     = false;
+
+    /* Update shared mouse position so build preview follows finger */
+    _mouseX = pos.x;
+    _mouseY = pos.y;
+
+    /* Move-building live follow (mirrors mousemove) */
+    var mode = _deps.getGameMode();
+    if (mode === 'move_building') {
+      var drawer = _deps.getDrawer();
+      if (drawer && drawer.target) {
+        var wp = s2w(pos.x, pos.y);
+        drawer.target.x = clamp(wp.x, 40, window._VW - 40);
+        drawer.target.y = clamp(wp.y, 40, window._VH - 80);
+      }
+    }
+
+  } else if (touches.length === 2) {
+    /* Two fingers — begin pinch-zoom; cancel any ongoing pan */
+    _touch.id0           = touches[0].identifier;
+    _touch.id1           = touches[1].identifier;
+    _touch.pinchStartDist = _touchDist(touches[0], touches[1]);
+    _touch.pinchStartZoom = cam.tzoom;
+    _touch.moved         = true; /* suppress tap on lift */
+  }
+}
+
+/* ── touchmove ──────────────────────────────────────────────── */
+function _onTouchMove(e) {
+  e.preventDefault();
+
+  var touches = e.touches;
+  _touch.count = touches.length;
+
+  if (touches.length === 2) {
+    /* ── Pinch-zoom ─────────────────────────────────────────
+       Scale zoom proportionally from pinch start distance.
+       Zoom toward the midpoint of the two fingers.          */
+    var t0 = _getTouch(touches, _touch.id0) || touches[0];
+    var t1 = _getTouch(touches, _touch.id1) || touches[1];
+
+    var currentDist = _touchDist(t0, t1);
+    if (_touch.pinchStartDist === 0) return;
+
+    var scaleFactor = currentDist / _touch.pinchStartDist;
+    var nz = clamp(_touch.pinchStartZoom * scaleFactor, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM);
+
+    /* Midpoint in screen space */
+    var rect = _canvas.getBoundingClientRect();
+    var midSX = ((t0.clientX + t1.clientX) / 2) - rect.left;
+    var midSY = ((t0.clientY + t1.clientY) / 2) - rect.top;
+
+    /* Zoom toward midpoint (same algebra as wheel handler) */
+    var wp = s2w(midSX, midSY);
+    cam.followTarget = null;
+    cam.tzoom = nz;
+    cam.tx    = wp.x + (midSX - window._VW / 2) / (-nz);
+    cam.ty    = wp.y + (midSY - window._VH / 2) / (-nz);
+    cam.focused = cam.tzoom > CAMERA_MIN_ZOOM + 0.05;
+
+    var hw = window._VW / (2 * cam.tzoom);
+    var hh = window._VH / (2 * cam.tzoom);
+    cam.tx = (2 * hw >= window._VW) ? window._VW / 2 : clamp(cam.tx, hw, window._VW - hw);
+    cam.ty = (2 * hh >= window._VH) ? window._VH / 2 : clamp(cam.ty, hh, window._VH - hh);
+    return;
+  }
+
+  if (touches.length !== 1 || !_touch.active) return;
+
+  /* ── Single-finger pan ───────────────────────────────────── */
+  var t   = _getTouch(touches, _touch.id0) || touches[0];
+  var pos = _touchPos(t);
+
+  _mouseX = pos.x;
+  _mouseY = pos.y;
+
+  var mode   = _deps.getGameMode();
+  var drawer = _deps.getDrawer();
+
+  /* Move-building live follow */
+  if (mode === 'move_building' && drawer && drawer.target) {
+    var wpM = s2w(pos.x, pos.y);
+    drawer.target.x = clamp(wpM.x, 40, window._VW - 40);
+    drawer.target.y = clamp(wpM.y, 40, window._VH - 80);
+    return;
+  }
+
+  var dx = pos.x - _touch.startSX;
+  var dy = pos.y - _touch.startSY;
+  if (!_touch.moved && Math.sqrt(dx * dx + dy * dy) > 8) _touch.moved = true;
+  if (!_touch.moved) return;
+
+  if (mode === 'build_shop') return; /* no pan during placement */
+
+  /* Pan camera */
+  var panScale = 1 / Math.max(cam.zoom, 0.1);
+  cam.followTarget = null;
+  cam.tx = _touch.startCamX - dx * panScale;
+  cam.ty = _touch.startCamY - dy * panScale;
+  var nz2 = clamp(cam.tzoom, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM);
+  var hw2 = window._VW / (2 * nz2);
+  var hh2 = window._VH / (2 * nz2);
+  cam.tx = (2 * hw2 >= window._VW) ? window._VW / 2 : clamp(cam.tx, hw2, window._VW - hw2);
+  cam.ty = (2 * hh2 >= window._VH) ? window._VH / 2 : clamp(cam.ty, hh2, window._VH - hh2);
+}
+
+/* ── touchend ───────────────────────────────────────────────── */
+function _onTouchEnd(e) {
+  e.preventDefault();
+
+  /* If we were pinching and one finger lifts, reset to single-pan state */
+  if (_touch.count === 2 && e.touches.length === 1) {
+    var remaining    = e.touches[0];
+    var pos          = _touchPos(remaining);
+    _touch.id0       = remaining.identifier;
+    _touch.id1       = null;
+    _touch.startSX   = pos.x;
+    _touch.startSY   = pos.y;
+    _touch.startCamX = cam.tx;
+    _touch.startCamY = cam.ty;
+    _touch.moved     = true; /* don't fire a tap */
+    _touch.count     = 1;
+    return;
+  }
+
+  _touch.count = e.touches.length;
+
+  if (e.touches.length > 0) return; /* still fingers on screen */
+
+  /* All fingers lifted — decide tap vs drag */
+  _touch.active = false;
+
+  var sx    = _touch.startSX + (_mouseX - _touch.startSX); /* last known pos */
+  var sy    = _touch.startSY + (_mouseY - _touch.startSY);
+  var moved = _touch.moved;
+
+  _touch.id0   = null;
+  _touch.id1   = null;
+  _touch.moved = false;
+
+  var mode = _deps.getGameMode();
+  if (mode === 'build_shop' || mode === 'move_building') {
+    _processClick(_mouseX, _mouseY);
+    return;
+  }
+
+  if (moved) return; /* was a drag, not a tap */
+
+  _processClick(_mouseX, _mouseY);
+}
+
+/* ── touchcancel ────────────────────────────────────────────── */
+function _onTouchCancel(e) {
+  _touch.active = false;
+  _touch.moved  = false;
+  _touch.id0    = null;
+  _touch.id1    = null;
+  _touch.count  = 0;
 }
