@@ -59,7 +59,7 @@ import { drawSprite as drawFarmSprite }       from './sprites/farm.js';
 import { drawSprite as drawCuartelSprite }    from './sprites/cuartel.js';
 import { drawSprite as drawPaaralanSprite }  from './sprites/paaralan.js';
 import { drawSprite as drawTemploSprite }     from './sprites/templo.js';
-   import { drawSprite as drawPaaralanSprite }  from './sprites/paaralan.js';
+   import { drawSprite as drawOspitalSprite }    from './sprites/ospital.js';
 
 /*
    Future imports — uncomment as sprite files are created:
@@ -72,7 +72,7 @@ import { drawSprite as drawTemploSprite }     from './sprites/templo.js';
    import { drawSprite as drawKutaSprite }       from './sprites/kuta.js';
    import { drawSprite as drawBantayanSprite }   from './sprites/bantayan.js';
    import { drawSprite as drawHukumanSprite }    from './sprites/hukuman.js';
-   import { drawSprite as drawOspitalSprite }    from './sprites/ospital.js';
+   
    
    import { drawSprite as drawDaunganSprite }    from './sprites/daungan.js';
    import { drawSprite as drawKalyeSprite }      from './sprites/kalye.js';
@@ -91,6 +91,7 @@ farm:       drawFarmSprite,
  paaralan:   drawPaaralanSprite,
  cuartel:    drawCuartelSprite,
  templo:     drawTemploSprite,
+ ospital:    drawOspitalSprite,
   /*
   
   
@@ -103,8 +104,6 @@ farm:       drawFarmSprite,
   kuta:       drawKutaSprite,
   bantayan:   drawBantayanSprite,
   hukuman:    drawHukumanSprite,
-  ospital:    drawOspitalSprite,
-  
   daungan:    drawDaunganSprite,
   kalye:      drawKalyeSprite,
   */
