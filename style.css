@@ -1378,7 +1378,7 @@ canvas.mode-view  { cursor: default; }
     min-width: 20px;
   }
   
-  
+
   .fab-item {
     min-width: 20px;
     min-height: 20px;
@@ -2016,3 +2016,75 @@ canvas.mode-view  { cursor: default; }
   background: #3a2a18;
   transform: translateY(-1px);
 }
+    .trade-contract {
+      background: #1a1208;
+      border: 1px solid #3a2a18;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .trade-contract-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .trade-flag { font-size: 20px; }
+    .trade-country { font-family: "Slackey", sans-serif; font-size: 13px; color: #f5c842; }
+    .trade-res { font-size: 12px; color: #c8a878; }
+    .trade-reward { font-family: monospace; font-size: 12px; color: #f5c842; }
+    .trade-timer { font-size: 10px; color: #8a6040; }
+    .trade-fulfill-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 6px;
+      background: #2a1a08;
+      border: 1px solid #44aa44;
+      border-radius: 4px;
+      color: #88ee88;
+      cursor: pointer;
+    }
+    .trade-import-section {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #3a2a18;
+    }
+    .trade-import-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .trade-import-input {
+      flex: 1;
+      min-width: 80px;
+      background: #2a1a10;
+      border: 1px solid #c49a4e;
+      border-radius: 4px;
+      padding: 6px;
+      color: #f5c842;
+    }
+    .trade-import-btn {
+      padding: 6px 12px;
+      background: #2a1a08;
+      border: 1px solid #c49a4e;
+      border-radius: 4px;
+      color: #f5c842;
+      cursor: pointer;
+    }
+    .trade-reputation {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: #2a1a08;
+      font-size: 12px;
+      margin-bottom: 12px;
+      border: 1px solid;
+    }
+    .trade-pending {
+      margin-top: 12px;
+      background: #0e0905;
+      border-radius: 8px;
+      padding: 8px;
+    }
