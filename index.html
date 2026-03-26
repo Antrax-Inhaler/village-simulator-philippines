@@ -16,188 +16,94 @@
   <link rel="stylesheet" href="style.css" />
 
   <style>
-    /* ── FAB: Tindahan button styling ───────────────────── */
-    .fab-shop-btn {
-      background: rgba(26,18,8,0.96) !important;
-      border-color: #c49a4e !important;
-      color: #f5c842;
+    /* Trade panel styles */
+    .trade-contract {
+      background: #1a1208;
+      border: 1px solid #3a2a18;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
     }
-    .fab-shop-btn:hover {
-      background: #2a1a08 !important;
-      border-color: #f5c842 !important;
-    }
-    
-    /* ===== AUDIO WIDGET ===== */
-    .audio-widget {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 1000;
-      background: rgba(26, 18, 8, 0.85);
-      backdrop-filter: blur(8px);
-      border: 1px solid #c49a4e;
-      border-radius: 40px;
-      padding: 6px 12px 6px 16px;
+    .trade-contract-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-family: 'Oldenburg', serif;
-      font-size: 13px;
-      color: #f5c842;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      transition: opacity 0.2s;
+      gap: 8px;
+      margin-bottom: 8px;
     }
-    .audio-widget button {
-      background: #2a1808;
-      border: none;
-      color: #f5c842;
-      font-size: 18px;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
+    .trade-flag { font-size: 20px; }
+    .trade-country { font-family: "Slackey", sans-serif; font-size: 13px; color: #f5c842; }
+    .trade-res { font-size: 12px; color: #c8a878; }
+    .trade-reward { font-family: monospace; font-size: 12px; color: #f5c842; }
+    .trade-timer { font-size: 10px; color: #8a6040; }
+    .trade-fulfill-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 6px;
+      background: #2a1a08;
+      border: 1px solid #44aa44;
+      border-radius: 4px;
+      color: #88ee88;
       cursor: pointer;
-      display: inline-flex;
+    }
+    .trade-import-section {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #3a2a18;
+    }
+    .trade-import-row {
+      display: flex;
       align-items: center;
-      justify-content: center;
-      transition: all 0.2s;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .trade-import-input {
+      flex: 1;
+      min-width: 80px;
+      background: #2a1a10;
       border: 1px solid #c49a4e;
+      border-radius: 4px;
+      padding: 6px;
+      color: #f5c842;
     }
-    .audio-widget button:hover {
-      background: #c49a4e;
-      color: #1a1208;
-      transform: scale(1.02);
+    .trade-import-btn {
+      padding: 6px 12px;
+      background: #2a1a08;
+      border: 1px solid #c49a4e;
+      border-radius: 4px;
+      color: #f5c842;
+      cursor: pointer;
     }
-    .audio-widget span {
+    .trade-reputation {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: #2a1a08;
       font-size: 12px;
-      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      border: 1px solid;
     }
-    .audio-widget .vol-slider {
-      width: 70px;
-      height: 3px;
-      -webkit-appearance: none;
-      background: #c49a4e;
-      border-radius: 3px;
-      outline: none;
-      cursor: pointer;
-    }
-    .audio-widget .vol-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #f5c842;
-      border: none;
-      cursor: pointer;
-    }
-    @media (max-width: 700px) {
-      .audio-widget { padding: 4px 8px 4px 12px; gap: 6px; }
-      .audio-widget button { width: 24px; height: 24px; font-size: 14px; }
-      .audio-widget .vol-slider { width: 55px; }
-    }
-
-    /* ── Centered Time/Day Display ── */
-    #center-time {
-      position: absolute;
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 26;
-      text-align: center;
-      pointer-events: none;
-      font-family: var(--font-display);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    #center-time .day-sub {
-      font-size: 18px;
-      color: #f5c842;
-      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      letter-spacing: 0.08em;
-      font-weight: bold;
-      line-height: 1.2;
-      font-family: var(--font-display);
-      margin-bottom: 2px;
-    }
-    #center-time .time-main {
-      font-size: 14px;
-      color: #c49a4e;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.4);
-      letter-spacing: 0.05em;
-      font-family: var(--font-mono);
-    }
-    @media (min-width: 1024px) {
-      #center-time .day-sub { font-size: 24px; }
-      #center-time .time-main { font-size: 16px; }
-    }
-    @media (max-height: 480px) and (orientation: landscape) {
-      #center-time .day-sub { font-size: 14px; }
-      #center-time .time-main { font-size: 10px; }
-      #center-time { top: 4px; }
-    }
-
-    /* ── Settings Button (Top Right) ─────────────────────────── */
-    #settings-btn-container {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 24;
-      pointer-events: all;
-    }
-
-    .settings-btn {
-      width: 40px;
-      height: 40px;
-      background: rgba(10,6,2,0.85);
-      border: 1.5px solid #c49a4e;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      backdrop-filter: blur(4px);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      color: #f5c842;
-    }
-
-    .settings-btn:hover {
-      background: rgba(42,24,12,0.95);
-      transform: scale(1.05);
-      border-color: #f5c842;
-    }
-
-    @media (max-width: 768px) {
-      .settings-btn {
-        width: 32px;
-        height: 32px;
-        font-size: 18px;
-        top: 8px;
-        right: 8px;
-      }
+    .trade-pending {
+      margin-top: 12px;
+      background: #0e0905;
+      border-radius: 8px;
+      padding: 8px;
     }
   </style>
 </head>
 <body>
 
-  <!-- ══════════════════════════════════════════
-       PORTRAIT LOCK OVERLAY
-  ══════════════════════════════════════════ -->
+  <!-- Portrait Lock -->
   <div id="portrait-lock" aria-hidden="true">
     <div id="portrait-lock-inner">
       <div id="portrait-lock-icon">📱</div>
-      <div id="portrait-lock-phone">
-        <div id="portrait-lock-arrow">↻</div>
-      </div>
+      <div id="portrait-lock-phone"><div id="portrait-lock-arrow">↻</div></div>
       <p id="portrait-lock-msg">I-rotate ang iyong telepono</p>
       <p id="portrait-lock-sub">Rotate your phone to landscape to play</p>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════
-       SPLASH
-  ══════════════════════════════════════════ -->
+  <!-- Splash -->
   <div id="splash">
     <div id="splash-inner">
       <div id="splash-deco">🌴</div>
@@ -210,27 +116,22 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════
-       GAME WRAPPER
-  ══════════════════════════════════════════ -->
+  <!-- Game Wrapper -->
   <div id="game-wrap">
-
     <div id="canvas-container">
       <canvas id="gameCanvas"></canvas>
-
-      <!-- Centered Time/Day Display -->
-      <div id="center-time">
-        <div class="day-sub" id="centerDayStr">Araw 1</div>
-        <div class="time-main" id="centerTimeStr">12:00 PM</div>
-      </div>
+    </div>
+    <div id="center-time">
+      <div class="day-sub" id="centerDayStr">Araw 1</div>
+      <div class="time-main" id="centerTimeStr">12:00 PM</div>
     </div>
 
-    <!-- Settings Button (Top Right) -->
+    <!-- Settings Button -->
     <div id="settings-btn-container">
       <div id="settings-btn" class="settings-btn" onclick="openSettingsPanel()">⚙️</div>
     </div>
 
-    <!-- Settings Panel (Modal) -->
+    <!-- Settings Panel -->
     <div id="settings-panel" class="settings-modal">
       <div class="settings-modal-content">
         <div class="settings-modal-header">
@@ -249,15 +150,16 @@
       </div>
     </div>
 
-    <!-- FAB: Government actions (stacked above Tindahan) -->
+    <!-- FAB: Government actions -->
     <div id="fab-gov" class="fab-toolbar">
-      <div class="fab-item" onclick="openSidePanel('log')" data-label="Talaan ng Buhay">📋</div>
-      <div class="fab-item" onclick="openSidePanel('policy')" data-label="Mga Patakaran">📜</div>
+      <div class="fab-item" onclick="openSidePanel('requests')" data-label="Mga Kahilingan">📋</div>
+      <div class="fab-item" onclick="openSidePanel('log')" data-label="Talaan ng Buhay">📜</div>
+      <div class="fab-item" onclick="openSidePanel('policy')" data-label="Mga Patakaran">⚖️</div>
       <div class="fab-item" onclick="openSidePanel('tax')" data-label="Buwis">💰</div>
       <div class="fab-item" onclick="openSidePanel('trade')" data-label="Kalakalan">⚓</div>
     </div>
 
-    <!-- Tindahan Button (Bottom Right, Large) -->
+    <!-- Shop Button -->
     <div id="shop-btn-container">
       <div id="shop-btn" class="shop-btn" onclick="openShop()">
         <div class="shop-btn-icon">🏗️</div>
@@ -265,16 +167,13 @@
       </div>
     </div>
 
-    <!-- Unified right side panel -->
+    <!-- Side Panel -->
     <div id="side-panel">
       <div id="side-panel-inner"></div>
     </div>
+  </div>
 
-  </div><!-- /#game-wrap -->
-
-  <!-- ══════════════════════════════════════════
-       BACKGROUND AUDIO PLAYER (welcome.mp3)
-  ══════════════════════════════════════════ -->
+  <!-- Audio Widget -->
   <div id="audioWidget" class="audio-widget">
     <span>🎵</span>
     <button id="audioPlayPauseBtn" aria-label="Play/Pause">⏸️</button>
@@ -283,14 +182,11 @@
   </div>
 
   <script>
-    // ─────────────────────────────────────────────────────────────
-    // Background Music Handler
-    // ─────────────────────────────────────────────────────────────
+    // Audio handler (unchanged)
     (function initBackgroundAudio() {
       const audioSrc = "audio/background/welcome.mp3";
       let bgAudio = null;
       let isPlaying = false;
-      let userInteracted = false;
       
       const playPauseBtn = document.getElementById('audioPlayPauseBtn');
       const volumeSlider = document.getElementById('audioVolumeSlider');
@@ -307,55 +203,28 @@
           audio.preload = "auto";
           bgAudio = audio;
           return bgAudio;
-        } catch(e) {
-          console.warn("[Audio] Failed to create audio element:", e);
-          return null;
-        }
+        } catch(e) { return null; }
       }
       
       function updatePlayPauseUI() {
         if (!playPauseBtn) return;
-        if (isPlaying) {
-          playPauseBtn.textContent = "⏸️";
-          playPauseBtn.setAttribute("aria-label", "Pause");
-        } else {
-          playPauseBtn.textContent = "▶️";
-          playPauseBtn.setAttribute("aria-label", "Play");
-        }
+        playPauseBtn.textContent = isPlaying ? "⏸️" : "▶️";
       }
       
       function startPlayback() {
         if (!bgAudio) return false;
-        bgAudio.play().then(() => {
-          isPlaying = true;
-          updatePlayPauseUI();
-        }).catch(err => {
-          console.warn("[Audio] Autoplay blocked or error:", err);
-          isPlaying = false;
-          updatePlayPauseUI();
-        });
+        bgAudio.play().then(() => { isPlaying = true; updatePlayPauseUI(); }).catch(() => {});
         return true;
       }
       
       function pausePlayback() {
-        if (bgAudio) {
-          bgAudio.pause();
-          isPlaying = false;
-          updatePlayPauseUI();
-        }
+        if (bgAudio) { bgAudio.pause(); isPlaying = false; updatePlayPauseUI(); }
       }
       
       function togglePlayPause() {
-        if (!bgAudio) {
-          const newAudio = createAudio();
-          if (!newAudio) return;
-          bgAudio = newAudio;
-        }
-        if (isPlaying) {
-          pausePlayback();
-        } else {
-          startPlayback();
-        }
+        if (!bgAudio) createAudio();
+        if (isPlaying) pausePlayback();
+        else startPlayback();
       }
       
       function setVolume(value) {
@@ -363,7 +232,6 @@
         if (bgAudio) bgAudio.volume = vol;
         if (volumeSlider) volumeSlider.value = vol;
         if (settingsVolumeSlider) settingsVolumeSlider.value = vol;
-        
         const updateIcon = (iconSpan) => {
           if (!iconSpan) return;
           if (vol === 0) iconSpan.textContent = "🔇";
@@ -375,72 +243,27 @@
         updateIcon(settingsVolIcon);
       }
       
-      if (playPauseBtn) {
-        playPauseBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          togglePlayPause();
-        });
-      }
-      if (volumeSlider) {
-        volumeSlider.addEventListener('input', (e) => {
-          setVolume(e.target.value);
-        });
-      }
-      if (settingsVolumeSlider) {
-        settingsVolumeSlider.addEventListener('input', (e) => {
-          setVolume(e.target.value);
-        });
-      }
+      if (playPauseBtn) playPauseBtn.addEventListener('click', togglePlayPause);
+      if (volumeSlider) volumeSlider.addEventListener('input', e => setVolume(e.target.value));
+      if (settingsVolumeSlider) settingsVolumeSlider.addEventListener('input', e => setVolume(e.target.value));
       
       setVolume(volumeSlider?.value || 0.5);
       
-      const splashStartBtn = document.getElementById('btnStart');
-      const splashContinueBtn = document.getElementById('btnContinue');
-      function forceAudioOnGameStart() {
-        if (!bgAudio) createAudio();
-        if (bgAudio && bgAudio.paused) {
-          bgAudio.play().then(() => {
-            isPlaying = true;
-            updatePlayPauseUI();
-            userInteracted = true;
-          }).catch(e => console.warn("Audio blocked even on game start:", e));
-        }
-      }
-      if (splashStartBtn) splashStartBtn.addEventListener('click', forceAudioOnGameStart);
-      if (splashContinueBtn) splashContinueBtn.addEventListener('click', forceAudioOnGameStart);
+      document.getElementById('btnStart')?.addEventListener('click', () => { if(!bgAudio) createAudio(); if(bgAudio && bgAudio.paused) startPlayback(); });
+      document.getElementById('btnContinue')?.addEventListener('click', () => { if(!bgAudio) createAudio(); if(bgAudio && bgAudio.paused) startPlayback(); });
       
       const preloadAudio = createAudio();
       if (preloadAudio) preloadAudio.load();
-      
-      window.__bgAudioControls = {
-        play: () => { if(bgAudio) bgAudio.play(); },
-        pause: () => { if(bgAudio) bgAudio.pause(); },
-        setVolume: (v) => setVolume(v)
-      };
     })();
     
-    // Settings Panel Functions (Modal)
-    window.openSettingsPanel = function() {
-      var panel = document.getElementById('settings-panel');
-      if (panel) panel.classList.add('open');
-    };
-    
-    window.closeSettingsPanel = function() {
-      var panel = document.getElementById('settings-panel');
-      if (panel) panel.classList.remove('open');
-    };
-    
-    // Close modal when clicking outside
+    // Settings panel functions
+    window.openSettingsPanel = function() { document.getElementById('settings-panel').classList.add('open'); };
+    window.closeSettingsPanel = function() { document.getElementById('settings-panel').classList.remove('open'); };
     window.addEventListener('click', function(e) {
       var panel = document.getElementById('settings-panel');
-      if (panel && panel.classList.contains('open')) {
-        if (e.target === panel) {
-          closeSettingsPanel();
-        }
-      }
+      if (panel && panel.classList.contains('open') && e.target === panel) closeSettingsPanel();
     });
     
-    // Update centered time display
     window.updateCenterTime = function(timeStr, dayStr) {
       var timeEl = document.getElementById('centerTimeStr');
       var dayEl = document.getElementById('centerDayStr');
@@ -449,30 +272,24 @@
     };
   </script>
 
-  <!-- ══════════════════════════════════════════
-       SPLASH LOGIC
-  ══════════════════════════════════════════ -->
+  <!-- Splash Logic -->
   <script>
   (function() {
-    var SAVE_KEY     = 'miniBayan_save';
+    var SAVE_KEY = 'miniBayan_save';
     var AUTOSAVE_KEY = 'miniBayan_autosave';
-    function _getSaveInfo(key) {
-      try { var r = localStorage.getItem(key); return r ? JSON.parse(r) : null; }
-      catch(e) { return null; }
-    }
-    var save   = _getSaveInfo(SAVE_KEY) || _getSaveInfo(AUTOSAVE_KEY);
+    function _getSaveInfo(key) { try { return JSON.parse(localStorage.getItem(key)); } catch(e) { return null; } }
+    var save = _getSaveInfo(SAVE_KEY) || _getSaveInfo(AUTOSAVE_KEY);
     var isAuto = !_getSaveInfo(SAVE_KEY) && !!_getSaveInfo(AUTOSAVE_KEY);
     var btnCont = document.getElementById('btnContinue');
-    var infoEl  = document.getElementById('splash-save-info');
+    var infoEl = document.getElementById('splash-save-info');
     if (save && btnCont) {
       btnCont.style.display = 'block';
-      var day  = save.dayCount || 1;
+      var day = save.dayCount || 1;
       var date = save.savedAt ? new Date(save.savedAt).toLocaleDateString('fil-PH') : '';
-      if (infoEl) infoEl.textContent =
-        (isAuto ? 'Auto-save' : 'Naligtas') + ': Araw ' + day + (date ? '  •  ' + date : '');
+      if (infoEl) infoEl.textContent = (isAuto ? 'Auto-save' : 'Naligtas') + ': Araw ' + day + (date ? '  •  ' + date : '');
     }
     function _launch(loadSave) {
-      var splash   = document.getElementById('splash');
+      var splash = document.getElementById('splash');
       var gameWrap = document.getElementById('game-wrap');
       if (!splash || !gameWrap) return;
       splash.style.opacity = '0';
@@ -485,63 +302,140 @@
       }, 620);
     }
     document.getElementById('btnContinue').addEventListener('click', function() { _launch(true); });
-    document.getElementById('btnStart').addEventListener('click',    function() { _launch(false); });
+    document.getElementById('btnStart').addEventListener('click', function() { _launch(false); });
   })();
   </script>
 
-  <!-- ══════════════════════════════════════════
-       SIDE PANEL ENGINE
-  ══════════════════════════════════════════ -->
+  <!-- Side Panel Engine with dynamic loading -->
   <script>
 var _activeSidePanel = null;
-var _seenLogCount    = 0;
+var _seenLogCount = 0;
 
-window.openSidePanel = function(key) {
-  if (key === 'trade') {
-    _closeSidePanel();
-    if (window.openTradePanel) window.openTradePanel();
-    return;
-  }
-  if (_activeSidePanel === key) { _closeSidePanel(); return; }
-  _activeSidePanel = key;
-  var inner = document.getElementById('side-panel-inner');
-  var panel = document.getElementById('side-panel');
-  if (!inner || !panel) return;
-  inner.innerHTML = _spRender(key);
-  panel.classList.add('open');
-  _spWire(key);
-  _spMarkActive(key);
+// These will be populated after modules load
+var _tradeModule = null;
+var _requestRenderFn = null;
 
-  if (key === 'log') {
-    var entries = _getLogEntries();
-    _seenLogCount = entries.length;
-    _updateLogBadge(0);
+// Function to check if request render is ready
+function _isRequestsReady() {
+  return typeof window._renderRequestsToSidePanel === 'function';
+}
+
+// Load trade module dynamically
+async function _loadTradeModule() {
+  if (_tradeModule) return _tradeModule;
+  try {
+    const module = await import('./resources/trade.js');
+    _tradeModule = module;
+    return module;
+  } catch(e) {
+    console.warn('Trade module not loaded yet', e);
+    return null;
   }
+}
+
+// Render trade panel content using loaded module
+async function _renderTradePanelContent() {
+  var VS = window._VS;
+  if (!VS) return '<div class="sp-empty">Loading game data...</div>';
+  
+  const trade = await _loadTradeModule();
+  if (!trade) return '<div class="sp-empty">Loading trade system...</div>';
+  
+  var tradeState = trade.getTradeState(VS);
+  if (!tradeState) return '<div class="sp-empty">Trade system loading...</div>';
+  
+  var reputation = tradeState.reputation || 50;
+  var contracts = tradeState.contracts || [];
+  var pendingImports = tradeState.pendingImports || [];
+  var importPrices = trade.getImportPrices(VS);
+  
+  var repColor = reputation >= 70 ? '#88dd88' : reputation >= 40 ? '#f5c842' : '#e74c3c';
+  
+  var contractsHtml = '';
+  if (contracts.length === 0) {
+    contractsHtml = '<div class="sp-empty">Walang aktibong kontrata. Maghintay ng mag-aalok.</div>';
+  } else {
+    contractsHtml = contracts.map(function(c) {
+      var timerSecs = Math.ceil(c.timeLeft);
+      var timerStr = timerSecs >= 60 ? Math.floor(timerSecs/60) + 'm ' + (timerSecs%60) + 's' : timerSecs + 's';
+      var resIcon = c.res === 'rice' ? '🌾' : c.res === 'langis' ? '💧' : '🪙';
+      return '<div class="trade-contract">' +
+        '<div class="trade-contract-header">' +
+          '<span class="trade-flag">' + (c.flag || '📦') + '</span>' +
+          '<span class="trade-country">' + c.country + '</span>' +
+        '</div>' +
+        '<div class="trade-res">Bibili: ' + c.amount + ' ' + resIcon + ' ' + c.res + '</div>' +
+        '<div class="trade-reward">Gantimpala: ' + c.reward + ' 🪙</div>' +
+        '<div class="trade-timer">⏱️ ' + timerStr + '</div>' +
+        '<button class="trade-fulfill-btn" onclick="fulfillTradeContract(\'' + c.id + '\')">✅ Ipasa ang Kalakal</button>' +
+      '</div>';
+    }).join('');
+  }
+  
+  var pendingHtml = '';
+  if (pendingImports.length > 0) {
+    pendingHtml = '<div class="trade-pending"><div class="sp-section-lbl" style="margin-bottom: 8px;">📦 Naghihintay na Import</div>';
+    pendingImports.forEach(function(imp) {
+      var timerSecs = Math.ceil(imp.timeLeft);
+      var timerStr = timerSecs >= 60 ? Math.floor(timerSecs/60) + 'm' : timerSecs + 's';
+      var resIcon = imp.res === 'rice' ? '🌾' : '💧';
+      pendingHtml += '<div style="padding: 6px 0; border-bottom: 1px solid #2a1808;">' +
+        '➕ ' + imp.amount + ' ' + resIcon + ' ' + imp.res + ' <span class="trade-timer">(' + timerStr + ')</span>' +
+      '</div>';
+    });
+    pendingHtml += '</div>';
+  }
+  
+  return '' +
+    '<div class="trade-reputation" style="border-color:' + repColor + '; color:' + repColor + '">' +
+      '🏛️ Reputasyon: ' + reputation + '/100' +
+    '</div>' +
+    '<div class="sp-section-lbl">📤 Mga Alok na Export</div>' +
+    contractsHtml +
+    '<div class="trade-import-section">' +
+      '<div class="sp-section-lbl">📥 Mag-import</div>' +
+      '<div class="trade-import-row">' +
+        '<span>🌾 Bigas</span>' +
+        '<input type="number" id="trade-rice-amount" class="trade-import-input" value="' + (window._tradeImportAmount?.rice || 100) + '" min="10" max="500" step="10">' +
+        '<span>' + importPrices.rice + '🪙/unit</span>' +
+        '<button class="trade-import-btn" onclick="importResource(\'rice\')">Bumili</button>' +
+      '</div>' +
+      '<div class="trade-import-row">' +
+        '<span>💧 Langis</span>' +
+        '<input type="number" id="trade-langis-amount" class="trade-import-input" value="' + (window._tradeImportAmount?.langis || 50) + '" min="10" max="500" step="10">' +
+        '<span>' + importPrices.langis + '🪙/unit</span>' +
+        '<button class="trade-import-btn" onclick="importResource(\'langis\')">Bumili</button>' +
+      '</div>' +
+    '</div>' +
+    pendingHtml;
+}
+
+// Global trade action handlers
+window.fulfillTradeContract = async function(contractId) {
+  const trade = await _loadTradeModule();
+  if (!trade) { window.showMsg('Trade system not ready', 'warning'); return; }
+  var result = trade.fulfillExport(contractId, window._VS, window.showMsg);
+  if (result && result.ok) setTimeout(() => window.refreshSidePanel(), 100);
 };
 
-window.closeSidePanel = function() { _closeSidePanel(); };
-window.openPolicy     = function() { window.openSidePanel('policy'); };
-window.openTaxPanel   = function() { window.openSidePanel('tax'); };
+window.importResource = async function(res) {
+  var amount = res === 'rice' ? (window._tradeImportAmount?.rice || 100) : (window._tradeImportAmount?.langis || 50);
+  const trade = await _loadTradeModule();
+  if (!trade) { window.showMsg('Import system not ready', 'warning'); return; }
+  var result = trade.placeImportOrder(res, amount, window._VS, window.showMsg);
+  if (result && result.ok) setTimeout(() => window.refreshSidePanel(), 100);
+};
 
-function _closeSidePanel() {
-  _activeSidePanel = null;
-  var panel = document.getElementById('side-panel');
-  if (panel) panel.classList.remove('open');
-  _spMarkActive(null);
+window._tradeImportAmount = { rice: 100, langis: 50 };
+
+function _wireTradeButtons() {
+  var riceInput = document.getElementById('trade-rice-amount');
+  var langisInput = document.getElementById('trade-langis-amount');
+  if (riceInput) riceInput.onchange = (e) => window._tradeImportAmount.rice = parseInt(e.target.value) || 100;
+  if (langisInput) langisInput.onchange = (e) => window._tradeImportAmount.langis = parseInt(e.target.value) || 50;
 }
 
-function _spMarkActive(key) {
-  document.querySelectorAll('.fab-item').forEach(function(el) {
-    el.classList.remove('fab-active');
-  });
-  if (!key) return;
-  document.querySelectorAll('.fab-item').forEach(function(el) {
-    var h = el.getAttribute('onclick') || '';
-    if (h.indexOf("'" + key + "'") !== -1) el.classList.add('fab-active');
-    if (key === 'log' && el.classList.contains('fab-log-btn')) el.classList.add('fab-active');
-  });
-}
-
+// Log entries helper
 function _getLogEntries() {
   var VS = window._VS;
   var entries = [];
@@ -555,19 +449,16 @@ function _getLogEntries() {
     });
   }
   if (VS && VS.election && VS.election.lastVotesTotal > 0) {
-    var E   = VS.election;
+    var E = VS.election;
     var pct = Math.round(E.lastApproval * 100);
-    var bd  = E.lastBreakdown;
-    var detail = bd
-      ? ' (Tiwala:' + bd.trust + ' Kasiyahan:' + bd.happy + ' Pagkain:' + bd.food + ' Trabaho:' + bd.employ + '%)'
-      : '';
+    var bd = E.lastBreakdown;
+    var detail = bd ? ' (Tiwala:' + bd.trust + ' Kasiyahan:' + bd.happy + ' Pagkain:' + bd.food + ' Trabaho:' + bd.employ + '%)' : '';
     entries.push({ id: 'election', icon: '🗳️', text: 'Eleksyon Termino ' + ((E.termNumber-1)||1) + ': ' + pct + '% boto' + detail, tag: 'election', detail: null });
   }
   if (VS && VS.trade && VS.trade.history) {
     VS.trade.history.slice(0, 6).forEach(function(h, i) {
       var icon = h.success ? '✅' : '❌';
-      var text = (h.flag||'') + ' ' + (h.country||'Import') + ': ' +
-                 (h.success?'+':'') + h.amount + ' ' + ({rice:'🌾',gold:'🪙',langis:'💎'}[h.res]||h.res);
+      var text = (h.flag||'') + ' ' + (h.country||'Import') + ': ' + (h.success?'+':'') + h.amount + ' ' + ({rice:'🌾',gold:'🪙',langis:'💎'}[h.res]||h.res);
       entries.push({ id: 'trade_' + i, icon: icon, text: text.trim(), tag: 'trade', detail: null });
     });
   }
@@ -581,16 +472,37 @@ function _getLogEntries() {
 
 function _updateLogBadge(count) {
   var badge = document.getElementById('fab-log-badge');
-  if (badge) {
-    badge.textContent   = Math.min(count, 99);
-    badge.style.display = count > 0 ? 'flex' : 'none';
-  }
+  if (badge) { badge.textContent = Math.min(count, 99); badge.style.display = count > 0 ? 'flex' : 'none'; }
+}
+
+function _spRenderLog() {
+  var entries = _getLogEntries();
+  var body = entries.length === 0
+    ? '<div class="sp-empty">Walang naitalang kaganapan pa.</div>'
+    : entries.map(function(e) {
+        var hasDetail = e.detail && ( (e.detail.affectedBuildings && e.detail.affectedBuildings.length > 0) || e.detail.goldLost || e.detail.riceLost || e.detail.healthHit );
+        var clickAttr = hasDetail ? ' onclick="window.showEventModal(' + JSON.stringify(e).replace(/"/g, '&quot;') + ')" style="cursor:pointer"' : '';
+        var hint = hasDetail ? '<span class="sp-log-hint">Tap para sa detalye ›</span>' : '';
+        return '<div class="sp-log-row sp-log-' + e.tag + '"' + clickAttr + '>' +
+          '<span class="sp-log-icon">' + e.icon + '</span>' +
+          '<span class="sp-log-text">' + e.text + hint + '</span>' +
+        '</div>';
+      }).join('');
+  return _spShell('📋 Talaan ng Buhay', body);
 }
 
 function _spRender(key) {
   var VS = window._VS;
   switch (key) {
-
+    case 'requests':
+      if (_isRequestsReady()) {
+        var requestsHtml = window._renderRequestsToSidePanel();
+        return _spShell('📋 Mga Kahilingan ng Mamamayan', requestsHtml);
+      }
+      return _spShell('📋 Mga Kahilingan', '<div class="sp-empty">Loading requests system...</div>');
+    case 'trade':
+      // Return a loading placeholder; actual content will be loaded after async call
+      return _spShell('⚓ Kalakalan at Import', '<div class="sp-empty" id="trade-loading">Loading trade system...</div>');
     case 'policy': {
       var states = window.getPolicyState ? window.getPolicyState() : [];
       if (!states.length) return _spShell('📜 Mga Patakaran', '<div class="sp-empty">Walang available na patakaran.</div>');
@@ -616,7 +528,6 @@ function _spRender(key) {
       }).join('');
       return _spShell('📜 Mga Patakaran', html);
     }
-
     case 'tax': {
       var rate = window.getTaxRate ? Math.round(window.getTaxRate() * 100) : 25;
       var happiness = VS ? _avg(VS.villagers, 'happiness') : 50;
@@ -640,165 +551,9 @@ function _spRender(key) {
         '<button class="sp-btn sp-btn-on" style="width:100%;margin-top:14px" onclick="spApplyTax()">Ilapat ang Bagong Buwis</button>',
       ].join(''));
     }
-
-    case 'expand': {
-      if (window.renderExpandContent) return _spShell('🗺️ Palawakin ang Nayon', window.renderExpandContent());
-      return _spShell('🗺️ Palawakin ang Nayon', '<div class="sp-empty">Mag-load muna ng laro.</div>');
-    }
-
     case 'log': return _spRenderLog();
-
     default: return _spShell('?', '<div class="sp-empty">Hindi kilala.</div>');
   }
-}
-
-function _spRenderLog() {
-  var entries = _getLogEntries();
-
-  var body = entries.length === 0
-    ? '<div class="sp-empty">Walang naitalang kaganapan pa.</div>'
-    : entries.map(function(e) {
-        var hasDetail = e.detail && (
-          (e.detail.affectedBuildings && e.detail.affectedBuildings.length > 0) ||
-          e.detail.goldLost || e.detail.riceLost || e.detail.healthHit
-        );
-        var clickAttr = hasDetail
-          ? ' onclick="window.showEventModal(' + JSON.stringify(e).replace(/"/g, '&quot;') + ')" style="cursor:pointer"'
-          : '';
-        var hint = hasDetail ? '<span class="sp-log-hint">Tap para sa detalye ›</span>' : '';
-        return '<div class="sp-log-row sp-log-' + e.tag + '"' + clickAttr + '>' +
-          '<span class="sp-log-icon">' + e.icon + '</span>' +
-          '<span class="sp-log-text">' + e.text + hint + '</span>' +
-        '</div>';
-      }).join('');
-
-  return _spShell('📋 Talaan ng Buhay', body);
-}
-
-window.showEventModal = function(entry) {
-  var existing = document.getElementById('event-detail-modal');
-  if (existing) existing.remove();
-
-  var d   = entry.detail || {};
-  var bld = d.affectedBuildings || [];
-
-  var bldHTML = bld.length === 0
-    ? '<div class="edm-none">Walang gusali ang nasira.</div>'
-    : '<div class="edm-bld-list">' +
-        bld.map(function(b) {
-          return '<div class="edm-bld-row">' +
-            '<span class="edm-bld-name">🏚️ ' + b.label + '</span>' +
-            '<span class="edm-bld-lvl">Lv' + b.fromLevel + ' → Lv' + b.toLevel + '</span>' +
-          '</div>';
-        }).join('') +
-      '</div>';
-
-  var impacts = [];
-  if (d.goldLost   > 0) impacts.push(['🪙 Ginto nawala',   '-' + d.goldLost,   'bad']);
-  if (d.goldLost   < 0) impacts.push(['🪙 Ginto nakuha',   '+' + (-d.goldLost), 'good']);
-  if (d.riceLost   > 0) impacts.push(['🌾 Bigas nawala',   '-' + d.riceLost,   'bad']);
-  if (d.riceLost   < 0) impacts.push(['🌾 Bigas nakuha',   '+' + (-d.riceLost), 'good']);
-  if (d.healthHit  > 0) impacts.push(['❤️ Kalusugan',       '-' + d.healthHit + '%', 'bad']);
-  if (d.trustLoss  > 0) impacts.push(['🏛️ Tiwala',          '-' + d.trustLoss + '%', 'bad']);
-  if (d.foodLost   > 0) impacts.push(['🍚 Pagkain nawala', '-' + d.foodLost,   'bad']);
-
-  var impactHTML = impacts.length === 0
-    ? ''
-    : '<div class="edm-impacts">' +
-        impacts.map(function(row) {
-          return '<div class="edm-impact-row">' +
-            '<span class="edm-impact-label">' + row[0] + '</span>' +
-            '<span class="edm-impact-val edm-' + row[2] + '">' + row[1] + '</span>' +
-          '</div>';
-        }).join('') +
-      '</div>';
-
-  var icon = entry.icon || '⚠️';
-  var sevColor = (entry.severity >= 3) ? '#e74c3c' : (entry.severity === 2) ? '#e67e22' : '#f5c842';
-
-  var modal = document.createElement('div');
-  modal.id  = 'event-detail-modal';
-  modal.innerHTML =
-    '<div class="edm-backdrop" onclick="document.getElementById(\'event-detail-modal\').remove()"></div>' +
-    '<div class="edm-box">' +
-      '<div class="edm-header" style="border-color:' + sevColor + '">' +
-        '<span class="edm-icon">' + icon + '</span>' +
-        '<span class="edm-title">' + entry.text + '</span>' +
-        '<button class="edm-close" onclick="document.getElementById(\'event-detail-modal\').remove()">✕</button>' +
-      '</div>' +
-      '<div class="edm-body">' +
-        (impacts.length > 0 ? '<div class="edm-section-label">Epekto</div>' + impactHTML : '') +
-        (bld.length > 0 ? '<div class="edm-section-label">Mga Nasiring Gusali (' + bld.length + ')</div>' + bldHTML : '') +
-        (bld.length === 0 && impacts.length === 0 ? '<div class="edm-none">Walang nakitang detalye.</div>' : '') +
-      '</div>' +
-      '<button class="edm-ok" onclick="document.getElementById(\'event-detail-modal\').remove()">Naiintindihan</button>' +
-    '</div>';
-
-  var container = document.getElementById('canvas-container') || document.body;
-  container.appendChild(modal);
-  _ensureEventModalStyles();
-};
-
-function _ensureEventModalStyles() {
-  if (document.getElementById('edm-styles')) return;
-  var s = document.createElement('style');
-  s.id  = 'edm-styles';
-  s.textContent = [
-    '#event-detail-modal{position:absolute;inset:0;z-index:95;pointer-events:all;}',
-    '.edm-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.68);}',
-    '.edm-box{',
-    '  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);',
-    '  width:min(420px,92vw);max-height:80vh;overflow-y:auto;',
-    '  background:linear-gradient(160deg,#1a1208,#0e0905);',
-    '  border:1.5px solid #8a6030;border-radius:12px;',
-    '  padding:0 0 16px;box-shadow:0 8px 40px rgba(0,0,0,0.7);',
-    '  animation:edmPop .25s ease;',
-    '}',
-    '@keyframes edmPop{from{opacity:0;transform:translate(-50%,-48%)}to{opacity:1;transform:translate(-50%,-50%)}}',
-    '.edm-header{',
-    '  display:flex;align-items:flex-start;gap:10px;',
-    '  padding:16px 16px 14px;border-bottom:1.5px solid #3a2010;',
-    '  border-top:4px solid #e67e22;border-radius:10px 10px 0 0;',
-    '}',
-    '.edm-icon{font-size:26px;flex-shrink:0;line-height:1;}',
-    '.edm-title{flex:1;font-family:"Oldenburg",serif;font-size:14px;color:#f5c842;line-height:1.4;}',
-    '.edm-close{',
-    '  background:#2a1808;border:1px solid #8a6030;color:#f5c842;',
-    '  border-radius:50%;width:26px;height:26px;font-size:13px;',
-    '  cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;',
-    '}',
-    '.edm-body{padding:12px 16px 0;}',
-    '.edm-section-label{',
-    '  font-family:"Oldenburg",serif;font-size:11px;color:#7a5030;',
-    '  letter-spacing:.08em;text-transform:uppercase;',
-    '  border-bottom:1px solid #2a1808;padding-bottom:4px;margin-bottom:8px;margin-top:12px;',
-    '}',
-    '.edm-section-label:first-child{margin-top:0;}',
-    '.edm-impacts{display:flex;flex-direction:column;gap:4px;}',
-    '.edm-impact-row{display:flex;justify-content:space-between;font-family:monospace;font-size:13px;padding:2px 0;}',
-    '.edm-impact-label{color:#8a6040;}',
-    '.edm-impact-val{font-weight:bold;}',
-    '.edm-bad{color:#e74c3c;}.edm-good{color:#88dd88;}',
-    '.edm-bld-list{display:flex;flex-direction:column;gap:5px;}',
-    '.edm-bld-row{',
-    '  display:flex;justify-content:space-between;align-items:center;',
-    '  background:#1a1208;border:1px solid #2a1808;border-radius:4px;',
-    '  padding:5px 8px;font-size:13px;',
-    '}',
-    '.edm-bld-name{color:#e8c87a;font-family:"Crimson Pro",serif;}',
-    '.edm-bld-lvl{color:#e74c3c;font-family:monospace;font-size:12px;font-weight:bold;}',
-    '.edm-none{color:#5a4030;font-family:monospace;font-size:13px;padding:6px 0;}',
-    '.edm-ok{',
-    '  display:block;margin:16px auto 0;padding:9px 32px;',
-    '  font-family:"Oldenburg",serif;font-size:13px;',
-    '  background:#2a1808;border:1.5px solid #f5c842;color:#f5c842;',
-    '  border-radius:6px;cursor:pointer;transition:background .15s;',
-    '}',
-    '.edm-ok:hover{background:#3a2810;}',
-    '.sp-log-row{cursor:default;}',
-    '.sp-log-hint{display:block;font-size:10px;color:#5a4030;margin-top:2px;letter-spacing:.04em;}',
-  ].join('\n');
-  document.head.appendChild(s);
 }
 
 function _avg(villagers, field) {
@@ -816,44 +571,147 @@ function _spShell(title, body) {
 }
 
 function _spWire(key) {
-  if (key !== 'tax') return;
-  window.spTaxSlider = function(val) {
-    var v = document.getElementById('sp-tax-val');
-    var w = document.getElementById('sp-tax-warn');
-    if (v) v.textContent = val + '%';
-    if (w) w.style.display = val > 50 ? 'block' : 'none';
-  };
-  window.spApplyTax = function() {
-    var s = document.getElementById('sp-tax-slider');
-    if (!s || !window.setTaxRate) return;
-    window.setTaxRate(parseInt(s.value) / 100);
-    window.openSidePanel('tax');
-  };
+  if (key === 'tax') {
+    window.spTaxSlider = function(val) {
+      var v = document.getElementById('sp-tax-val');
+      var w = document.getElementById('sp-tax-warn');
+      if (v) v.textContent = val + '%';
+      if (w) w.style.display = val > 50 ? 'block' : 'none';
+    };
+    window.spApplyTax = function() {
+      var s = document.getElementById('sp-tax-slider');
+      if (!s || !window.setTaxRate) return;
+      window.setTaxRate(parseInt(s.value) / 100);
+      window.openSidePanel('tax');
+    };
+  }
+  if (key === 'trade') {
+    // After panel is rendered, load the real content
+    (async () => {
+      var inner = document.getElementById('side-panel-inner');
+      if (inner) {
+        var tradeHtml = await _renderTradePanelContent();
+        inner.innerHTML = _spShell('⚓ Kalakalan at Import', tradeHtml);
+        _wireTradeButtons();
+      }
+    })();
+  }
+  if (key === 'requests') {
+    setTimeout(function() {
+      if (window.wireRequestButtons) window.wireRequestButtons();
+    }, 100);
+  }
 }
 
+window.openSidePanel = function(key) {
+  if (_activeSidePanel === key) { _closeSidePanel(); return; }
+  _activeSidePanel = key;
+  var inner = document.getElementById('side-panel-inner');
+  var panel = document.getElementById('side-panel');
+  if (!inner || !panel) return;
+  inner.innerHTML = _spRender(key);
+  panel.classList.add('open');
+  _spMarkActive(key);
+  _spWire(key);
+  if (key === 'log') {
+    var entries = _getLogEntries();
+    _seenLogCount = entries.length;
+    _updateLogBadge(0);
+  }
+};
+
+window.closeSidePanel = function() { _closeSidePanel(); };
+window.openPolicy = function() { window.openSidePanel('policy'); };
+window.openTaxPanel = function() { window.openSidePanel('tax'); };
+
+function _closeSidePanel() {
+  _activeSidePanel = null;
+  var panel = document.getElementById('side-panel');
+  if (panel) panel.classList.remove('open');
+  _spMarkActive(null);
+}
+
+function _spMarkActive(key) {
+  document.querySelectorAll('.fab-item').forEach(function(el) { el.classList.remove('fab-active'); });
+  if (!key) return;
+  document.querySelectorAll('.fab-item').forEach(function(el) {
+    var h = el.getAttribute('onclick') || '';
+    if (h.indexOf("'" + key + "'") !== -1) el.classList.add('fab-active');
+  });
+}
+
+// Refresh side panel function (async)
+window.refreshSidePanel = async function() {
+  if (_activeSidePanel === 'requests' && _isRequestsReady()) {
+    var inner = document.getElementById('side-panel-inner');
+    if (inner) {
+      var html = window._renderRequestsToSidePanel();
+      inner.innerHTML = _spShell('📋 Mga Kahilingan ng Mamamayan', html);
+      setTimeout(() => { if (window.wireRequestButtons) window.wireRequestButtons(); }, 100);
+    }
+  }
+  if (_activeSidePanel === 'trade') {
+    var inner = document.getElementById('side-panel-inner');
+    if (inner) {
+      var tradeHtml = await _renderTradePanelContent();
+      inner.innerHTML = _spShell('⚓ Kalakalan at Import', tradeHtml);
+      _wireTradeButtons();
+    }
+  }
+};
+
+// Auto-refresh every 6 seconds
 setInterval(function() {
-  var entries  = _getLogEntries();
+  var entries = _getLogEntries();
   var newCount = Math.max(0, entries.length - _seenLogCount);
   _updateLogBadge(newCount);
   if (_activeSidePanel === 'log') {
     var inner = document.getElementById('side-panel-inner');
     if (inner) inner.innerHTML = _spRenderLog();
   }
+  if (_activeSidePanel === 'requests' || _activeSidePanel === 'trade') {
+    window.refreshSidePanel();
+  }
 }, 6000);
   </script>
 
-  <!-- ══════════════════════════════════════════
-       MOBILE HELPERS
-  ══════════════════════════════════════════ -->
+  <!-- Additional styles for side panel and modals (already in style.css but add fallbacks) -->
+
+  <!-- Event Modal Styles (already in script, but add fallback) -->
+  <style>
+    .edm-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.68); z-index: 95; }
+    .edm-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(420px, 92vw); background: #0e0905; border: 1px solid #8a6030; border-radius: 12px; z-index: 96; padding: 0 0 16px; max-height: 80vh; overflow-y: auto; }
+    .edm-header { display: flex; align-items: flex-start; gap: 10px; padding: 16px; border-bottom: 1px solid #3a2010; border-top: 4px solid #e67e22; }
+    .edm-icon { font-size: 26px; }
+    .edm-title { flex: 1; font-family: 'Oldenburg', serif; font-size: 14px; color: #f5c842; }
+    .edm-close { background: #2a1808; border: 1px solid #8a6030; color: #f5c842; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
+    .edm-body { padding: 12px 16px; }
+    .edm-section-label { font-family: 'Oldenburg', serif; font-size: 11px; color: #7a5030; text-transform: uppercase; border-bottom: 1px solid #2a1808; margin: 12px 0 8px; padding-bottom: 4px; }
+    .edm-impacts { display: flex; flex-direction: column; gap: 4px; }
+    .edm-impact-row { display: flex; justify-content: space-between; font-size: 13px; }
+    .edm-impact-label { color: #8a6040; }
+    .edm-impact-val { font-weight: bold; }
+    .edm-bad { color: #e74c3c; }
+    .edm-good { color: #88dd88; }
+    .edm-bld-list { display: flex; flex-direction: column; gap: 5px; }
+    .edm-bld-row { display: flex; justify-content: space-between; background: #1a1208; border: 1px solid #2a1808; padding: 5px 8px; border-radius: 4px; font-size: 13px; }
+    .edm-bld-name { color: #e8c87a; }
+    .edm-bld-lvl { color: #e74c3c; font-family: monospace; }
+    .edm-none { color: #5a4030; font-style: italic; padding: 6px 0; }
+    .edm-ok { display: block; margin: 16px auto 0; padding: 8px 32px; background: #2a1808; border: 1px solid #f5c842; border-radius: 6px; color: #f5c842; cursor: pointer; }
+  </style>
+
+  <script type="module" src="main.js"></script>
+
+  <!-- Mobile helpers -->
   <script>
     (function() {
       var widget = document.getElementById('audioWidget');
       if (!widget) return;
-      widget.style.position = 'fixed';
       var btn = document.createElement('button');
       btn.id = 'audio-hide-btn';
-      btn.title = 'Itago ang musika';
       btn.textContent = '◀';
+      btn.title = 'Itago ang musika';
       var hidden = false;
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -865,19 +723,9 @@ setInterval(function() {
     })();
   </script>
 
-  <!-- ══════════════════════════════════════════
-       ERROR SURFACE
-  ══════════════════════════════════════════ -->
   <script type="module">
-    window.addEventListener('error', function(e) {
-      console.error('[Mini Bayan] Uncaught error:', e.message, e.filename, e.lineno);
-    });
-    window.addEventListener('unhandledrejection', function(e) {
-      console.error('[Mini Bayan] Unhandled promise rejection:', e.reason);
-    });
+    // After main.js loads, it will set window._renderRequestsToSidePanel
+    // We also set up trade module loading via dynamic import in the side panel script.
   </script>
-
-  <script type="module" src="main.js"></script>
-
 </body>
 </html>

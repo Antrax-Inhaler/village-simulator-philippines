@@ -98,40 +98,46 @@ export function updateWasteDisplay(VS) {
 /* ══════════════════════════════════════════════════════════════
    drawGround
 ══════════════════════════════════════════════════════════════ */
-export function drawGround(ctx, VW, VH) {
-  /* Always draw ground to cover the full fixed world space */
-  var WW = WORLD_W, WH = WORLD_H;
-  var g = ctx.createLinearGradient(0, 0, 0, WH);
+export function drawGround(ctx, canvasW, canvasH) {
+  // 1. Fill whole canvas with base gradient
+  var g = ctx.createLinearGradient(0, 0, 0, canvasH);
   g.addColorStop(0,    '#4a7c5a');
   g.addColorStop(0.35, '#5d8c6b');
   g.addColorStop(0.7,  '#507860');
   g.addColorStop(1,    '#3d5e46');
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, WW, WH);
+  ctx.fillRect(0, 0, canvasW, canvasH);
 
+  // 2. World‑specific decorations (only inside the original world rectangle)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, WORLD_W, WORLD_H);
+  ctx.clip();
+
+  // existing dirt path (still using WORLD_W/H)
   ctx.fillStyle = 'rgba(150,110,55,0.22)';
   ctx.beginPath();
-  ctx.moveTo(WW*0.46, 0);
-  ctx.bezierCurveTo(WW*0.49, WH*0.3,  WW*0.45, WH*0.5,  WW*0.5,  WH*0.43);
-  ctx.bezierCurveTo(WW*0.55, WH*0.36, WW*0.53, WH*0.65, WW*0.54, WH);
-  ctx.lineTo(WW*0.61, WH);
-  ctx.bezierCurveTo(WW*0.60, WH*0.65, WW*0.62, WH*0.36, WW*0.57, WH*0.43);
-  ctx.bezierCurveTo(WW*0.52, WH*0.5,  WW*0.56, WH*0.3,  WW*0.53, 0);
+  ctx.moveTo(WORLD_W*0.46, 0);
+  ctx.bezierCurveTo(WORLD_W*0.49, WORLD_H*0.3,  WORLD_W*0.45, WORLD_H*0.5,  WORLD_W*0.5,  WORLD_H*0.43);
+  ctx.bezierCurveTo(WORLD_W*0.55, WORLD_H*0.36, WORLD_W*0.53, WORLD_H*0.65, WORLD_W*0.54, WORLD_H);
+  ctx.lineTo(WORLD_W*0.61, WORLD_H);
+  ctx.bezierCurveTo(WORLD_W*0.60, WORLD_H*0.65, WORLD_W*0.62, WORLD_H*0.36, WORLD_W*0.57, WORLD_H*0.43);
+  ctx.bezierCurveTo(WORLD_W*0.52, WORLD_H*0.5,  WORLD_W*0.56, WORLD_H*0.3,  WORLD_W*0.53, 0);
   ctx.closePath();
   ctx.fill();
 
   ctx.fillStyle = 'rgba(150,110,55,0.16)';
   ctx.beginPath();
-  ctx.moveTo(0, WH*0.40);
-  ctx.bezierCurveTo(WW*0.25, WH*0.43, WW*0.45, WH*0.40, WW*0.5, WH*0.43);
-  ctx.bezierCurveTo(WW*0.55, WH*0.46, WW*0.75, WH*0.42, WW,     WH*0.44);
-  ctx.lineTo(WW, WH*0.50);
-  ctx.bezierCurveTo(WW*0.75, WH*0.48, WW*0.55, WH*0.52, WW*0.5, WH*0.49);
-  ctx.bezierCurveTo(WW*0.45, WH*0.46, WW*0.25, WH*0.49, 0,      WH*0.47);
+  ctx.moveTo(0, WORLD_H*0.40);
+  ctx.bezierCurveTo(WORLD_W*0.25, WORLD_H*0.43, WORLD_W*0.45, WORLD_H*0.40, WORLD_W*0.5, WORLD_H*0.43);
+  ctx.bezierCurveTo(WORLD_W*0.55, WORLD_H*0.46, WORLD_W*0.75, WORLD_H*0.42, WORLD_W,     WORLD_H*0.44);
+  ctx.lineTo(WORLD_W, WORLD_H*0.50);
+  ctx.bezierCurveTo(WORLD_W*0.75, WORLD_H*0.48, WORLD_W*0.55, WORLD_H*0.52, WORLD_W*0.5, WORLD_H*0.49);
+  ctx.bezierCurveTo(WORLD_W*0.45, WORLD_H*0.46, WORLD_W*0.25, WORLD_H*0.49, 0,      WORLD_H*0.47);
   ctx.closePath();
   ctx.fill();
 
-  /* Decorative dots — expressed as fractions of world size */
+  // decorative dots
   ctx.fillStyle = 'rgba(38,90,38,0.28)';
   var dots = [
     [0.063,0.132],[0.156,0.243],[0.328,0.083],[0.547,0.118],[0.742,0.271],[0.859,0.188],
@@ -139,11 +145,19 @@ export function drawGround(ctx, VW, VH) {
   ];
   dots.forEach(function(t) {
     ctx.beginPath();
-    ctx.ellipse(t[0]*WW, t[1]*WH, 7, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(t[0]*WORLD_W, t[1]*WORLD_H, 7, 3, 0, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  drawGroundSprite(ctx, 'grass', 0, 0, WW, WH);
+  // ground sprite (only inside world)
+  drawGroundSprite(ctx, 'grass', 0, 0, WORLD_W, WORLD_H);
+
+  ctx.restore();
+
+  // 3. Optional world border (helps players see the playable area)
+  ctx.strokeStyle = 'rgba(197, 154, 78, 0.5)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
 }
 
 /* ══════════════════════════════════════════════════════════════

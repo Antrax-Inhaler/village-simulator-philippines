@@ -237,6 +237,79 @@ var CALAMITY_GENERIC = [
   'Tulungan tayo.',
 ];
 
+export var REQUEST_APPEAR_QUIPS = [
+  'May problema!',
+  'Sana pansinin!',
+  'Kailangan namin ng tulong!',
+  'Naku, ganito na naman!',
+  'Tulong po!',
+  'Sino kaya ang tutulong?'
+];
+
+export var AYUDA_HAPPY_QUIPS = [
+  'Salamat po!',
+  'Buti naman!',
+  'May pag-asa pa!',
+  'Tulong ay dumating!',
+  'Mabuti ang gobyerno!',
+  'Salamat sa tulong!'
+];
+
+export var AYUDA_LOW_QUIPS = [
+  'Kulang!',
+  'Ano ito?',
+  'Sana hindi na lang!',
+  'Walang kwenta!',
+  'Masyadong maliit!',
+  'Hindi sapat ito!'
+];
+
+export var AYUDA_HIGH_QUIPS = [
+  'Wow! Sobra!',
+  'Sana lagi ganyan!',
+  'Hindi kami sanay!',
+  'Salamat ng marami!',
+  'Ang laki naman!',
+  'Sobra-sobra pa!'
+];
+
+export var JOB_CREATED_QUIPS = [
+  'May trabaho na!',
+  'Salamat sa pagkakataon!',
+  'Kita na ulit!',
+  'Masaya na ang pamilya!',
+  'Sa wakas may hanapbuhay!',
+  'Hindi na kami magugutom!'
+];
+
+export var BUILDING_BUILT_QUIPS = [
+  'May bagong gusali!',
+  'Salamat sa bagong pasilidad!',
+  'Ito ang kailangan namin!',
+  'Maganda ito para sa nayon!',
+  'Buti naman at itinayo!'
+];
+
+export var REQUEST_IGNORED_QUIPS = [
+  'Binalewala nila tayo...',
+  'Walang nakinig sa amin!',
+  'Sana pinansin nila!',
+  'Galit na ako sa gobyerno!',
+  'Walang pag-asa!'
+];
+
+export var REQUEST_EXPIRED_QUIPS = [
+  'Walang nangyari...',
+  'Huli na ang lahat!',
+  'Sana ay inasikaso nila!',
+  'Nakakaiyak naman!',
+  'Sayang ang pagkakataon!'
+];
+
+/* Helper to get random quip from pool */
+export function getRandomQuip(pool) {
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 function _getCalamityQuip(type) {
   var pool = CALAMITY_QUIPS[type] || CALAMITY_GENERIC;
   return pool[randInt(0, pool.length - 1)];

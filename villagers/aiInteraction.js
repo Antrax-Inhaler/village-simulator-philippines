@@ -22,11 +22,17 @@
    4. AI DIALOGUE (Gemini) — CAN BE TOGGLED ON/OFF
       • Set ENABLE_GEMINI = true to use Gemini API
       • Set ENABLE_GEMINI = false to use fallback dialogues only
+
+   5. REQUEST REACTION BUBBLES
+      • New request appears
+      • Request fulfilled (ayuda or building)
+      • Request ignored/expired
+      • Ayuda amount reactions (low/good/high)
 ═══════════════════════════════════════════════════════════════ */
 
 import { perspScale, clamp, dist, randInt, randRange } from '../utils/perspective.js';
-import { getTimeOfDay }    from '../utils/time.js';
-import { SpatialGrid }     from '../utils/collision.js';
+import { getTimeOfDay } from '../utils/time.js';
+import { SpatialGrid } from '../utils/collision.js';
 import { spawnPlayerQuip } from './villagerQuips.js';
 
 /* ── GEMINI TOGGLE ──────────────────────────────────────────── */
@@ -505,4 +511,137 @@ export function checkVillagerInteractions(villagers, dt, currentHour, activeBubb
       });
     })(a, b);
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   REQUEST REACTION BUBBLES
+   Called from citizenNeeds.js or requestPanel.js when requests
+   are created, fulfilled, or ignored.
+══════════════════════════════════════════════════════════════ */
+
+/* Trigger reaction when a new request appears */
+export function triggerRequestReaction(request, type, VS) {
+  if (!VS || !VS.villagers || VS.villagers.length === 0) return;
+  
+  var reactionQuips = {
+    appear: ['May problema sa nayon!', 'Sana pansinin!', 'Kailangan namin ng tulong!', 'Naku, ganito na naman!'],
+    fulfilled_building: ['May trabaho na! 🙌', 'Salamat sa gusali!', 'Buti naman!', 'Tulong ay dumating!'],
+    fulfilled_ayuda_good: ['Salamat sa tulong!', 'Buti naman!', 'May pag-asa pa!'],
+    ignored: ['Binalewala nila tayo...', 'Walang nakinig!', 'Sana hindi na lang!', 'Galit na ako!'],
+    expired: ['Walang nangyari...', 'Sana pala inasikaso nila!', 'Nakakaiyak naman!']
+  };
+  
+  var quips = reactionQuips[type] || reactionQuips.appear;
+  var count = Math.min(3, VS.villagers.length);
+  var selected = [];
+  
+  // Select random villagers to react
+  for (var i = 0; i < count; i++) {
+    var idx = randInt(0, VS.villagers.length - 1);
+    var v = VS.villagers[idx];
+    if (!selected.includes(v) && !v._quip) {
+      selected.push(v);
+      _spawnRequestBubble(v, quips[randInt(0, quips.length - 1)], type);
+    }
+  }
+}
+
+/* Trigger reaction when ayuda is given */
+export function triggerAyudaReaction(amount, min, max, VS) {
+  if (!VS || !VS.villagers || VS.villagers.length === 0) return;
+  
+  var reaction = '';
+  var style = '';
+  
+  if (amount < min) {
+    reaction = 'Ang baba naman! 🤨';
+    style = 'angry';
+  } else if (amount > max) {
+    reaction = 'Sobra naman! 😲 Sana lagi ganyan.';
+    style = 'surprised';
+  } else {
+    reaction = 'Salamat po! 🙏';
+    style = 'happy';
+  }
+  
+  // Show reaction bubbles on random villagers
+  var count = Math.min(4, VS.villagers.length);
+  for (var i = 0; i < count; i++) {
+    var v = VS.villagers[randInt(0, VS.villagers.length - 1)];
+    if (!v._quip) {
+      _spawnRequestBubble(v, reaction, 'ayuda_' + style);
+    }
+  }
+}
+
+/* Trigger reaction when jobs are created */
+export function triggerJobCreatedReaction(profession, count, VS) {
+  if (!VS || !VS.villagers || count === 0) return;
+  
+  var quips = [
+    'May trabaho na! 🙌',
+    'Salamat sa pagkakataon!',
+    'Kita na ulit!',
+    'Masaya na ang pamilya!'
+  ];
+  
+  // Find villagers of that profession to react
+  var professionVillagers = VS.villagers.filter(function(v) {
+    var role = (v._typeDef && v._typeDef.role) || '';
+    return role.includes(profession) || (profession === 'manggagawa' && !v.workBuilding);
+  });
+  
+  var reactCount = Math.min(count * 2, professionVillagers.length, 5);
+  for (var i = 0; i < reactCount; i++) {
+    var v = professionVillagers[randInt(0, professionVillagers.length - 1)];
+    if (!v._quip) {
+      _spawnRequestBubble(v, quips[randInt(0, quips.length - 1)], 'job_created');
+    }
+  }
+}
+
+/* Spawn a DOM bubble for request reactions */
+function _spawnRequestBubble(villager, text, type) {
+  var layer = _getBubbleLayer();
+  if (!layer) return;
+  
+  var styleClass = '';
+  if (type === 'angry' || type === 'ignored' || type === 'expired') styleClass = 'stressed';
+  else if (type === 'surprised') styleClass = 'greet';
+  else if (type === 'happy' || type === 'job_created' || type === 'fulfilled_ayuda_good') styleClass = 'birth';
+  
+  var bubble = document.createElement('div');
+  bubble.className = 'chat-bubble request-bubble ' + styleClass;
+  bubble.textContent = text;
+  bubble.style.opacity = '0';
+  layer.appendChild(bubble);
+  
+  // Position the bubble
+  function positionBubble() {
+    var canvas = document.getElementById('gameCanvas');
+    if (!canvas) return;
+    var rect = canvas.getBoundingClientRect();
+    var sc = perspScale(villager.y) * (villager._typeScale || 1);
+    var x = rect.left + villager.x;
+    var y = rect.top + villager.y - 45 * sc;
+    var w = bubble.offsetWidth || 140;
+    bubble.style.left = Math.round(Math.max(rect.left + 5, Math.min(x - w/2, rect.right - w - 5))) + 'px';
+    bubble.style.top = Math.round(y - 50) + 'px';
+  }
+  
+  positionBubble();
+  
+  // Fade in
+  requestAnimationFrame(function() {
+    bubble.style.transition = 'opacity 0.2s ease';
+    bubble.style.opacity = '1';
+  });
+  
+  // Fade out and remove after 3 seconds
+  setTimeout(function() {
+    bubble.style.opacity = '0';
+    setTimeout(function() {
+      if (bubble.parentNode) bubble.parentNode.removeChild(bubble);
+    }, 300);
+  }, 2800);
 }

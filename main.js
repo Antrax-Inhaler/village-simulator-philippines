@@ -16,7 +16,7 @@ import { checkVillagerInteractions, triggerPlayerGreeting, triggerBirthAnnouncem
 import { tickNeeds, clearResolvedRequests, checkAndEmit } from './villagers/citizenNeeds.js';
 import { tickPolitics, updateLeaders } from './villagers/politics.js';
 
-import { cam, initCamera, camRecentre, updateCamera, zoomTo, zoomOut, softPan, WORLD_W, WORLD_H } from './render/camera.js';
+import { cam, initCamera, camRecentre, updateCamera, zoomTo, zoomOut, softPan, WORLD_W, WORLD_H, expandWorld } from './render/camera.js';
 import { renderFrame } from './render/renderer.js';
 
 import { initInput, getDragState, getMousePos } from './input/input.js';
@@ -423,23 +423,83 @@ window.triggerLoad = function() {
   showMsg('Na-load! Araw ' + dayCount);
 };
 
-function _getViewportSize() {
-  return { w: WORLD_W, h: WORLD_H };
+function updateCanvasSizeForDevice() {
+  if (!canvas) return;
+  canvas.width = WORLD_W;
+  canvas.height = WORLD_H;
+}
+
+function adjustContainerLayout() {
+  const container = document.getElementById('canvas-container');
+  if (!container || !canvas) return;
+
+  canvas.width = WORLD_W;
+  canvas.height = WORLD_H;
+
+  const containerWidth = container.clientWidth;
+  const containerHeight = container.clientHeight;
+  const fits = WORLD_W <= containerWidth && WORLD_H <= containerHeight;
+
+  if (fits) {
+    // Desktop: canvas fits, scale to fill container
+    container.style.overflow = 'hidden';
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'center';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.objectFit = 'cover';
+  } else {
+    // Mobile: canvas larger, center it, allow panning via camera
+    container.style.overflow = 'hidden';
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'center';
+    canvas.style.width = WORLD_W + 'px';
+    canvas.style.height = WORLD_H + 'px';
+    canvas.style.objectFit = 'fill';
+  }
+  // Ensure camera starts centered
+  camRecentre();
 }
 
 function init() {
   canvas = document.getElementById('gameCanvas');
   ctx = canvas.getContext('2d');
 
-  VW = WORLD_W;
-  VH = WORLD_H;
-  canvas.width = VW;
-  canvas.height = VH;
+  canvas.width = WORLD_W;
+  canvas.height = WORLD_H;
+  
+  VW = canvas.width;
+  VH = canvas.height;
+  
   window._VW = VW;
   window._VH = VH;
 
   initCamera(VW, VH);
   camRecentre();
+
+  const container = document.getElementById('canvas-container');
+  if (container) {
+    container.style.position = 'absolute';
+    container.style.inset = '0';
+    container.style.width = '100%';
+    container.style.height = '100%';
+    container.style.overflow = 'hidden';
+    adjustContainerLayout();
+  }
+  
+  window.addEventListener('resize', () => {
+    adjustContainerLayout();
+  });
+  
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => adjustContainerLayout(), 100);
+  });
+  
+  setTimeout(adjustContainerLayout, 100);
+  setTimeout(adjustContainerLayout, 300);
+  setTimeout(adjustContainerLayout, 1000);
 
   VS.resourceNodes = createDefaultResourceNodes(WORLD_W, WORLD_H);
   VS.buildings = createDefaultBuildings(WORLD_W, WORLD_H);
@@ -506,20 +566,31 @@ function init() {
     showMsg: showMsg,
     onExpand: function(key, def) {
       if (def.canvasExpand) {
-        window._VH = (window._VH || VH) + (def.canvasExpand.h || 0);
-        window._VW = (window._VW || VW) + (def.canvasExpand.w || 0);
-        _resize();
+        if (def.canvasExpand.w) expandWorld(def.canvasExpand.w, 0);
+        if (def.canvasExpand.h) expandWorld(0, def.canvasExpand.h);
+        
+        updateCanvasSizeForDevice();
+        VW = canvas.width;
+        VH = canvas.height;
+        
+        initCamera(VW, VH);
+        camRecentre();
+        initWaypoints();
+        
+        setTimeout(() => adjustContainerLayout(), 100);
+        
+        showMsg('Lumawak ang nayon!');
       }
     },
   });
 
   initInput(canvas, {
     VS: VS,
-    getGameMode: function() { return gameMode; },
-    setGameMode: function(m) { gameMode = m; },
-    getPendingBuildType: function() { return _pendingBuildType; },
-    setPendingBuildType: function(t) { _pendingBuildType = t; },
-    getDrawer: function() { return _drawer; },
+    getGameMode: () => gameMode,
+    setGameMode: (m) => { gameMode = m; },
+    getPendingBuildType: () => _pendingBuildType,
+    setPendingBuildType: (t) => { _pendingBuildType = t; },
+    getDrawer: () => _drawer,
     openDrawer: openDrawer,
     closeDrawer: closeDrawer,
     initWaypoints: initWaypoints,
@@ -554,34 +625,11 @@ function init() {
     },
   });
 
-  window.addEventListener('resize', _resize);
   lastTime = performance.now();
   _initialized = true;
   requestAnimationFrame(gameLoop);
 
   showMsg('Maligayang pagdating! I-click ang Tindahan para bumili ng gusali.');
-}
-
-function _resize() {
-  if (!_initialized) return;
-  
-  VW = WORLD_W;
-  VH = WORLD_H;
-  canvas.width = VW;
-  canvas.height = VH;
-  window._VW = VW;
-  window._VH = VH;
-
-  VS.getZoneMult = function(res, wx, wy) { return getZoneProductionMult(res, wx, wy, WORLD_W, WORLD_H, VS); };
-
-  initCamera(VW, VH);
-  if (!cam.focused) camRecentre();
-  else {
-    var hw = VW / (2 * cam.tzoom), hh = VH / (2 * cam.tzoom);
-    cam.tx = clamp(cam.tx, hw, WORLD_W - hw);
-    cam.ty = clamp(cam.ty, hh, WORLD_H - hh);
-  }
-  initWaypoints();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -592,9 +640,6 @@ document.addEventListener('DOMContentLoaded', function() {
     gameWrap.classList.add('visible');
     requestAnimationFrame(function() {
       init();
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', _resize);
-      }
       if (loadSave) setTimeout(function() { window.triggerLoad(); }, 120);
     });
   }
