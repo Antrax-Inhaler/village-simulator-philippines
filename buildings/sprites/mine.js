@@ -49,19 +49,7 @@ function drawLv1(ctx, sc, w, h, def, t) {
     ctx.fillStyle = '#2a2418';
     ctx.fillRect(-w/2, 4 * sc, w, 3 * sc);
     
-    // Rocky hillside — the "building" is a hillside
-    hillside(ctx, -w * 0.33, -42 * sc, w * 0.66, 42 * sc, '#8a7050', '#6a5038', sc);
-    
-    // Rock texture details
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.beginPath();
-    ctx.ellipse(-10 * sc, -28 * sc, 8 * sc, 4 * sc, 0.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(18 * sc, -32 * sc, 6 * sc, 3 * sc, 0.2, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Mine shaft entrance in hillside
+    // Mine shaft entrance
     shaftEntrance(ctx, -8 * sc, -6 * sc, 18 * sc, 22 * sc, sc);
     
     // Wooden support beam struts
@@ -135,18 +123,6 @@ function drawLv2(ctx, sc, w, h, def, t) {
     ctx.fillRect(-w/2, 0, w, 6 * sc);
     ctx.fillStyle = '#2a2418';
     ctx.fillRect(-w/2, 4 * sc, w, 3 * sc);
-    
-    // Larger hillside
-    hillside(ctx, -w * 0.44, -50 * sc, w * 0.88, 50 * sc, '#907858', '#6a5038', sc);
-    
-    // Rock highlights
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath();
-    ctx.ellipse(-18 * sc, -32 * sc, 10 * sc, 5 * sc, 0.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(22 * sc, -36 * sc, 8 * sc, 4 * sc, 0.2, 0, Math.PI * 2);
-    ctx.fill();
     
     // Small timber support hut left side
     wall(ctx, -48 * sc, -28 * sc, 18 * sc, 28 * sc, '#7a6040', false, sc);
@@ -244,19 +220,6 @@ function drawLv3(ctx, sc, w, h, def, t) {
     ctx.fillStyle = '#282210';
     ctx.fillRect(-w/2, 4 * sc, w, 3 * sc);
     
-    // Wide hillside
-    hillside(ctx, -w * 0.53, -54 * sc, w * 1.06, 54 * sc, '#9a8060', '#7a6040', sc);
-    
-    // Rock details
-    [[-22 * sc, -36 * sc, 12 * sc, 6 * sc, 0.6],
-     [12 * sc, -40 * sc, 9 * sc, 5 * sc, 0.2],
-     [-40 * sc, -28 * sc, 8 * sc, 4 * sc, 0.4]].forEach(function(r) {
-        ctx.fillStyle = 'rgba(255,255,255,0.055)';
-        ctx.beginPath();
-        ctx.ellipse(r[0], r[1], r[2], r[3], r[4], 0, Math.PI * 2);
-        ctx.fill();
-    });
-    
     // PROCESSING BUILDING left
     processBldg(ctx, -58 * sc, -4 * sc, 26 * sc, 32 * sc, '#706050', sc);
     // Window lit
@@ -337,20 +300,6 @@ function drawLv4(ctx, sc, w, h, def, t) {
     ctx.fillRect(-w/2, 0, w, 6 * sc);
     ctx.fillStyle = '#262010';
     ctx.fillRect(-w/2, 4 * sc, w, 3 * sc);
-    
-    // Big hillside backdrop
-    hillside(ctx, -w * 0.67, -60 * sc, w * 1.34, 60 * sc, '#a08868', '#806848', sc);
-    
-    // Rock details
-    [[-30 * sc, -42 * sc, 14 * sc, 7 * sc, 0.6],
-     [20 * sc, -46 * sc, 11 * sc, 5 * sc, 0.3],
-     [-52 * sc, -34 * sc, 10 * sc, 5 * sc, 0.4],
-     [42 * sc, -36 * sc, 9 * sc, 4 * sc, 0.2]].forEach(function(r) {
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.beginPath();
-        ctx.ellipse(r[0], r[1], r[2], r[3], r[4], 0, Math.PI * 2);
-        ctx.fill();
-    });
     
     // LEFT PROCESSING COMPLEX
     wall(ctx, -74 * sc, -46 * sc, 36 * sc, 46 * sc, '#6a5838', false, sc);
@@ -463,21 +412,6 @@ function drawLv5(ctx, sc, w, h, def, t) {
     ctx.fillRect(-w/2, 0, w, 6 * sc);
     ctx.fillStyle = '#22180c';
     ctx.fillRect(-w/2, 4 * sc, w, 3 * sc);
-    
-    // Massive hillside
-    hillside(ctx, -w * 0.76, -66 * sc, w * 1.52, 66 * sc, '#b09070', '#8a6848', sc);
-    
-    // Rock details
-    [[-36 * sc, -48 * sc, 16 * sc, 8 * sc, 0.6],
-     [28 * sc, -52 * sc, 13 * sc, 6 * sc, 0.3],
-     [-60 * sc, -38 * sc, 12 * sc, 6 * sc, 0.4],
-     [50 * sc, -40 * sc, 10 * sc, 5 * sc, 0.2],
-     [-10 * sc, -44 * sc, 9 * sc, 5 * sc, 0.5]].forEach(function(r) {
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.beginPath();
-        ctx.ellipse(r[0], r[1], r[2], r[3], r[4], 0, Math.PI * 2);
-        ctx.fill();
-    });
     
     // LEFT WING: crusher + processing
     wall(ctx, -84 * sc, -54 * sc, 30 * sc, 54 * sc, '#6a5838', true, sc);
@@ -635,35 +569,6 @@ function drawLv5(ctx, sc, w, h, def, t) {
 /* ══════════════════════════════════════════════════════════════
    HELPER FUNCTIONS (scaled versions from HTML)
 ══════════════════════════════════════════════════════════════ */
-
-function hillside(ctx, x, y, w, h, c1, c2, sc) {
-    var g = ctx.createLinearGradient(x, y - h, x, y);
-    g.addColorStop(0, c1 || '#7a6848');
-    g.addColorStop(1, c2 || '#5a4830');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    var segs = 8;
-    for (var i = 0; i <= segs; i++) {
-        var px = x + i * (w / segs);
-        var jag = (i === 0 || i === segs) ? 0 : (Math.sin(i * 2.3) * h * 0.18 + Math.cos(i * 1.7) * h * 0.1);
-        ctx.lineTo(px, y - h + jag);
-    }
-    ctx.lineTo(x + w, y);
-    ctx.closePath();
-    ctx.fill();
-    
-    // Rock crack lines
-    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-    ctx.lineWidth = 0.8 * sc;
-    var cracks = [[0.2, 0.3, 0.35, 0.7], [0.5, 0.15, 0.6, 0.55], [0.7, 0.4, 0.8, 0.8], [0.1, 0.6, 0.25, 0.9]];
-    cracks.forEach(function(c) {
-        ctx.beginPath();
-        ctx.moveTo(x + c[0] * w, y - c[1] * h);
-        ctx.lineTo(x + c[2] * w, y - c[3] * h);
-        ctx.stroke();
-    });
-}
 
 function shaftEntrance(ctx, cx, baseY, sw, sh, sc) {
     // Arch timber frame
