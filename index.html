@@ -132,41 +132,41 @@
     </div>
 
     <!-- Settings Panel -->
-    <div id="settings-panel" class="settings-modal">
-      <div class="settings-modal-content">
-        <div class="settings-modal-header">
-          <span class="settings-modal-title">⚙️ MGA SETTING</span>
-          <button class="settings-modal-close" onclick="closeSettingsPanel()">✕</button>
-        </div>
-        <div class="settings-modal-body">
-          <!-- Save/Load -->
-          <button class="settings-action-btn" onclick="triggerSave()">💾 I-save ang Laro</button>
-          <button class="settings-action-btn" onclick="triggerLoad()">📂 I-load ang Laro</button>
+<!-- Settings Panel (Modal) -->
+<div id="settings-panel" class="settings-modal">
+  <div class="settings-modal-content">
+    <div class="settings-modal-header">
+      <span class="settings-modal-title">⚙️ MGA SETTING</span>
+      <button class="settings-modal-close" onclick="closeSettingsPanel()">✕</button>
+    </div>
+    <div class="settings-modal-body">
+      <!-- Save/Load -->
+      <button class="settings-action-btn" onclick="triggerSave()">💾 I-save ang Laro</button>
+      <button class="settings-action-btn" onclick="triggerLoad()">📂 I-load ang Laro</button>
 
-          <!-- Fullscreen -->
-          <div class="settings-sound-row">
-            <span>🖥️ Fullscreen</span>
-            <button id="fullscreen-btn" class="settings-action-btn" style="flex:1;">⛶ Pumasok sa Fullscreen</button>
-          </div>
+      <!-- Fullscreen -->
+      <div class="settings-sound-row">
+        <span>🖥️ Fullscreen</span>
+        <button id="fullscreen-btn" class="settings-action-btn" style="flex:1;">⛶ Pumasok sa Fullscreen</button>
+      </div>
 
-          <!-- Volume -->
-          <div class="settings-sound-row">
-            <span>🔊 Tunog</span>
-            <input type="range" id="settings-volume-slider" class="settings-volume-slider" min="0" max="1" step="0.01" value="0.5">
-            <span id="settings-vol-icon">🔊</span>
-          </div>
+      <!-- Volume -->
+      <div class="settings-sound-row">
+        <span>🔊 Tunog</span>
+        <input type="range" id="settings-volume-slider" class="settings-volume-slider" min="0" max="1" step="0.01" value="0.5">
+        <span id="settings-vol-icon">🔊</span>
+      </div>
 
-          <!-- Make default -->
-          <div class="settings-sound-row">
-            <span>⭐ Default Settings</span>
-            <label class="checkbox-label">
-              <input type="checkbox" id="make-default-checkbox"> Tandaan ang mga setting na ito
-            </label>
-          </div>
-        </div>
+      <!-- Make default -->
+      <div class="settings-sound-row">
+        <span>⭐ Default Settings</span>
+        <label class="checkbox-label">
+          <input type="checkbox" id="make-default-checkbox"> Tandaan ang mga setting na ito
+        </label>
       </div>
     </div>
-    
+  </div>
+</div>
     <!-- FAB: Government actions -->
     <div id="fab-gov" class="fab-toolbar">
       <div class="fab-item" onclick="openSidePanel('requests')" data-label="Mga Kahilingan">📋</div>
@@ -770,6 +770,170 @@ setInterval(function() {
       });
       widget.appendChild(btn);
     })();
+      (function() {
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    const volumeSlider = document.getElementById('settings-volume-slider');
+    const defaultCheckbox = document.getElementById('make-default-checkbox');
+    const volIconSpan = document.getElementById('settings-vol-icon');
+    
+    // Storage key for default settings
+    const DEFAULT_SETTINGS_KEY = 'miniBayan_defaultSettings';
+    
+    // Helper: Update volume icon
+    function updateVolumeIcon(value) {
+      const vol = parseFloat(value);
+      if (vol === 0) volIconSpan.textContent = '🔇';
+      else if (vol < 0.3) volIconSpan.textContent = '🔈';
+      else if (vol < 0.7) volIconSpan.textContent = '🔉';
+      else volIconSpan.textContent = '🔊';
+    }
+    
+    // Helper: Save current settings to localStorage as default
+    function saveDefaultSettings() {
+      const settings = {
+        volume: volumeSlider.value,
+        fullscreenPreference: document.fullscreenElement !== null,
+        // You can add more settings later, e.g., sound on/off
+      };
+      localStorage.setItem(DEFAULT_SETTINGS_KEY, JSON.stringify(settings));
+      showToast('Default settings saved!', 'success');
+    }
+    
+    // Helper: Load default settings and apply them
+    function loadDefaultSettings() {
+      const stored = localStorage.getItem(DEFAULT_SETTINGS_KEY);
+      if (!stored) return false;
+      try {
+        const settings = JSON.parse(stored);
+        // Apply volume
+        if (settings.volume !== undefined) {
+          volumeSlider.value = settings.volume;
+          if (window.setBackgroundVolume) window.setBackgroundVolume(settings.volume);
+          updateVolumeIcon(settings.volume);
+        }
+        // Apply fullscreen preference (if saved as true, request fullscreen)
+        if (settings.fullscreenPreference && !document.fullscreenElement) {
+          requestFullscreen();
+        } else if (!settings.fullscreenPreference && document.fullscreenElement) {
+          exitFullscreen();
+        }
+        return true;
+      } catch(e) {
+        console.warn('Failed to parse default settings', e);
+        return false;
+      }
+    }
+    
+    // Fullscreen handling
+    function requestFullscreen() {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch(err => {
+          console.warn(`Fullscreen error: ${err.message}`);
+          showToast('Hindi ma-fullscreen', 'warning');
+        });
+      } else {
+        showToast('Hindi supported ang fullscreen', 'warning');
+      }
+    }
+    
+    function exitFullscreen() {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(err => {
+          console.warn(`Exit fullscreen error: ${err.message}`);
+        });
+      }
+    }
+    
+    function toggleFullscreen() {
+      if (document.fullscreenElement) {
+        exitFullscreen();
+      } else {
+        requestFullscreen();
+      }
+    }
+    
+    // Update button text based on fullscreen state
+    function updateFullscreenButton() {
+      if (fullscreenBtn) {
+        fullscreenBtn.textContent = document.fullscreenElement ? '✕ Lumabas sa Fullscreen' : '⛶ Pumasok sa Fullscreen';
+      }
+    }
+    
+    // Event listeners
+    if (fullscreenBtn) {
+      fullscreenBtn.addEventListener('click', toggleFullscreen);
+      document.addEventListener('fullscreenchange', updateFullscreenButton);
+      updateFullscreenButton();
+    }
+    
+    // Volume slider
+    if (volumeSlider) {
+      volumeSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (window.setBackgroundVolume) window.setBackgroundVolume(val);
+        updateVolumeIcon(val);
+        // If default checkbox is checked, save on change
+        if (defaultCheckbox && defaultCheckbox.checked) {
+          saveDefaultSettings();
+        }
+      });
+      // Initialize icon
+      updateVolumeIcon(volumeSlider.value);
+    }
+    
+    // Default checkbox
+    if (defaultCheckbox) {
+      defaultCheckbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          saveDefaultSettings();
+        } else {
+          // Optionally remove stored defaults? We'll keep them but not save on future changes.
+          // User can uncheck to stop auto-saving.
+          showToast('Auto-save disabled', 'info');
+        }
+      });
+    }
+    
+    // Load default settings when game starts (call this after volume/sound system is ready)
+    window.loadDefaultGameSettings = function() {
+      const loaded = loadDefaultSettings();
+      // Also sync checkbox state: if there is a stored default, check the box
+      if (localStorage.getItem(DEFAULT_SETTINGS_KEY)) {
+        if (defaultCheckbox) defaultCheckbox.checked = true;
+      }
+      return loaded;
+    };
+    
+    // Simple toast message
+    function showToast(msg, type = 'info') {
+      if (window.showMsg) {
+        window.showMsg(msg, type);
+      } else {
+        // Fallback
+        const toast = document.createElement('div');
+        toast.textContent = msg;
+        toast.style.position = 'fixed';
+        toast.style.bottom = '80px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.backgroundColor = 'rgba(26,18,8,0.95)';
+        toast.style.color = '#f5c842';
+        toast.style.padding = '8px 16px';
+        toast.style.borderRadius = '8px';
+        toast.style.border = '1px solid #c49a4e';
+        toast.style.fontFamily = 'Oldenburg, serif';
+        toast.style.fontSize = '13px';
+        toast.style.zIndex = '2000';
+        toast.style.pointerEvents = 'none';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+      }
+    }
+    
+    // Expose helper for main.js to call when game fully initializes
+    window.applyDefaultSettings = loadDefaultSettings;
+  })();
   </script>
 
   <script type="module">
