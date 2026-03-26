@@ -644,6 +644,7 @@ function _injectStyles() {
   outline: none;
   width: 100%;
   transition: border-color .15s;
+  text-align: center;
 }
 .pcm-sig-input:focus { border-bottom-color: #2a1008; }
 .pcm-sig-input::placeholder { color: #b09060; font-size: 12px; }

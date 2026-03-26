@@ -647,6 +647,8 @@ canvas.mode-view  { cursor: default; }
   display: flex;
   flex-direction: column;
   gap: 14px;
+  max-height: 200px;
+  overflow: auto;
 }
 
 .settings-action-btn {
@@ -1372,13 +1374,13 @@ canvas.mode-view  { cursor: default; }
   .sp-close,
   .bd-btn,
   .sp-btn {
-    min-height: 44px;
-    min-width: 44px;
+    min-height: 20px;
+    min-width: 20px;
   }
   
   .fab-item {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 20px;
+    min-height: 20px;
   }
   
   .sp-card {
