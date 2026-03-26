@@ -358,6 +358,9 @@ export function triggerPlayerGreeting(villager, currentHour, activeBubbles) {
    Pans camera to baby, shows happy bubbles over both parents.
 ══════════════════════════════════════════════════════════════ */
 export function triggerBirthAnnouncement(baby, parentA, parentB, activeBubbles) {
+  if (typeof window !== 'undefined' && window.playSound) {
+    window.playSound('sfx-birth');
+  }
   /* Bubble over parent A */
   if (parentA) {
     var bA = new ChatBubble(parentA, null, '👶 Ipinanganak si ' + baby.label + '! 🎉', null, 'birth');
@@ -393,6 +396,10 @@ export function triggerProtestGathering(VS, activeBubbles) {
   if (_protestCooldown > 0) return;
   _protestCooldown  = 90;   /* don't re-trigger for 90 real seconds */
   _protestDuration  = 25;   /* protest lasts 25 seconds */
+
+  if (typeof window !== 'undefined' && window.playSound) {
+    window.playSound('sfx-protest');
+  }
 
   /* Rally point: main hall if it exists, else center of map */
   var hall = null;

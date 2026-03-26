@@ -536,6 +536,9 @@ function _roleEmoji(typeIdx) {
    with smaller items.
 ══════════════════════════════════════════════════════════════ */
 function _showUnlockBanner(newLevel, BUILDING_DEFS) {
+  if (typeof window !== 'undefined' && window.playSound) {
+    window.playSound('sfx-unlock');
+  }
   var newBuildings = Object.keys(BUILDING_DEFS).filter(function(k) {
     var def = BUILDING_DEFS[k];
     return def.minHallLevel === newLevel && def.shopCost;

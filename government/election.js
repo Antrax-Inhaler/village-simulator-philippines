@@ -93,6 +93,10 @@ export function forceElection(VS, notifyFn) {
   var E = VS.election;
   E.electionPending = true;
 
+  if (typeof window !== 'undefined' && window.playSound) {
+    window.playSound('sfx-election');
+  }
+
   if (VS.villagers.length < MIN_VOTERS) {
     /* Not enough citizens — auto-win but warn */
     if (notifyFn) notifyFn('Eleksyon: Walang sapat na botante. Nanalo ka pa rin.', 'info');

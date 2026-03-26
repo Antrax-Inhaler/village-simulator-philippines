@@ -36,6 +36,9 @@ function _setCalamity(VS, type, durationTicks) {
     remaining: durationTicks,
     total:     durationTicks,
   };
+  if (typeof window !== 'undefined' && window.playSound) {
+    window.playSound('sfx-calamity-' + type, { loop: true });
+  }
 }
 
 function _countBld(VS, type) {
@@ -277,7 +280,12 @@ export function tickEvents(dt, VS, notifyFn) {
   if (VS.events.calamity) {
     VS.events.calamity.remaining -= dt;
     VS.events.calamity.intensity  = clamp(VS.events.calamity.remaining / VS.events.calamity.total, 0, 1);
-    if (VS.events.calamity.remaining <= 0) VS.events.calamity = null;
+    if (VS.events.calamity.remaining <= 0) {
+      if (typeof window !== 'undefined' && window.stopAllCalamitySounds) {
+        window.stopAllCalamitySounds();
+      }
+      VS.events.calamity = null;
+    }
   }
 
   VS.events.cooldown = Math.max(0, (VS.events.cooldown || 0) - dt);

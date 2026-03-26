@@ -629,6 +629,82 @@ function init() {
   _initialized = true;
   requestAnimationFrame(gameLoop);
 
+  /* ── Sound Manager ─────────────────────────────────────── */
+  (function _initSoundManager() {
+    var _activeSounds = {};   /* id → HTMLAudioElement */
+    var _bgmState     = null; /* 'day' | 'night' */
+
+    window.playSound = function(id, opts) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      opts = opts || {};
+      try {
+        el.currentTime = 0;
+        el.loop        = !!opts.loop;
+        el.volume      = opts.volume !== undefined ? opts.volume : 1.0;
+        el.play().catch(function() {});
+        _activeSounds[id] = el;
+      } catch (e) {}
+    };
+
+    window.stopSound = function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      try { el.pause(); el.currentTime = 0; } catch (e) {}
+      delete _activeSounds[id];
+    };
+
+    window.stopAllCalamitySounds = function() {
+      ['sfx-calamity-bagyo','sfx-calamity-lindol','sfx-calamity-tagtuyot'].forEach(window.stopSound);
+    };
+
+    /* Day/Night BGM crossfade */
+    var _BGM_FADE_STEP = 0.02;
+    var _bgmFadeTimer  = 0;
+    var _bgmCheckInterval = setInterval(function() {
+      if (!_initialized) return;
+      var hour    = VS.time;
+      var isNight = (hour >= 20 || hour < 6);
+      var target  = isNight ? 'bgm-night' : 'bgm-day';
+      var fade    = isNight ? 'bgm-day'   : 'bgm-night';
+
+      if (_bgmState !== target) {
+        _bgmState = target;
+        /* Fade out current BGM */
+        var fadeEl = document.getElementById(fade);
+        if (fadeEl && !fadeEl.paused) {
+          var _fadeOut = setInterval(function() {
+            if (!fadeEl || fadeEl.volume <= _BGM_FADE_STEP) {
+              clearInterval(_fadeOut);
+              try { fadeEl.pause(); fadeEl.currentTime = 0; fadeEl.volume = 1; } catch(e) {}
+            } else {
+              fadeEl.volume = Math.max(0, fadeEl.volume - _BGM_FADE_STEP);
+            }
+          }, 80);
+        }
+        /* Fade in new BGM */
+        var targetEl = document.getElementById(target);
+        if (targetEl) {
+          try {
+            targetEl.volume = 0;
+            targetEl.loop   = true;
+            targetEl.currentTime = 0;
+            targetEl.play().catch(function() {});
+            var _fadeIn = setInterval(function() {
+              if (!targetEl || targetEl.volume >= 1 - _BGM_FADE_STEP) {
+                clearInterval(_fadeIn);
+                try { targetEl.volume = 1; } catch(e) {}
+              } else {
+                targetEl.volume = Math.min(1, targetEl.volume + _BGM_FADE_STEP);
+              }
+            }, 80);
+          } catch(e) {}
+        }
+      }
+    }, 5000);   /* check every 5 real seconds */
+  })();
+  /* ── End Sound Manager ─────────────────────────────────── */
+
   showMsg('Maligayang pagdating! I-click ang Tindahan para bumili ng gusali.');
 }
 

@@ -197,7 +197,20 @@
     <input type="range" id="audioVolumeSlider" class="vol-slider" min="0" max="1" step="0.01" value="0.5">
     <span id="audioVolIcon">🔊</span>
   </div>
-
+<audio id="sfx-calamity-bagyo"    preload="auto" loop><source src="audio/sfx/typhoon.mp3"   type="audio/mpeg"></audio>
+<audio id="sfx-calamity-lindol"   preload="auto" loop><source src="audio/sfx/earthquake.mp3" type="audio/mpeg"></audio>
+<audio id="sfx-calamity-tagtuyot" preload="auto" loop><source src="audio/sfx/drought.mp3"    type="audio/mpeg"></audio>
+ 
+<!-- ── One-shot SFX ─────────────────────────────────────────────────────────── -->
+<audio id="sfx-protest"  preload="auto"><source src="audio/sfx/protest.mp3"  type="audio/mpeg"></audio>
+<audio id="sfx-election" preload="auto"><source src="audio/sfx/election.mp3" type="audio/mpeg"></audio>
+<audio id="sfx-birth"    preload="auto"><source src="audio/sfx/birth.mp3"    type="audio/mpeg"></audio>
+<audio id="sfx-unlock"   preload="auto"><source src="audio/sfx/unlock.mp3"   type="audio/mpeg"></audio>
+ 
+<!-- ── Background Music (day/night crossfade, managed by main.js) ───────────── -->
+<audio id="bgm-day"   preload="auto" loop><source src="audio/bgm/day.mp3"   type="audio/mpeg"></audio>
+<audio id="bgm-night" preload="auto" loop><source src="audio/bgm/night.mp3" type="audio/mpeg"></audio>
+ 
   <script>
     // Audio handler (unchanged)
     (function initBackgroundAudio() {
