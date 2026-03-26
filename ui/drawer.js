@@ -532,6 +532,8 @@ function _roleEmoji(typeIdx) {
    _showUnlockBanner
    Called ONLY after construction completes (or instantly if
    mainHall has no buildTime). Shows newly unlocked buildings.
+   Responsive: on mobile, cards become horizontally scrollable
+   with smaller items.
 ══════════════════════════════════════════════════════════════ */
 function _showUnlockBanner(newLevel, BUILDING_DEFS) {
   var newBuildings = Object.keys(BUILDING_DEFS).filter(function(k) {
@@ -558,7 +560,9 @@ function _showUnlockBanner(newLevel, BUILDING_DEFS) {
   el.innerHTML =
     '<div class="unlock-inner">' +
       '<div class="unlock-title">🏛️ Bahay-Bayan Lv' + newLevel + ' — Bagong Gusali!</div>' +
-      '<div class="unlock-cards">' + cards + '</div>' +
+      '<div class="unlock-cards-wrapper">' +
+        '<div class="unlock-cards">' + cards + '</div>' +
+      '</div>' +
       '<button class="unlock-ok" onclick="document.getElementById(\'unlock-banner\').remove()">Sige!</button>' +
     '</div>';
 
@@ -571,7 +575,108 @@ function _showUnlockBanner(newLevel, BUILDING_DEFS) {
   }, 8000);
 }
 
-/* ── Style injection ──────────────────────────────────────── */
+function _ensureUnlockStyles() {
+  if (document.getElementById('unlock-styles')) return;
+  var s = document.createElement('style');
+  s.id = 'unlock-styles';
+  s.textContent = [
+    '#unlock-banner{',
+    '  position:absolute;inset:0;z-index:90;',
+    '  display:flex;align-items:center;justify-content:center;',
+    '  background:rgba(0,0,0,0.72);pointer-events:all;',
+    '  animation:unlockFadeIn .3s ease;',
+    '}',
+    '@keyframes unlockFadeIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}',
+    '.unlock-inner{',
+    '  background:linear-gradient(160deg,#1a1208,#0e0905);',
+    '  border:2px solid #f5c842;border-radius:14px;',
+    '  padding:24px 24px 28px;',
+    '  max-width:90vw;',
+    '  width:auto;',
+    '  text-align:center;',
+    '  box-shadow:0 0 40px rgba(245,200,66,0.25);',
+    '  max-height:85vh;',
+    '  display:flex;',
+    '  flex-direction:column;',
+    '}',
+    '.unlock-title{',
+    '  font-family:"Oldenburg",serif;font-size:17px;color:#f5c842;',
+    '  letter-spacing:.08em;margin-bottom:20px;',
+    '  white-space:nowrap;',
+    '}',
+    '.unlock-cards-wrapper{',
+    '  overflow-x:auto;',
+    '  overflow-y:hidden;',
+    '  margin-bottom:22px;',
+    '  -webkit-overflow-scrolling:touch;',
+    '}',
+    '.unlock-cards{',
+    '  display:flex;',
+    '  gap:12px;',
+    '  justify-content:center;',
+    '  flex-wrap:wrap;',
+    '  transition:gap .2s;',
+    '}',
+    '.unlock-card{',
+    '  background:#1a1208;',
+    '  border:1.5px solid #8a6030;',
+    '  border-radius:10px;',
+    '  padding:12px 14px;',
+    '  min-width:80px;',
+    '  text-align:center;',
+    '  animation:unlockCardPop .4s ease both;',
+    '  flex-shrink:0;',
+    '}',
+    '.unlock-card:nth-child(2){animation-delay:.07s}',
+    '.unlock-card:nth-child(3){animation-delay:.14s}',
+    '.unlock-card:nth-child(4){animation-delay:.21s}',
+    '@keyframes unlockCardPop{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}',
+    '.unlock-card-icon{font-size:32px;margin-bottom:6px;}',
+    '.unlock-card-name{font-family:"Oldenburg",serif;font-size:12px;color:#f5c842;letter-spacing:.04em;}',
+    '.unlock-ok{',
+    '  padding:8px 32px;',
+    '  font-family:"Oldenburg",serif;',
+    '  font-size:13px;',
+    '  font-weight:bold;',
+    '  background:#2a1808;',
+    '  border:1.5px solid #f5c842;',
+    '  color:#f5c842;',
+    '  border-radius:6px;',
+    '  cursor:pointer;',
+    '  transition:background .15s;',
+    '  margin-top:8px;',
+    '  align-self:center;',
+    '}',
+    '.unlock-ok:hover{background:#3a2810;}',
+    /* Tablet / mobile adjustments */
+    '@media (max-width: 768px) {',
+    '  .unlock-title { font-size: 14px; white-space: normal; }',
+    '  .unlock-inner { padding: 16px 16px 20px; max-width: 95vw; }',
+    '  .unlock-cards { gap: 8px; justify-content: flex-start; }',
+    '  .unlock-card { padding: 8px 10px; min-width: 70px; }',
+    '  .unlock-card-icon { font-size: 24px; }',
+    '  .unlock-card-name { font-size: 10px; }',
+    '  .unlock-ok { padding: 6px 24px; font-size: 12px; }',
+    '}',
+    '@media (max-width: 480px) {',
+    '  .unlock-cards { flex-wrap: nowrap; }',
+    '  .unlock-cards-wrapper { overflow-x: auto; }',
+    '  .unlock-card { min-width: 65px; }',
+    '}',
+    '@media (max-height: 480px) and (orientation: landscape) {',
+    '  .unlock-inner { padding: 12px 16px; }',
+    '  .unlock-title { font-size: 12px; margin-bottom: 8px; }',
+    '  .unlock-cards-wrapper { margin-bottom: 12px; }',
+    '  .unlock-card { padding: 6px 8px; min-width: 60px; }',
+    '  .unlock-card-icon { font-size: 20px; margin-bottom: 2px; }',
+    '  .unlock-card-name { font-size: 9px; }',
+    '  .unlock-ok { padding: 4px 20px; font-size: 11px; }',
+    '}',
+  ].join('\n');
+  document.head.appendChild(s);
+}
+
+/* ── Style injection for bottom drawer (already present) ──── */
 function _injectStyles() {
   if (document.getElementById('bd-styles')) return;
   var s = document.createElement('style');
@@ -658,51 +763,5 @@ function _injectStyles() {
     '  #bd-info-right { width: 90px !important; }',
     '}',
   ].join('');
-  document.head.appendChild(s);
-}
-
-function _ensureUnlockStyles() {
-  if (document.getElementById('unlock-styles')) return;
-  var s = document.createElement('style');
-  s.id = 'unlock-styles';
-  s.textContent = [
-    '#unlock-banner{',
-    '  position:absolute;inset:0;z-index:90;',
-    '  display:flex;align-items:center;justify-content:center;',
-    '  background:rgba(0,0,0,0.72);pointer-events:all;',
-    '  animation:unlockFadeIn .3s ease;',
-    '}',
-    '@keyframes unlockFadeIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}',
-    '.unlock-inner{',
-    '  background:linear-gradient(160deg,#1a1208,#0e0905);',
-    '  border:2px solid #f5c842;border-radius:14px;',
-    '  padding:28px 32px;max-width:480px;width:90%;',
-    '  text-align:center;box-shadow:0 0 40px rgba(245,200,66,0.25);',
-    '}',
-    '.unlock-title{',
-    '  font-family:"Oldenburg",serif;font-size:17px;color:#f5c842;',
-    '  letter-spacing:.08em;margin-bottom:20px;',
-    '}',
-    '.unlock-cards{',
-    '  display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:22px;',
-    '}',
-    '.unlock-card{',
-    '  background:#1a1208;border:1.5px solid #8a6030;',
-    '  border-radius:10px;padding:14px 16px;min-width:90px;',
-    '  animation:unlockCardPop .4s ease both;',
-    '}',
-    '.unlock-card:nth-child(2){animation-delay:.07s}',
-    '.unlock-card:nth-child(3){animation-delay:.14s}',
-    '.unlock-card:nth-child(4){animation-delay:.21s}',
-    '@keyframes unlockCardPop{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}',
-    '.unlock-card-icon{font-size:32px;margin-bottom:8px;}',
-    '.unlock-card-name{font-family:"Oldenburg",serif;font-size:11px;color:#f5c842;letter-spacing:.04em;}',
-    '.unlock-ok{',
-    '  padding:10px 36px;font-family:"Oldenburg",serif;font-size:13px;font-weight:bold;',
-    '  background:#2a1808;border:1.5px solid #f5c842;color:#f5c842;',
-    '  border-radius:6px;cursor:pointer;transition:background .15s;',
-    '}',
-    '.unlock-ok:hover{background:#3a2810;}',
-  ].join('\n');
   document.head.appendChild(s);
 }
