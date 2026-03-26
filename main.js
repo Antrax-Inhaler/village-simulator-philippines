@@ -649,4 +649,7 @@ document.addEventListener('DOMContentLoaded', function() {
     _start(window._minibayanAutoLoad);
     window._minibayanAutoLoad = undefined;
   }
+  if (window.loadDefaultGameSettings) {
+  window.loadDefaultGameSettings();
+}
 });

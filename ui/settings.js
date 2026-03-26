@@ -21,18 +21,41 @@ export function initSettingsPanel() {
   
   // Build panel content
   panel.innerHTML = `
-    <button class="close-btn" id="settings-close" aria-label="Close">✕</button>
-    <h3>⚙️ Mga Setting</h3>
-    <div class="setting-group">
-      <button id="settings-save">💾 I-save ang Laro</button>
-      <button id="settings-load">📂 I-load ang Laro</button>
+<!-- Settings Panel (Modal) -->
+<div id="settings-panel" class="settings-modal">
+  <div class="settings-modal-content">
+    <div class="settings-modal-header">
+      <span class="settings-modal-title">⚙️ MGA SETTING</span>
+      <button class="settings-modal-close" onclick="closeSettingsPanel()">✕</button>
     </div>
-    <div class="setting-group">
-      <div class="sound-control">
-        <button id="settings-sound-toggle">🔊 Tunog</button>
-        <input type="range" id="settings-volume" min="0" max="1" step="0.01" value="0.5">
+    <div class="settings-modal-body">
+      <!-- Save/Load -->
+      <button class="settings-action-btn" onclick="triggerSave()">💾 I-save ang Laro</button>
+      <button class="settings-action-btn" onclick="triggerLoad()">📂 I-load ang Laro</button>
+
+      <!-- Fullscreen -->
+      <div class="settings-sound-row">
+        <span>🖥️ Fullscreen</span>
+        <button id="fullscreen-btn" class="settings-action-btn" style="flex:1;">⛶ Pumasok sa Fullscreen</button>
+      </div>
+
+      <!-- Volume -->
+      <div class="settings-sound-row">
+        <span>🔊 Tunog</span>
+        <input type="range" id="settings-volume-slider" class="settings-volume-slider" min="0" max="1" step="0.01" value="0.5">
+        <span id="settings-vol-icon">🔊</span>
+      </div>
+
+      <!-- Make default -->
+      <div class="settings-sound-row">
+        <span>⭐ Default Settings</span>
+        <label class="checkbox-label">
+          <input type="checkbox" id="make-default-checkbox"> Tandaan ang mga setting na ito
+        </label>
       </div>
     </div>
+  </div>
+</div>
   `;
   
   document.body.appendChild(panel);

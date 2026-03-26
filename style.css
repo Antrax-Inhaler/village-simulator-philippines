@@ -1987,3 +1987,29 @@ canvas.mode-view  { cursor: default; }
       border-radius: 8px;
       padding: 8px;
     }
+    /* Checkbox styling for settings */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Oldenburg', serif;
+  font-size: 12px;
+  color: #c8a878;
+  cursor: pointer;
+}
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #c49a4e;
+  cursor: pointer;
+}
+.settings-action-btn#fullscreen-btn {
+  background: #2a1a08;
+  border: 1px solid #c49a4e;
+  color: #f5c842;
+  transition: all 0.15s;
+}
+.settings-action-btn#fullscreen-btn:hover {
+  background: #3a2a18;
+  transform: translateY(-1px);
+}
