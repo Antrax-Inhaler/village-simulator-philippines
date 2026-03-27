@@ -13,6 +13,7 @@ import {
   CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM,
   WORLD_W, WORLD_H,
 } from '../render/camera.js';
+import { getZoneArrowAt, ZONE_DEFS, purchaseZone } from '../world/zones.js';
 
 var _deps   = null;
 var _canvas = null;
@@ -165,7 +166,8 @@ function _onMouseMove(e) {
     const overBld = VS.buildings.some(function(b) {
       return dist(wp3.x, wp3.y, b.x, b.y) < b.w * perspScale(b.y) * 0.55;
     });
-    _canvas.style.cursor = overBld ? 'grab' : (_hoveredVillager ? 'pointer' : 'grab');
+    const overArrow = !!getZoneArrowAt(wp3.x, wp3.y, VS);
+    _canvas.style.cursor = overArrow ? 'pointer' : (overBld ? 'grab' : (_hoveredVillager ? 'pointer' : 'grab'));
   }
 
   /* Move‑building live follow */
@@ -365,6 +367,13 @@ function _processClick(sx, sy) {
     }
   }
 
+  /* ── Zone arrow click — show purchase confirmation ────────── */
+  const zoneKey = getZoneArrowAt(wp2.x, wp2.y, VS);
+  if (zoneKey) {
+    _showZonePurchaseModal(zoneKey);
+    return;
+  }
+
   /* Building click */
   for (var b = 0; b < VS.buildings.length; b++) {
     const bld = VS.buildings[b];
@@ -391,9 +400,165 @@ function _onRightClick(e) {
   if (cam.focused) _deps.closeDrawer();
 }
 
+/* ── Zone purchase confirmation modal ────────────────────────── */
+function _showZonePurchaseModal(key) {
+  var VS  = _deps.VS;
+  var def = ZONE_DEFS[key];
+  if (!def) return;
+
+  /* Check hall requirement */
+  var mhLv = 1;
+  (VS.buildings || []).forEach(function(b) {
+    if (b.type === 'mainHall') mhLv = Math.max(mhLv, b.level || 1);
+  });
+
+  var hallOk    = mhLv >= (def.prereqHall || 1);
+  var canAfford = hallOk &&
+    (VS.res.gold  || 0) >= def.cost.gold &&
+    (VS.res.rice  || 0) >= def.cost.rice &&
+    (VS.res.langis|| 0) >= def.cost.langis;
+
+  /* Remove any existing zone-purchase modal */
+  var existing = document.getElementById('_zonePurchaseModal');
+  if (existing) existing.remove();
+
+  /* Build modal DOM */
+  var overlay = document.createElement('div');
+  overlay.id = '_zonePurchaseModal';
+  overlay.style.cssText = [
+    'position:fixed;inset:0;z-index:9800;',
+    'display:flex;align-items:center;justify-content:center;',
+    'background:rgba(5,3,1,0.72);',
+    'animation:_zpFadeIn 0.18s ease;',
+  ].join('');
+
+  /* Inject keyframe once */
+  if (!document.getElementById('_zpStyles')) {
+    var st = document.createElement('style');
+    st.id  = '_zpStyles';
+    st.textContent = [
+      '@keyframes _zpFadeIn{from{opacity:0}to{opacity:1}}',
+      '@keyframes _zpSlideUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}',
+      '@keyframes _zpBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}',
+    ].join('');
+    document.head.appendChild(st);
+  }
+
+  var costLine = def.cost.gold + ' 🪙';
+  if (def.cost.rice)   costLine += '  ' + def.cost.rice  + ' 🌾';
+  if (def.cost.langis) costLine += '  ' + def.cost.langis + ' 💧';
+
+  var hallMsg  = hallOk
+    ? '<span style="color:#8ecf60">✓ Hall Lv' + mhLv + ' — OK</span>'
+    : '<span style="color:#ff7a5a">✗ Kailangan Hall Lv' + def.prereqHall + ' (ikaw: Lv' + mhLv + ')</span>';
+
+  var btnStyle = canAfford
+    ? 'background:linear-gradient(135deg,#f5c842,#c8920a);color:#1a0e00;'
+    : 'background:#4a3a28;color:#7a6a58;cursor:not-allowed;';
+
+  var card = document.createElement('div');
+  card.style.cssText = [
+    'position:relative;',
+    'background:linear-gradient(160deg,#1e1508 0%,#120e04 100%);',
+    'border:2px solid #8a6030;border-radius:14px;',
+    'padding:28px 32px 24px;min-width:300px;max-width:370px;width:90%;',
+    'box-shadow:0 8px 40px rgba(0,0,0,0.8),inset 0 1px 0 rgba(255,220,80,0.08);',
+    'font-family:"Oldenburg",serif;color:#e8d8a0;',
+    'animation:_zpSlideUp 0.22s cubic-bezier(.25,.8,.25,1);',
+  ].join('');
+
+  card.innerHTML = [
+    /* Arrow icon bouncing at top */
+    '<div style="text-align:center;margin-bottom:4px;">',
+    '  <span style="font-size:2.2rem;display:inline-block;',
+    canAfford ? 'animation:_zpBounce 1.1s ease-in-out infinite;' : '',
+    '">', def.icon, '</span>',
+    '</div>',
+
+    /* Zone name */
+    '<h2 style="text-align:center;margin:0 0 4px;font-size:1.2rem;',
+    'color:#f5c842;text-shadow:0 1px 6px rgba(245,200,66,0.4);">',
+    def.label, '</h2>',
+
+    /* Specialty tag */
+    '<div style="text-align:center;margin-bottom:14px;">',
+    '<span style="background:#2a1e08;border:1px solid #6a4a18;',
+    'border-radius:20px;padding:2px 12px;font-size:0.72rem;color:#c8a050;letter-spacing:.05em;">',
+    (def.sign || def.specialty.toUpperCase()), '</span></div>',
+
+    /* Description */
+    '<p style="font-size:0.82rem;color:#c8b880;margin:0 0 14px;',
+    'text-align:center;line-height:1.5;">', def.desc, '</p>',
+
+    /* Divider */
+    '<div style="border-top:1px solid rgba(138,96,48,0.4);margin-bottom:14px;"></div>',
+
+    /* Hall requirement */
+    '<div style="font-size:0.78rem;margin-bottom:8px;text-align:center;">', hallMsg, '</div>',
+
+    /* Cost */
+    '<div style="text-align:center;margin-bottom:18px;">',
+    '<span style="font-size:0.78rem;color:#a08848;">Gastos: </span>',
+    '<span style="font-size:0.9rem;font-weight:bold;color:#f5c842;">', costLine, '</span>',
+    '</div>',
+
+    /* Not-affordable note */
+    (!canAfford && hallOk) ? '<div style="text-align:center;font-size:0.75rem;color:#ff9a7a;margin-bottom:14px;">Hindi sapat ang mga yaman.</div>' : '',
+
+    /* Buttons */
+    '<div style="display:flex;gap:10px;justify-content:center;">',
+    '<button id="_zpCancel" style="',
+    'flex:1;padding:10px 0;border-radius:8px;border:1px solid #6a4a18;',
+    'background:#1a1208;color:#a08848;font-family:inherit;font-size:0.85rem;cursor:pointer;',
+    '">Ibalik</button>',
+    '<button id="_zpConfirm" ', (canAfford ? '' : 'disabled'), ' style="',
+    'flex:1;padding:10px 0;border-radius:8px;border:none;',
+    btnStyle,
+    'font-family:inherit;font-size:0.85rem;font-weight:bold;transition:opacity .15s;',
+    '">I-unlock ✓</button>',
+    '</div>',
+  ].join('');
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  /* Close helpers */
+  function _close() {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  }
+
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) _close(); });
+
+  var cancelBtn  = document.getElementById('_zpCancel');
+  var confirmBtn = document.getElementById('_zpConfirm');
+
+  cancelBtn.addEventListener('click', _close);
+
+  if (canAfford) {
+    confirmBtn.addEventListener('click', function() {
+      var result = purchaseZone(key, VS, _deps.showMsg, WORLD_W, WORLD_H);
+      if (result.ok) {
+        _close();
+      } else {
+        _deps.showMsg(result.msg);
+        _close();
+      }
+    });
+
+    /* Hover glow for confirm button */
+    confirmBtn.addEventListener('mouseenter', function() { this.style.opacity = '0.85'; });
+    confirmBtn.addEventListener('mouseleave', function() { this.style.opacity = '1'; });
+  }
+}
+
 /* ── Keyboard ───────────────────────────────────────────────── */
 function _onKeyDown(e) {
   if (e.key !== 'Escape') return;
+
+  /* Close zone purchase modal if open */
+  var zm = document.getElementById('_zonePurchaseModal');
+  if (zm) { zm.parentNode && zm.parentNode.removeChild(zm); return; }
+
   const mode   = _deps.getGameMode();
   const drawer = _deps.getDrawer();
   if (mode === 'build_shop' || mode === 'move_building') {

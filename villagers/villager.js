@@ -349,10 +349,15 @@ var ROAM_BREAK_MAX_S = 2  * REAL_SECS_PER_GAME_HOUR;   /* 60s  */
 var ENTER_RADIUS     = 22; /* px — snap inside when within this distance */
 
 export function updateVillager(v, dt, waypoints) {
-  var speedMult = v._hungerSpeedMult !== undefined ? v._hungerSpeedMult : 1.0;
+  // Use the hunger speed multiplier from resource.js
+  var hungerMult = v._hungerSpeedMult !== undefined ? v._hungerSpeedMult : 1.0;
+  var healthMult = 1.0;
+  
   if (v.health !== undefined && v.health < 30) {
-    speedMult *= clamp(v.health / 30, 0.3, 1.0);
+    healthMult = clamp(v.health / 30, 0.3, 1.0);
   }
+  
+  var speedMult = hungerMult * healthMult;
 
   /* ── TRAINING: locked inside trainBuilding ─────────────── */
   if (v.isTraining) {
@@ -367,9 +372,7 @@ export function updateVillager(v, dt, waypoints) {
   if (v.isInsideWork) {
     v.workShiftTimer = Math.max(0, v.workShiftTimer - dt);
     if (v.workShiftTimer <= 0) {
-      /* Shift over — exit and take a roam break */
       v.isInsideWork = false;
-      /* Eject slightly outside the building door */
       if (v.workBuilding) {
         var vt0 = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
         v.x = v.workBuilding.x + randRange(-20, 20);
@@ -382,17 +385,27 @@ export function updateVillager(v, dt, waypoints) {
   }
 
   /* ── HAS WORK: walk to building and enter after roam break  */
-  if (v.workBuilding && v.workTimer > 0) {
+  // Check if hunger prevents work
+  if (v._canWork === false && v.hunger > 80) {
+    // Too hungry to work - stay home/roam
+    v.workTimer = 999; // Delay work indefinitely
+    if (!v.isInsideWork && v.workBuilding) {
+      // Don't go to work, just roam
+      if (v.waitT <= 0) {
+        chooseNextWaypoint(v, waypoints);
+      }
+    }
+  }
+  
+  if (v.workBuilding && v.workTimer > 0 && v._canWork !== false) {
     v.workTimer -= dt;
   }
 
-  if (v.workBuilding && v.workTimer <= 0 && !v.isInsideWork) {
-    /* Walk toward work building */
+  if (v.workBuilding && v.workTimer <= 0 && !v.isInsideWork && v._canWork !== false) {
     var wb   = v.workBuilding;
     var dToW = dist(v.x, v.y, wb.x, wb.y);
 
     if (dToW <= ENTER_RADIUS) {
-      /* Close enough — enter */
       v.isInsideWork   = true;
       v.workShiftTimer = randRange(WORK_SHIFT_MIN_S, WORK_SHIFT_MAX_S);
       v.x              = wb.x;
@@ -401,7 +414,6 @@ export function updateVillager(v, dt, waypoints) {
       return;
     }
 
-    /* Set destination toward work building */
     if (v.waitT <= 0 || (dist(v.destX, v.destY, wb.x, wb.y) > ENTER_RADIUS * 2)) {
       v.destX = wb.x + randRange(-10, 10);
       v.destY = wb.y + randRange(-6, 6);
@@ -412,8 +424,7 @@ export function updateVillager(v, dt, waypoints) {
   if (v.waitT > 0) {
     v.waitT -= dt;
     if (v.waitT <= 0) {
-      /* Only roam if not heading to work */
-      if (!v.workBuilding || v.workTimer > 0) {
+      if (!v.workBuilding || v.workTimer > 0 || v._canWork === false) {
         chooseNextWaypoint(v, waypoints);
       }
     }
@@ -427,12 +438,10 @@ export function updateVillager(v, dt, waypoints) {
   var spd = v.spd * perspScale(v.y) * speedMult;
 
   if (d < spd * dt + 1) {
-    /* Arrived at destination */
     v.x = v.destX;
     v.y = v.destY;
 
-    /* If this was the work building, enter it */
-    if (v.workBuilding && v.workTimer <= 0 && dist(v.x, v.y, v.workBuilding.x, v.workBuilding.y) <= ENTER_RADIUS) {
+    if (v.workBuilding && v.workTimer <= 0 && dist(v.x, v.y, v.workBuilding.x, v.workBuilding.y) <= ENTER_RADIUS && v._canWork !== false) {
       v.isInsideWork   = true;
       v.workShiftTimer = randRange(WORK_SHIFT_MIN_S, WORK_SHIFT_MAX_S);
       v.x              = v.workBuilding.x;
@@ -448,7 +457,6 @@ export function updateVillager(v, dt, waypoints) {
     v.y += (dy / d) * spd * dt;
   }
 
-  /* Carrying toggle */
   if (Math.random() < 0.0004) {
     var vt3 = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
     v.carrying = Math.random() < vt3.carryChance;
@@ -456,6 +464,7 @@ export function updateVillager(v, dt, waypoints) {
 
   _updateMood(v, dt);
 }
+
 
 /* ── Choose a work-biased waypoint ────────────────────────── */
 function _chooseWorkWaypoint(v, vt) {
@@ -869,18 +878,15 @@ export function rebuildVillagersFromSave(savedVillagers) {
    Reads new stats only for the health-based alpha fade.
 ══════════════════════════════════════════════════════════════ */
 export function drawVillager(ctx, v) {
-  /* Villagers fully inside buildings are invisible — building shows occupancy count */
   if (v.isHome || v.isInsideWork) return;
 
   var vt = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
   var sc = perspScale(v.y) * vt.scale;
 
-  /* Health fade */
   var healthAlpha = v.health !== undefined
     ? clamp(0.45 + (v.health / 100) * 0.55, 0.45, 1.0)
     : 1.0;
 
-  /* Walk cycle — unique phase per villager so they don't all step together */
   var t      = Date.now() / 1000;
   var moving = (v.waitT <= 0) && !v.isHome && !v.isTraining;
   var idHash = 0;
@@ -894,19 +900,13 @@ export function drawVillager(ctx, v) {
   ctx.globalAlpha = healthAlpha;
   ctx.translate(v.x, v.y - bob);
 
-  /* Shadow squishes when villager bobs up */
   ctx.fillStyle = 'rgba(0,0,0,0.22)';
   ctx.beginPath();
   ctx.ellipse(0, 3 * sc + bob, 9 * sc * (1 - bob * 0.02), 3 * sc, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  /* Body with walk cycle */
   _drawBody(ctx, vt, sc, v.isChild, walkAmt, moving);
-
-  /* Hat */
   if (vt.hat !== 'none') _drawHat(ctx, vt, sc);
-
-  /* Carry item */
   if (v.carrying && v.carryIcon) {
     ctx.font      = (13 * sc) + 'px serif';
     ctx.textAlign = 'center';
@@ -915,16 +915,35 @@ export function drawVillager(ctx, v) {
     ctx.fillText(v.carryIcon, 12 * sc, -18 * sc);
   }
 
-  /* Hunger indicator — small red dot when very hungry */
-  if (v.hunger !== undefined && v.hunger > 75) {
-    ctx.globalAlpha = 0.8;
-    ctx.fillStyle   = '#e74c3c';
-    ctx.beginPath();
-    ctx.arc(6 * sc, -28 * sc, 2.5 * sc, 0, Math.PI * 2);
-    ctx.fill();
+  /* Enhanced hunger indicator - color changes based on severity */
+  if (v.hunger !== undefined) {
+    if (v.hunger > 80) {
+      // Severe hunger - red exclamation + red aura
+      ctx.globalAlpha = 0.7 + Math.sin(t * 8) * 0.3;
+      ctx.fillStyle = '#e74c3c';
+      ctx.font = 'bold ' + (12 * sc) + 'px sans-serif';
+      ctx.fillText('!!!', 0, -32 * sc);
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = '#ff4444';
+      ctx.beginPath();
+      ctx.arc(0, -20 * sc, 12 * sc, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (v.hunger > 60) {
+      // Moderate hunger - orange warning
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#ff8844';
+      ctx.font = 'bold ' + (10 * sc) + 'px sans-serif';
+      ctx.fillText('!', 0, -32 * sc);
+    } else if (v.hunger > 30) {
+      // Mild hunger - small yellow dot
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = '#ffaa44';
+      ctx.beginPath();
+      ctx.arc(6 * sc, -28 * sc, 2.2 * sc, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
-  /* Anger indicator — red exclamation above head when very angry */
   if (v.anger !== undefined && v.anger > 70) {
     ctx.globalAlpha  = 0.85;
     ctx.fillStyle    = '#e74c3c';
@@ -936,7 +955,6 @@ export function drawVillager(ctx, v) {
 
   ctx.restore();
 
-  /* Floating head quip label (transparent bg, gold border) */
   if (v._quip) drawVillagerQuip(ctx, v, window._camZoom || 1);
 }
 
@@ -1049,6 +1067,13 @@ function _darken(hex, amount) {
     ('0' + g.toString(16)).slice(-2) +
     ('0' + b.toString(16)).slice(-2);
 }
-
+export function getHungerStatus(v) {
+  if (!v || v.hunger === undefined) return { level: 'Unknown', multiplier: 1.0, canWork: true };
+  
+  if (v.hunger <= 30) return { level: 'Busog', multiplier: 1.0, canWork: true };
+  if (v.hunger <= 60) return { level: 'Gutom na', multiplier: 0.8, canWork: true };
+  if (v.hunger <= 80) return { level: 'Gutom na gutom', multiplier: 0.5, canWork: true };
+  return { level: 'Halos mamatay sa gutom', multiplier: 0.2, canWork: false };
+}
 /* Re-export tickQuips so main.js can call it alongside other villager imports */
 export { tickQuips } from './villagerQuips.js';

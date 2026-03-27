@@ -1,18 +1,11 @@
-/* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — main.js  (with Debt System)
-═══════════════════════════════════════════════════════════════ */
-
 import { ZONE_DEFS, getZoneAt, isZoneUnlocked, purchaseZone, drawZoneGrid, canBuildInZone, getZoneProductionMult } from './world/zones.js';
 import { clamp, dist, randRange, randInt } from './utils/perspective.js';
 import { advanceTime, getTimeStr, getTimeOfDay, setTimeSpeed } from './utils/time.js';
 import { saveGame, loadGame, updateAutoSave } from './utils/storage.js';
 import { preloadAll as preloadSprites } from './utils/sprites.js';
 
-import { ResourceNode, createDefaultResourceNodes, tickFoodConsumption } from './resources/resource.js';
-import { 
-  tickEconomy, onNewDay as economyOnNewDay, setTaxRate, getTaxRate,
-  initDebt, takeLoan, makeDebtPayment, getDebtSummary, getMaxLoanAmount, getInterestRate
-} from './resources/economy.js';
+import { ResourceNode, createDefaultResourceNodes, tickFoodPool } from './resources/resource.js';
+import { tickEconomy, onNewDay as economyOnNewDay, setTaxRate, getTaxRate } from './resources/economy.js';
 import { tickTrade } from './resources/trade.js';
 import { Building, createDefaultBuildings, rebuildFromSave, BUILDING_DEFS, getMainHallLevel, getMainHallRules, canPlaceBuilding, getShopCatalogue, recalcResourceCaps } from './buildings/building.js';
 import { applyQualityEffect } from './buildings/buildingUpgrade.js';
@@ -75,7 +68,6 @@ var VS = {
   economy: null,
   unlockedZones: [],
   food: { pool: 200, consumption: 0, buffer: 0 },
-  debt: null,  // Will be initialized by initDebt
 };
 
 var _drawer = {
@@ -210,7 +202,7 @@ function update(dt) {
   VS.pop.cur = VS.villagers.length;
   _recalcCaps();
 
-  tickFoodConsumption(dt, VS);
+  tickFoodPool(dt, VS);
   tickEconomy(dt, VS);
   tickTrade(dt, VS, showMsg);
 
@@ -289,7 +281,7 @@ function _spawnFromParents(typeIdx, x, y, pA, pB) {
   VS.villagers.push(v);
   assignHomes(VS.villagers, VS.buildings);
   showMsg('Ipinanganak si ' + v.label + '! (' + pA.label + ' & ' + pB.label + ')');
-  triggerBirthAnnouncement(v, pA, pB);
+  triggerBirthAnnouncement(v, pA, pB, activeBubbles);
 }
 
 export function initWaypoints() {
@@ -345,66 +337,6 @@ function _updateElectionBar() {
   }
 }
 
-// Debt system global functions
-window._makeDebtPayment = function(amount) {
-  if (makeDebtPayment) {
-    makeDebtPayment(amount, VS, showMsg);
-  } else {
-    // Fallback manual implementation
-    if (VS.res.gold < amount) {
-      showMsg('Kulang ang ginto!', 'danger');
-      return false;
-    }
-    if (!VS.debt) VS.debt = { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] };
-    var payment = Math.min(amount, VS.debt.principal);
-    VS.res.gold -= payment;
-    VS.debt.principal -= payment;
-    VS.debt.paymentHistory.unshift({ amount: payment, day: dayCount });
-    if (VS.debt.paymentHistory.length > 30) VS.debt.paymentHistory.pop();
-    VS.debt.missedPayments = 0;
-    showMsg(`Nagbayad ng ${payment} 🪙. Natitirang utang: ${VS.debt.principal} 🪙`, 'success');
-    return true;
-  }
-};
-
-window._takeLoan = function(amount) {
-  if (takeLoan) {
-    takeLoan(amount, VS, showMsg);
-  } else {
-    // Fallback manual implementation
-    if (VS.debt && VS.debt.defaulted) {
-      showMsg('Hindi ka na pwedeng umutang dahil sa nakaraang hindi pagbabayad.', 'danger');
-      return false;
-    }
-    var maxLoan = 1000;
-    if (amount > maxLoan) {
-      showMsg(`Ang maximum na pwedeng utangin ay ${maxLoan} 🪙.`, 'warning');
-      return false;
-    }
-    if (!VS.debt) VS.debt = { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] };
-    VS.debt.principal += amount;
-    VS.res.gold += amount;
-    showMsg(`Nakautang ng ${amount} 🪙. Kabuuang utang: ${VS.debt.principal} 🪙`, 'info');
-    return true;
-  }
-};
-
-window._getMaxLoanAmount = function(vs) {
-  if (getMaxLoanAmount) return getMaxLoanAmount(vs || VS);
-  return 1000;
-};
-
-window._getInterestRate = function(vs) {
-  if (getInterestRate) return getInterestRate(vs || VS);
-  return 0.05;
-};
-
-window._getDebtSummary = function(vs) {
-  if (getDebtSummary) return getDebtSummary(vs || VS);
-  return { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] };
-};
-
-// Expose other window functions
 window.spawnVillager = function() { _spawnVillager(undefined, false); };
 window.showMsg = showMsg;
 window._VS = VS;
@@ -421,7 +353,7 @@ window.setSpeed = function(s) {
 
 window.openShop = function() { openDrawer(null, '_shop'); };
 window.softPan = function(wx, wy, dur) { softPan(wx, wy, dur); };
-window.triggerProtest = function() { triggerProtestGathering(VS); };
+window.triggerProtest = function() { triggerProtestGathering(VS, activeBubbles); };
 window.openExpand = openExpansionPanel;
 window.purchaseZone = function(key) {
   var r = purchaseZone(key, VS, showMsg, WORLD_W, WORLD_H);
@@ -465,7 +397,6 @@ window.triggerLoad = function() {
   if (s.policies) VS.policies = s.policies;
   if (s.election) VS.election = s.election;
   if (s.food) VS.food = s.food;
-  if (s.debt) VS.debt = s.debt;  // Load debt data
   if (s.villagers && s.villagers.length) VS.villagers = rebuildVillagersFromSave(s.villagers);
   if (s.buildings && s.buildings.length) VS.buildings = rebuildFromSave(s.buildings);
   if (s.resourceNodes && s.resourceNodes.length) {
@@ -510,6 +441,7 @@ function adjustContainerLayout() {
   const fits = WORLD_W <= containerWidth && WORLD_H <= containerHeight;
 
   if (fits) {
+    // Desktop: canvas fits, scale to fill container
     container.style.overflow = 'hidden';
     container.style.display = 'flex';
     container.style.alignItems = 'center';
@@ -518,6 +450,7 @@ function adjustContainerLayout() {
     canvas.style.height = '100%';
     canvas.style.objectFit = 'cover';
   } else {
+    // Mobile: canvas larger, center it, allow panning via camera
     container.style.overflow = 'hidden';
     container.style.display = 'flex';
     container.style.alignItems = 'center';
@@ -526,6 +459,7 @@ function adjustContainerLayout() {
     canvas.style.height = WORLD_H + 'px';
     canvas.style.objectFit = 'fill';
   }
+  // Ensure camera starts centered
   camRecentre();
 }
 
@@ -544,9 +478,6 @@ function init() {
 
   initCamera(VW, VH);
   camRecentre();
-
-  // Initialize debt system
-  initDebt(VS);
 
   const container = document.getElementById('canvas-container');
   if (container) {
@@ -698,6 +629,82 @@ function init() {
   _initialized = true;
   requestAnimationFrame(gameLoop);
 
+  /* ── Sound Manager ─────────────────────────────────────── */
+  (function _initSoundManager() {
+    var _activeSounds = {};   /* id → HTMLAudioElement */
+    var _bgmState     = null; /* 'day' | 'night' */
+
+    window.playSound = function(id, opts) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      opts = opts || {};
+      try {
+        el.currentTime = 0;
+        el.loop        = !!opts.loop;
+        el.volume      = opts.volume !== undefined ? opts.volume : 1.0;
+        el.play().catch(function() {});
+        _activeSounds[id] = el;
+      } catch (e) {}
+    };
+
+    window.stopSound = function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      try { el.pause(); el.currentTime = 0; } catch (e) {}
+      delete _activeSounds[id];
+    };
+
+    window.stopAllCalamitySounds = function() {
+      ['sfx-calamity-bagyo','sfx-calamity-lindol','sfx-calamity-tagtuyot'].forEach(window.stopSound);
+    };
+
+    /* Day/Night BGM crossfade */
+    var _BGM_FADE_STEP = 0.02;
+    var _bgmFadeTimer  = 0;
+    var _bgmCheckInterval = setInterval(function() {
+      if (!_initialized) return;
+      var hour    = VS.time;
+      var isNight = (hour >= 20 || hour < 6);
+      var target  = isNight ? 'bgm-night' : 'bgm-day';
+      var fade    = isNight ? 'bgm-day'   : 'bgm-night';
+
+      if (_bgmState !== target) {
+        _bgmState = target;
+        /* Fade out current BGM */
+        var fadeEl = document.getElementById(fade);
+        if (fadeEl && !fadeEl.paused) {
+          var _fadeOut = setInterval(function() {
+            if (!fadeEl || fadeEl.volume <= _BGM_FADE_STEP) {
+              clearInterval(_fadeOut);
+              try { fadeEl.pause(); fadeEl.currentTime = 0; fadeEl.volume = 1; } catch(e) {}
+            } else {
+              fadeEl.volume = Math.max(0, fadeEl.volume - _BGM_FADE_STEP);
+            }
+          }, 80);
+        }
+        /* Fade in new BGM */
+        var targetEl = document.getElementById(target);
+        if (targetEl) {
+          try {
+            targetEl.volume = 0;
+            targetEl.loop   = true;
+            targetEl.currentTime = 0;
+            targetEl.play().catch(function() {});
+            var _fadeIn = setInterval(function() {
+              if (!targetEl || targetEl.volume >= 1 - _BGM_FADE_STEP) {
+                clearInterval(_fadeIn);
+                try { targetEl.volume = 1; } catch(e) {}
+              } else {
+                targetEl.volume = Math.min(1, targetEl.volume + _BGM_FADE_STEP);
+              }
+            }, 80);
+          } catch(e) {}
+        }
+      }
+    }, 5000);   /* check every 5 real seconds */
+  })();
+  /* ── End Sound Manager ─────────────────────────────────── */
+
   showMsg('Maligayang pagdating! I-click ang Tindahan para bumili ng gusali.');
 }
 
@@ -719,6 +726,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window._minibayanAutoLoad = undefined;
   }
   if (window.loadDefaultGameSettings) {
-    window.loadDefaultGameSettings();
-  }
+  window.loadDefaultGameSettings();
+}
 });

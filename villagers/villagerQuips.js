@@ -1,35 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — villagers/villagerQuips.js
-
-   DESIGN
-   ─────────────────────────────────────────────────────────────
-   • Floating head labels — canvas-drawn, no DOM / no bubble tail
-   • Background: rgba(10,6,2,0.72) — dark panel, semi-transparent
-   • Border: thin rounded rect in --clr-accent-dim (#c49a4e)
-   • Text: --clr-accent (#f5c842) — matches HUD gold exactly
-   • Small font (~9px screen-stable), short duration (~2s)
-   • Only a RANDOM SUBSET of villagers quip during calamities
-     (2–4 villagers max, chosen randomly each wave)
-
-   CALAMITY REACTIONS
-   ─────────────────────────────────────────────────────────────
-   tickQuips receives VS so it can read VS.events.calamity.
-   When a calamity is active, a dedicated quip pool fires for
-   that calamity type. Reaction quips suppress normal ambient
-   quips while the calamity lasts.
-   Only a random sample of 2–4 visible villagers react per wave,
-   with a new wave every 6 seconds while the calamity persists.
-
-   INTEGRATION
-   ─────────────────────────────────────────────────────────────
-   villager.js  → import { tickQuips, drawVillagerQuip }
-                  drawVillagerQuip(ctx, v, window._camZoom||1)
-                  export { tickQuips } from './villagerQuips.js'
-
-   main.js      → tickQuips(dt, VS.villagers, VS)   ← pass VS!
-   input.js     → spawnPlayerQuip(clickedVillager)
-═══════════════════════════════════════════════════════════════ */
-
 import { perspScale, randInt, randRange } from '../utils/perspective.js';
 
 /* ══════════════════════════════════════════════════════════════
@@ -118,6 +86,13 @@ var PLAYER_QUIPS = [
   'Naol, nandito ka.',
   'Bet ko ang lider natin!',
   'Solid ka dyan boss.',
+];
+
+/* ── Fullscreen reminder quips ─────────────────────────────── */
+var FULLSCREEN_QUIPS = [
+  'ifull screen mo boss',
+  'sa settings',
+  'kanan taas'
 ];
 
 /* ── Calamity-specific reaction pools ──────────────────────── */
@@ -411,6 +386,37 @@ export function tickQuips(dt, villagers, VS) {
         isCalamity: false,
       };
       activeCount++;
+    }
+  }
+
+  /* ── Fullscreen reminder (if not in fullscreen) ────────────────── */
+  let _fullscreenQuipCooldown = 0;
+  // Retrieve the global variable or initialize it
+  if (typeof window._fullscreenQuipCooldown === 'undefined') {
+    window._fullscreenQuipCooldown = 0;
+  }
+  window._fullscreenQuipCooldown -= dt;
+  if (!document.fullscreenElement && window._fullscreenQuipCooldown <= 0) {
+    // Only add if there's room for more quips and no calamity
+    if (activeCount < MAX_ACTIVE_QUIPS) {
+      // Find a random idle villager without an active quip
+      var candidates = [];
+      for (var f = 0; f < villagers.length; f++) {
+        var vf = villagers[f];
+        if (!vf.isHome && !vf.isInsideWork && !vf._quip) candidates.push(vf);
+      }
+      if (candidates.length > 0) {
+        var target = candidates[Math.floor(Math.random() * candidates.length)];
+        target._quip = {
+          text:       FULLSCREEN_QUIPS[Math.floor(Math.random() * FULLSCREEN_QUIPS.length)],
+          timer:      QUIP_DURATION,
+          maxTimer:   QUIP_DURATION,
+          isPlayer:   false,
+          isCalamity: false,
+        };
+        window._fullscreenQuipCooldown = 12; // 12 seconds cooldown
+        activeCount++; // increment to respect cap
+      }
     }
   }
 }

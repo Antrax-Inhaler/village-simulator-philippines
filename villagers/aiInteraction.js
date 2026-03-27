@@ -35,6 +35,23 @@ import { getTimeOfDay } from '../utils/time.js';
 import { SpatialGrid } from '../utils/collision.js';
 import { spawnPlayerQuip } from './villagerQuips.js';
 
+/* ── Quip helper ─────────────────────────────────────────────
+   Sets v._quip using the exact shape drawVillagerQuip expects:
+     { text, timer, maxTimer, isPlayer, isCalamity }
+   isPlayer:true  → bright gold border (#f5c842), same as click quips.
+   tickQuips() decrements timer and nulls _quip at 0.
+──────────────────────────────────────────────────────────── */
+function _setQuip(villager, text, durationSecs) {
+  var dur = durationSecs || 4;
+  villager._quip = {
+    text:       text,
+    timer:      dur,
+    maxTimer:   dur,
+    isPlayer:   true,
+    isCalamity: false,
+  };
+}
+
 /* ── GEMINI TOGGLE ──────────────────────────────────────────── */
 // SET THIS TO true TO ENABLE GEMINI AI, false TO DISABLE
 var ENABLE_GEMINI = false;  // ← CHANGE THIS TO true TO TURN ON GEMINI
@@ -357,22 +374,18 @@ export function triggerPlayerGreeting(villager, currentHour, activeBubbles) {
    Called from main.js _spawnFromParents after a baby is born.
    Pans camera to baby, shows happy bubbles over both parents.
 ══════════════════════════════════════════════════════════════ */
-export function triggerBirthAnnouncement(baby, parentA, parentB, activeBubbles) {
+export function triggerBirthAnnouncement(baby, parentA, parentB) {
   if (typeof window !== 'undefined' && window.playSound) {
     window.playSound('sfx-birth');
   }
-  /* Bubble over parent A */
+  /* Quip over parent A */
   if (parentA) {
-    var bA = new ChatBubble(parentA, null, '👶 Ipinanganak si ' + baby.label + '! 🎉', null, 'birth');
-    bA.timer = 7.0;
-    activeBubbles.push(bA);
+    _setQuip(parentA, '👶 Ipinanganak si ' + baby.label + '! 🎉', 7);
   }
-  /* Bubble over parent B */
+  /* Quip over parent B — stagger slightly */
   if (parentB) {
     setTimeout(function() {
-      var bB = new ChatBubble(parentB, null, 'Maligayang buhay, ' + baby.label + '! 💕', null, 'birth');
-      bB.timer = 6.0;
-      activeBubbles.push(bB);
+      _setQuip(parentB, 'Maligayang buhay, ' + baby.label + '! 💕', 6);
     }, 800);
   }
   /* Soft pan to baby's location — 5 second hold */
@@ -392,7 +405,7 @@ var _protestDuration   = 0;
 var _protestVillagers  = [];   /* villagers currently in protest */
 var _protestCenter     = null; /* {x, y} rally point */
 
-export function triggerProtestGathering(VS, activeBubbles) {
+export function triggerProtestGathering(VS) {
   if (_protestCooldown > 0) return;
   _protestCooldown  = 90;   /* don't re-trigger for 90 real seconds */
   _protestDuration  = 25;   /* protest lasts 25 seconds */
@@ -424,11 +437,9 @@ export function triggerProtestGathering(VS, activeBubbles) {
     v.destY   = cy + randRange(-20, 20);
     /* Stagger their arrival so they don't all snap at once */
     setTimeout(function() {
-      if (v && activeBubbles.length < 8) {
+      if (v) {
         var line = PROTEST_LINES[randInt(0, PROTEST_LINES.length - 1)];
-        var b    = new ChatBubble(v, null, line, null, 'protest');
-        b.timer  = 4.0 + Math.random() * 3;
-        activeBubbles.push(b);
+        _setQuip(v, line, 4 + Math.random() * 3);
       }
     }, idx * 1200);
   });
@@ -439,22 +450,18 @@ export function triggerProtestGathering(VS, activeBubbles) {
   }
 }
 
-export function updateProtest(dt, VS, activeBubbles) {
+export function updateProtest(dt, VS) {
   if (_protestCooldown > 0) _protestCooldown -= dt;
   if (_protestDuration <= 0 || _protestVillagers.length === 0) return;
 
   _protestDuration -= dt;
 
   /* Periodic new protest shouts while active */
-  if (Math.random() < dt * 0.3 && activeBubbles.length < 8) {
+  if (Math.random() < dt * 0.3) {
     var shouter = _protestVillagers[randInt(0, _protestVillagers.length - 1)];
-    /* Make sure this shouter doesn't already have a bubble */
-    var hasBubble = activeBubbles.some(function(bub) { return bub.vA === shouter; });
-    if (!hasBubble && shouter) {
+    if (shouter && !shouter._quip) {
       var line = PROTEST_LINES[randInt(0, PROTEST_LINES.length - 1)];
-      var pb   = new ChatBubble(shouter, null, line, null, 'protest');
-      pb.timer = 3.5;
-      activeBubbles.push(pb);
+      _setQuip(shouter, line, 3.5);
     }
   }
 
@@ -482,7 +489,7 @@ export function checkVillagerInteractions(villagers, dt, currentHour, activeBubb
   }
 
   /* Tick protest system */
-  if (VS) updateProtest(dt, VS, activeBubbles);
+  if (VS) updateProtest(dt, VS);
 
   /* Periodic random player-awareness greeting — floating quip, no DOM bubble */
   _playerGreetTimer -= dt;
@@ -608,14 +615,16 @@ export function triggerJobCreatedReaction(profession, count, VS) {
 }
 
 /* Spawn a DOM bubble for request reactions */
-function _spawnRequestBubble(villager, text, type) {
+function _spawnRequestBubble(villager, text, type, duration) {
   var layer = _getBubbleLayer();
   if (!layer) return;
-  
+  duration = (duration !== undefined) ? duration : 2800;
+
   var styleClass = '';
   if (type === 'angry' || type === 'ignored' || type === 'expired') styleClass = 'stressed';
   else if (type === 'surprised') styleClass = 'greet';
-  else if (type === 'happy' || type === 'job_created' || type === 'fulfilled_ayuda_good') styleClass = 'birth';
+  else if (type === 'happy' || type === 'birth' || type === 'job_created' || type === 'fulfilled_ayuda_good') styleClass = 'birth';
+  else if (type === 'protest') styleClass = 'protest';
   
   var bubble = document.createElement('div');
   bubble.className = 'chat-bubble request-bubble ' + styleClass;
@@ -644,11 +653,11 @@ function _spawnRequestBubble(villager, text, type) {
     bubble.style.opacity = '1';
   });
   
-  // Fade out and remove after 3 seconds
+  // Fade out and remove after duration ms
   setTimeout(function() {
     bubble.style.opacity = '0';
     setTimeout(function() {
       if (bubble.parentNode) bubble.parentNode.removeChild(bubble);
     }, 300);
-  }, 2800);
+  }, duration);
 }

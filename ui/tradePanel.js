@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — ui/tradePanel.js  (new)
+   Mini Bayan — ui/tradePanel.js  (updated with langis)
 
    TRADE SIDEBAR
    ─────────────────────────────────────────────────────────────
@@ -7,6 +7,8 @@
      TOP:    Reputation bar
      MIDDLE: Export contracts (country task board)
      BOTTOM: Import order form + pending deliveries
+     
+   UPDATED: Added langis support for import/export
 ═══════════════════════════════════════════════════════════════ */
 
 import { getTradeState, fulfillExport, placeImportOrder, getImportPrices } from '../resources/trade.js';
@@ -109,7 +111,7 @@ function _refresh() {
       var eta = imp.timeLeft < 60 ? Math.ceil(imp.timeLeft) + 's' : Math.ceil(imp.timeLeft / 60) + 'min';
       return [
         '<div class="tp-pending-row">',
-          '<span>' + _resIcon(imp.res) + ' ' + imp.amount + ' ' + imp.res + '</span>',
+          '<span>' + _resIcon(imp.res) + ' ' + imp.amount + ' ' + imp.res.toUpperCase() + '</span>',
           '<span class="tp-eta">ETA: ' + eta + '</span>',
           '<div class="tp-bar-wrap"><div class="tp-bar tp-bar-import" style="width:' + Math.round(pct * 100) + '%"></div></div>',
         '</div>',
@@ -118,9 +120,9 @@ function _refresh() {
   }
 
   /* Import prices */
-  document.getElementById('tp-price-rice').textContent  = prices.rice  + '🪙/unit';
+  document.getElementById('tp-price-rice').textContent   = prices.rice  + '🪙/unit';
   document.getElementById('tp-price-langis').textContent = prices.langis + '🪙/unit';
-  document.getElementById('tp-gold-avail').textContent  = gold + '🪙';
+  document.getElementById('tp-gold-avail').textContent   = gold + '🪙';
 
   /* History */
   var histBox = document.getElementById('tp-history');
@@ -135,7 +137,7 @@ function _refresh() {
 }
 
 function _resIcon(res) {
-  return { rice: '🌾', gold: '🪙', langis: '💎' }[res] || res;
+  return { rice: '🌾', gold: '🪙', langis: '⛽' }[res] || res;
 }
 
 /* ── Order submission ─────────────────────────────────────── */
@@ -145,15 +147,27 @@ function _submitImport() {
   var res   = resEl ? resEl.value : 'rice';
   var amount = parseInt(amtEl ? amtEl.value : '0');
 
-  if (!amount || amount < 1) { if (_showMsg) _showMsg('Maglagay ng dami.'); return; }
+  if (!amount || amount < 1) { 
+    if (_showMsg) _showMsg('Maglagay ng dami.'); 
+    return; 
+  }
+  
+  // Validate amount is reasonable
+  if (amount > 500) {
+    if (_showMsg) _showMsg('Masyadong malaki ang dami. Max 500 units per order.', 'warning');
+    return;
+  }
 
   var r = placeImportOrder(res, amount, _VS, _showMsg);
   if (!r.ok && _showMsg) _showMsg(r.msg);
-  if (r.ok) { amtEl.value = ''; _refresh(); }
+  if (r.ok) { 
+    amtEl.value = ''; 
+    _refresh(); 
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
-   DOM + Styles
+   DOM + Styles (updated with langis support)
 ══════════════════════════════════════════════════════════════ */
 function _buildPanel() {
   var container = document.getElementById('canvas-container');
@@ -186,13 +200,13 @@ function _buildPanel() {
     '<div class="tp-section">',
       '<div class="tp-sec-label">📥 Mag-import</div>',
       '<div class="tp-price-row">',
-        '<span>Bigas: <span id="tp-price-rice">—</span></span>',
-        '<span>Langis: <span id="tp-price-langis">—</span></span>',
+        '<span>🌾 Bigas: <span id="tp-price-rice">—</span></span>',
+        '<span>⛽ Langis: <span id="tp-price-langis">—</span></span>',
       '</div>',
       '<div class="tp-import-form">',
         '<select id="tp-import-res" class="tp-select">',
           '<option value="rice">🌾 Bigas</option>',
-          '<option value="langis">💎 Langis</option>',
+          '<option value="langis">⛽ Langis</option>',
         '</select>',
         '<input id="tp-import-amt" class="tp-input" type="number" min="1" max="500" placeholder="Dami" />',
         '<button class="tp-btn tp-order" id="tp-order-btn">Order</button>',
@@ -312,6 +326,16 @@ function _injectStyles() {
     '.tp-eta{font-family:monospace; font-size:13px; color:#4a8fc4;}',
     '.tp-hist-row{font-size:13px; color:#8a7050; padding:2px 0; border-bottom:1px solid #1a1008;}',
     '.tp-hist-row:last-child{border-bottom:none;}',
+    /* Mobile adjustments */
+    '@media (max-width: 768px) {',
+    '  #trade-panel { width: 280px; right: -280px; }',
+    '  .tp-header { padding: 8px 12px; font-size: 13px; }',
+    '  .tp-section { padding: 8px 10px; }',
+    '  .tp-sec-label { font-size: 11px; }',
+    '  .tp-contract-detail { font-size: 12px; }',
+    '  .tp-btn { font-size: 11px; padding: 5px 0; }',
+    '  .tp-select, .tp-input { font-size: 12px; }',
+    '}',
   ].join('\n');
   document.head.appendChild(s);
 }

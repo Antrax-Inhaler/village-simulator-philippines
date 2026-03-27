@@ -3,28 +3,18 @@
 
    CHANGES FROM ORIGINAL
    ─────────────────────────────────────────────────────────────
-   FOOD POOL SYSTEM (new)
-     All food production now feeds a global pool (VS.food.pool).
-     Each citizen consumes HUNGER_PER_SEC per real-second from the
-     pool. When the pool is empty, citizens' hunger stat rises.
-     When the pool is plentiful, hunger decays back down.
-
-     This replaces the old model where rice was purely a currency
-     resource — rice still exists as a currency for building costs,
-     but the food pool is the separate survival mechanic.
-
-   tickFoodPool(dt, VS)   — call from main.js update(), handles
-                            pool production, citizen consumption,
-                            and hunger cascade effects.
-
-   ResourceNode.update()  — unchanged in structure but now also
-                            credits VS.food.pool when villagers
-                            with workBias:'farm'/'river' gather.
-                            (Actual gathering driven by villager.js)
-
-   EVERYTHING ELSE UNCHANGED
-     ResourceNode class, draw() methods, _drawForest, _drawMine,
-     _drawRiver, createDefaultResourceNodes — all identical.
+   PROPER RICE CONSUMPTION SYSTEM:
+   - Citizens consume rice from storage (VS.res.rice)
+   - Hunger increases when rice storage is low
+   - Food pool is now the RICE storage, not separate
+   - Removed separate food pool system
+   - Farms and resource nodes add rice directly to storage
+   
+   Hunger Level Effects:
+   - 0-30:  Normal speed
+   - 31-60: Speed reduced by 20%
+   - 61-80: Speed reduced by 50%
+   - 81-100: Speed reduced by 80%, cannot work
 ═══════════════════════════════════════════════════════════════ */
 
 import { perspScale, clamp, hpCol } from '../utils/perspective.js';
@@ -39,8 +29,6 @@ var RESOURCE_DEFS = {
     regenRate:  8,
     giveRes:    'rice',
     giveAmt:    5,
-    /* NEW: also contributes this many food-pool units per gather */
-    foodAmt:    8,
     color:      '#2d7a3a',
     colorDepleted: '#7a5c2d',
     wMin: 80, wMax: 100,
@@ -52,7 +40,6 @@ var RESOURCE_DEFS = {
     regenRate:  12,
     giveRes:    'rice',
     giveAmt:    3,
-    foodAmt:    5,
     color:      '#3a8fc4',
     colorDepleted: '#7aafb4',
     w: 54, h: 20,
@@ -63,81 +50,90 @@ var RESOURCE_DEFS = {
     regenRate:  4,
     giveRes:    'gold',
     giveAmt:    8,
-    foodAmt:    0,   /* mines don't produce food */
     color:      '#8c7a5a',
     colorDepleted: '#5a5a5a',
     w: 54, h: 38,
   },
+  langis: {
+    label:      'Tigaban ng Langis',
+    capacity:   250,
+    regenRate:  2.5,
+    giveRes:    'langis',
+    giveAmt:    4,
+    color:      '#2a3a1a',
+    colorDepleted: '#3a2a1a',
+    w: 52, h: 28,
+  },
 };
 
-/* ── Food pool constants ──────────────────────────────────── */
-var FOOD_POOL_CAP        = 2000;   /* max food pool size */
-var HUNGER_PER_SEC       = 0.015;  /* hunger increase per citizen per real-sec when pool empty */
-var HUNGER_RECOVERY_RATE = 0.025;  /* hunger decrease per citizen per real-sec when pool full */
-var POOL_PER_FARM_SEC    = 0.8;    /* food pool produced per farm building per real-sec */
-var POOL_CONSUMPTION_PER_CITIZEN = 0.008; /* pool drained per citizen per real-sec */
-var PRODUCTIVITY_HUNGER_THRESH   = 60;   /* hunger above this = reduced productivity */
+/* ── Food consumption constants ──────────────────────────── */
+var RICE_CONSUMPTION_PER_CITIZEN_PER_SEC = 0.008;  // Rice units consumed per citizen per second
+var MIN_RICE_FOR_FULL_SPEED = 100;  // Minimum rice storage to avoid hunger
+var HUNGER_INCREASE_RATE = 0.5;  // Hunger increase per second when rice is 0
+
+// Hunger level speed multipliers
+var HUNGER_SPEED_MULTIPLIERS = {
+  NORMAL:     { min: 0,   max: 30,  mult: 1.0,   desc: 'Normal' },
+  SLOW_20:    { min: 31,  max: 60,  mult: 0.8,   desc: 'Medyo gutom' },
+  SLOW_50:    { min: 61,  max: 80,  mult: 0.5,   desc: 'Gutom na gutom' },
+  SLOW_80:    { min: 81,  max: 100, mult: 0.2,   desc: 'Halos mamatay sa gutom' }
+};
 
 /* ── Counter for unique IDs ───────────────────────────────── */
 var _nodeCounter = 0;
 
 /* ══════════════════════════════════════════════════════════════
-   tickFoodPool
-   Call from main.js update() every tick.
-   Handles pool production from farm buildings, consumption by
-   citizens, and hunger cascade effects.
+   tickFoodConsumption - New function that consumes rice from storage
+   Call this from main.js update() every tick
 ══════════════════════════════════════════════════════════════ */
-export function tickFoodPool(dt, VS) {
-  if (!VS.food) VS.food = { pool: 200, consumption: 0, buffer: 0 };
-
-  var food     = VS.food;
-  var pop      = VS.villagers.length;
+export function tickFoodConsumption(dt, VS) {
+  var pop = VS.villagers.length;
   if (pop === 0) return;
 
-  /* ── Production from farm buildings ─────────────────── */
-  var farmRate = 0;
-  VS.buildings.forEach(function(b) {
-    if (b.type === 'farm') {
-      farmRate += POOL_PER_FARM_SEC * b.level * b.getStats().efficiency;
-    }
-  });
-
-  /* Policy: Programa sa Pagkain adds a buffer bonus */
-  var bufferBonus = food.buffer || 0;
-  food.pool = Math.min(FOOD_POOL_CAP, food.pool + (farmRate + bufferBonus * 0.01) * dt);
-
-  /* ── Consumption by population ───────────────────────── */
-  var consume = pop * POOL_CONSUMPTION_PER_CITIZEN * dt;
-  food.consumption = consume / dt;   /* store rate for dashboard display */
-  food.pool = Math.max(0, food.pool - consume);
-
-  var poolRatio = food.pool / FOOD_POOL_CAP;
-
-  /* ── Hunger / satiety cascade ────────────────────────── */
-  /* Policy: Programa sa Pagkain slows hunger decay */
+  // Calculate total rice consumption for this tick
+  var totalConsumption = pop * RICE_CONSUMPTION_PER_CITIZEN_PER_SEC * dt;
+  
+  // Get current rice storage
+  var currentRice = VS.res.rice || 0;
+  
+  // Consume rice from storage
+  var riceConsumed = Math.min(totalConsumption, currentRice);
+  VS.res.rice = Math.max(0, currentRice - riceConsumed);
+  
+  // Calculate rice availability ratio (0 to 1)
+  var riceRatio = (VS.res.rice + riceConsumed) / Math.max(MIN_RICE_FOR_FULL_SPEED, totalConsumption);
+  riceRatio = clamp(riceRatio, 0, 1);
+  
+  // Track consumption stats for UI
+  if (!VS.food) VS.food = { consumption: 0, riceRatio: 1 };
+  VS.food.consumption = riceConsumed / dt;  // Rate per second
+  VS.food.riceRatio = riceRatio;
+  
+  // Apply hunger effects to each citizen
   var hungerMult = isPolicyActive('programaPagkain', VS) ? 0.6 : 1.0;
-
+  
   VS.villagers.forEach(function(v) {
     if (v.hunger === undefined) v.hunger = 20;
-
-    if (food.pool <= 0) {
-      /* Pool empty — hunger rises */
-      v.hunger = clamp(v.hunger + HUNGER_PER_SEC * dt * hungerMult * 100, 0, 100);
-    } else if (poolRatio > 0.4) {
-      /* Pool healthy — hunger falls */
-      v.hunger = clamp(v.hunger - HUNGER_RECOVERY_RATE * dt * 100, 0, 100);
-    }
-    /* Between 0 and 40% — neutral, no change */
-
-    /* Hunger cascade: high hunger → reduce effective speed */
-    if (v.hunger > PRODUCTIVITY_HUNGER_THRESH) {
-      var penalty = (v.hunger - PRODUCTIVITY_HUNGER_THRESH) / 100;
-      v._hungerSpeedMult = clamp(1.0 - penalty * 0.5, 0.4, 1.0);
+    
+    // Update hunger based on how much rice was available
+    if (riceConsumed < totalConsumption) {
+      // Not enough rice - hunger increases
+      var shortage = (totalConsumption - riceConsumed) / totalConsumption;
+      var hungerIncrease = HUNGER_INCREASE_RATE * dt * shortage * hungerMult * 100;
+      v.hunger = clamp(v.hunger + hungerIncrease, 0, 100);
     } else {
-      v._hungerSpeedMult = 1.0;
+      // Enough rice - hunger decreases slowly
+      var hungerDecrease = 0.02 * dt * 100;
+      v.hunger = clamp(v.hunger - hungerDecrease, 0, 100);
     }
-
-    /* Extreme hunger → health damage */
+    
+    // Apply speed multiplier based on hunger level
+    v._hungerSpeedMult = getHungerSpeedMultiplier(v.hunger);
+    
+    // Apply work ability flag (cannot work if hunger > 80)
+    v._canWork = v.hunger <= 80;
+    
+    // Extreme hunger causes health damage
     if (v.hunger >= 90) {
       if (v.health === undefined) v.health = 80;
       v.health = clamp(v.health - 0.005 * dt * 100, 0, 100);
@@ -146,9 +142,45 @@ export function tickFoodPool(dt, VS) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ResourceNode Class  — unchanged from original except:
-   - gather() now also credits VS.food.pool if node has foodAmt
-   - _hungerSpeedMult is read from gatherer villager in villager.js
+   tickFoodPool - Legacy function for backward compatibility
+   Calls tickFoodConsumption
+══════════════════════════════════════════════════════════════ */
+export function tickFoodPool(dt, VS) {
+  tickFoodConsumption(dt, VS);
+}
+
+/* Get speed multiplier based on hunger level */
+export function getHungerSpeedMultiplier(hunger) {
+  if (hunger <= 30) return HUNGER_SPEED_MULTIPLIERS.NORMAL.mult;
+  if (hunger <= 60) return HUNGER_SPEED_MULTIPLIERS.SLOW_20.mult;
+  if (hunger <= 80) return HUNGER_SPEED_MULTIPLIERS.SLOW_50.mult;
+  return HUNGER_SPEED_MULTIPLIERS.SLOW_80.mult;
+}
+
+/* Get hunger effect description for UI */
+export function getHungerEffectDescription(hunger) {
+  if (hunger <= 30) return HUNGER_SPEED_MULTIPLIERS.NORMAL.desc;
+  if (hunger <= 60) return HUNGER_SPEED_MULTIPLIERS.SLOW_20.desc;
+  if (hunger <= 80) return HUNGER_SPEED_MULTIPLIERS.SLOW_50.desc;
+  return HUNGER_SPEED_MULTIPLIERS.SLOW_80.desc;
+}
+
+/* Get food consumption stats for dashboard */
+export function getFoodStats(VS) {
+  if (!VS.food) return { consumption: 0, riceRatio: 1 };
+  return {
+    consumption: VS.food.consumption || 0,
+    riceRatio: VS.food.riceRatio || 1
+  };
+}
+
+/* Get food pool state - legacy function for compatibility */
+export function getFoodPoolState(VS) {
+  return getFoodStats(VS);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ResourceNode Class
 ══════════════════════════════════════════════════════════════ */
 export function ResourceNode(type, x, y) {
   var def       = RESOURCE_DEFS[type] || RESOURCE_DEFS.forest;
@@ -162,7 +194,6 @@ export function ResourceNode(type, x, y) {
   this.regenAccum = 0;
   this.giveRes  = def.giveRes;
   this.giveAmt  = def.giveAmt;
-  this.foodAmt  = def.foodAmt || 0;
   this.animOffset = Math.random() * Math.PI * 2;
 
   if (type === 'forest') {
@@ -175,15 +206,22 @@ export function ResourceNode(type, x, y) {
   }
 }
 
-/* ── Gather — now optionally credits food pool ────────────── */
 ResourceNode.prototype.gather = function(amount, VS) {
   var taken   = Math.min(this.amount, amount);
   this.amount = Math.max(0, this.amount - taken);
 
-  /* Credit food pool if this node type produces food */
-  if (taken > 0 && this.foodAmt > 0 && VS && VS.food) {
-    var foodGain = taken * (this.foodAmt / this.giveAmt);
-    VS.food.pool = Math.min(FOOD_POOL_CAP, VS.food.pool + foodGain);
+  if (taken > 0 && VS) {
+    if (this.giveRes === 'langis') {
+      if (!VS.res.langis) VS.res.langis = 0;
+      VS.res.langis = Math.min(VS.resCap.langis || 9999, VS.res.langis + taken * this.giveAmt);
+    } else if (this.giveRes === 'rice') {
+      // Add rice directly to storage
+      if (!VS.res.rice) VS.res.rice = 0;
+      VS.res.rice = Math.min(VS.resCap.rice || 9999, VS.res.rice + taken * this.giveAmt);
+    } else if (this.giveRes === 'gold') {
+      if (!VS.res.gold) VS.res.gold = 0;
+      VS.res.gold = Math.min(VS.resCap.gold || 9999, VS.res.gold + taken * this.giveAmt);
+    }
   }
 
   return taken;
@@ -203,19 +241,8 @@ ResourceNode.prototype.update = function(dt) {
   }
 };
 
-/* ── getFoodPoolState — for dashboard display ─────────────── */
-export function getFoodPoolState(VS) {
-  if (!VS.food) return { pool: 0, cap: FOOD_POOL_CAP, ratio: 0, consumption: 0 };
-  return {
-    pool:        Math.floor(VS.food.pool),
-    cap:         FOOD_POOL_CAP,
-    ratio:       clamp(VS.food.pool / FOOD_POOL_CAP, 0, 1),
-    consumption: VS.food.consumption || 0,
-  };
-}
-
 /* ══════════════════════════════════════════════════════════════
-   RENDERING — all draw code identical to original
+   RENDERING functions
 ══════════════════════════════════════════════════════════════ */
 ResourceNode.prototype.draw = function(ctx, now) {
   var def    = RESOURCE_DEFS[this.type] || RESOURCE_DEFS.forest;
@@ -236,6 +263,8 @@ ResourceNode.prototype.draw = function(ctx, now) {
 
   if      (this.type === 'forest') _drawForest(ctx, sc, w, h, col, ratio, t + this.animOffset);
   else if (this.type === 'river')  _drawRiver(ctx, sc, w, h, col, ratio, t + this.animOffset);
+  else if (this.type === 'mine')   _drawMine(ctx, sc, w, h, col, ratio, t + this.animOffset);
+  else if (this.type === 'langis') _drawLangis(ctx, sc, w, h, col, ratio, t + this.animOffset);
   else                             _drawMine(ctx, sc, w, h, col, ratio, t + this.animOffset);
 
   drawResourceSprite(ctx, this.type, ratio, w, h);
@@ -254,7 +283,7 @@ ResourceNode.prototype.draw = function(ctx, now) {
   ctx.restore();
 };
 
-/* ── Forest draw (identical to original) ─────────────────── */
+/* ── Drawing functions ───────────────────────────────────── */
 function _drawForest(ctx, sc, w, h, col, ratio, t) {
   var treeCount = Math.max(5, Math.floor(w / (10 * sc)));
   var backCount = Math.ceil(treeCount * 0.6);
@@ -311,7 +340,6 @@ function _drawForest(ctx, sc, w, h, col, ratio, t) {
   }
 }
 
-/* ── Mine draw (identical to original) ───────────────────── */
 function _drawMine(ctx, sc, w, h, col, ratio, t) {
   var glowAlpha = ratio > 0.25 ? (0.18 + Math.sin(t*1.8)*0.09)*ratio : 0.04;
   var glowR = ctx.createRadialGradient(0,-h*0.3,2*sc,0,-h*0.3,w*0.7);
@@ -358,7 +386,6 @@ function _drawMine(ctx, sc, w, h, col, ratio, t) {
   if(ratio>0.1){ctx.fillStyle='rgba(255,200,80,0.5)'; ctx.beginPath(); ctx.arc(0,h*0.05,2*sc,0,Math.PI*2); ctx.fill();}
 }
 
-/* ── River draw (identical to original) ──────────────────── */
 function _drawRiver(ctx, sc, w, h, col, ratio, t) {
   var wave = Math.sin(t * 1.2) * 2 * sc;
   ctx.fillStyle = col;
@@ -368,7 +395,52 @@ function _drawRiver(ctx, sc, w, h, col, ratio, t) {
   if (ratio > 0.4) { ctx.fillStyle='rgba(180,240,180,0.5)'; ctx.beginPath(); ctx.arc(8*sc+wave*0.5,-2*sc,3.5*sc,0,Math.PI*2); ctx.fill(); }
 }
 
-/* ── Colour blend helper (identical to original) ─────────── */
+function _drawLangis(ctx, sc, w, h, col, ratio, t) {
+  ctx.fillStyle = '#1a2a0a';
+  ctx.beginPath(); ctx.ellipse(0, 0, w*0.85, h*0.65, 0, 0, Math.PI*2); ctx.fill();
+  var sheen = Math.sin(t * 0.8) * 0.2 + 0.3;
+  ctx.fillStyle = `rgba(40, 50, 20, ${sheen * 0.5})`;
+  ctx.beginPath(); ctx.ellipse(0, -2*sc, w*0.7, h*0.45, 0, 0, Math.PI*2); ctx.fill();
+  for (var i = 0; i < 8; i++) {
+    var angle = (i / 8) * Math.PI * 2 + t * 0.5;
+    var ox = Math.sin(angle) * w * 0.3;
+    var oy = Math.cos(angle) * h * 0.2 - 3*sc;
+    var size = (Math.sin(t * 1.5 + i) * 0.5 + 1) * 1.5 * sc;
+    ctx.fillStyle = ratio > 0.3 ? 'rgba(30, 40, 10, 0.7)' : 'rgba(20, 25, 8, 0.5)';
+    ctx.beginPath(); ctx.ellipse(ox, oy, size, size * 0.7, 0, 0, Math.PI*2); ctx.fill();
+  }
+  if (ratio > 0.5) {
+    var slick = ctx.createLinearGradient(-w*0.4, 0, w*0.4, 0);
+    slick.addColorStop(0, 'rgba(100, 70, 20, 0.3)');
+    slick.addColorStop(0.33, 'rgba(80, 60, 30, 0.4)');
+    slick.addColorStop(0.66, 'rgba(60, 80, 40, 0.3)');
+    slick.addColorStop(1, 'rgba(40, 60, 20, 0.2)');
+    ctx.fillStyle = slick;
+    ctx.beginPath(); ctx.ellipse(0, -2*sc, w*0.8, h*0.55, 0, 0, Math.PI*2); ctx.fill();
+  }
+  if (ratio < 0.2) {
+    ctx.fillStyle = '#5a4a2a';
+    ctx.font = `${8 * sc}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⛽', 0, -5*sc);
+  } else {
+    var bob = Math.sin(t * 1.2) * 2 * sc;
+    ctx.fillStyle = '#3a2a0a';
+    ctx.fillRect(-6*sc, -h*0.4 + bob, 12*sc, 7*sc);
+    ctx.fillStyle = '#5a3a1a';
+    ctx.fillRect(-5*sc, -h*0.38 + bob, 10*sc, 2*sc);
+    ctx.fillStyle = '#f5c842';
+    ctx.font = `${7 * sc}px monospace`;
+    ctx.fillText('⛽', 0, -h*0.36 + bob);
+  }
+  ctx.strokeStyle = '#2a2a0a';
+  ctx.lineWidth = 1.5 * sc;
+  ctx.beginPath(); ctx.ellipse(0, 0, w*0.85, h*0.65, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(0, h*0.28, w*0.65, h*0.15, 0, 0, Math.PI*2); ctx.fill();
+}
+
 function _blendColor(hexA, hexB, t) {
   var ar=parseInt(hexA.slice(1,3),16), ag=parseInt(hexA.slice(3,5),16), ab=parseInt(hexA.slice(5,7),16);
   var br=parseInt(hexB.slice(1,3),16), bg=parseInt(hexB.slice(3,5),16), bb=parseInt(hexB.slice(5,7),16);
@@ -376,21 +448,18 @@ function _blendColor(hexA, hexB, t) {
   return '#'+('0'+r.toString(16)).slice(-2)+('0'+g.toString(16)).slice(-2)+('0'+b.toString(16)).slice(-2);
 }
 
-/* ── Factory helpers (identical to original) ──────────────── */
+/* ── Factory helpers ──────────────────────────────────────── */
 export function createDefaultResourceNodes(VW, VH) {
-  /* Nodes spread across zones - center zone gets starter nodes,
-     outer zones show what they'll produce when unlocked */
   return [
-    /* Center zone (sentro) starter nodes */
     new ResourceNode('forest', VW*0.38, VH*0.42),
     new ResourceNode('river',  VW*0.62, VH*0.44),
-    /* Outer zone resource indicators */
-    new ResourceNode('forest', VW*0.12, VH*0.18),   /* kalikasan */
-    new ResourceNode('river',  VW*0.50, VH*0.12),   /* dagat */
-    new ResourceNode('mine',   VW*0.85, VH*0.50),   /* bundok */
-    new ResourceNode('mine',   VW*0.15, VH*0.68),   /* depensa */
-    new ResourceNode('river',  VW*0.50, VH*0.85),   /* langis area */
-    new ResourceNode('forest', VW*0.82, VH*0.82),   /* kalye */
+    new ResourceNode('forest', VW*0.12, VH*0.18),
+    new ResourceNode('river',  VW*0.50, VH*0.12),
+    new ResourceNode('mine',   VW*0.85, VH*0.50),
+    new ResourceNode('mine',   VW*0.15, VH*0.68),
+    new ResourceNode('langis', VW*0.50, VH*0.85),
+    new ResourceNode('langis', VW*0.78, VH*0.75),
+    new ResourceNode('forest', VW*0.82, VH*0.82),
   ];
 }
 

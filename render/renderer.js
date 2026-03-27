@@ -22,6 +22,7 @@ import { drawVillager }             from '../villagers/villager.js';
 import { cam, camApply, camReset, w2s, WORLD_W, WORLD_H } from './camera.js';
 import { getActiveCalamity } from '../government/events.js';
 import { getWasteStats }     from '../resources/economy.js';
+import { drawZoneArrows }    from '../world/zones.js';
 
 /* ══════════════════════════════════════════════════════════════
    Wind particles — persist across frames
@@ -59,7 +60,8 @@ export function renderFrame(canvas, ctx, state) {
       ctx.translate(state.shakeX || 0, state.shakeY || 0);
     }
     drawGround(ctx, VW, VH);
-    if (state.drawZoneGrid) state.drawZoneGrid(ctx, VW, VH, state.VS);
+    if (state.drawZoneGrid)   state.drawZoneGrid(ctx, VW, VH, state.VS);
+    drawZoneArrows(ctx, VW, VH, state.VS);
     drawEntitiesSorted(ctx, state);
     drawBuildPreview(ctx, state);
   camReset(ctx);

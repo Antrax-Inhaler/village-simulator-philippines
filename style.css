@@ -2088,3 +2088,259 @@ canvas.mode-view  { cursor: default; }
       border-radius: 8px;
       padding: 8px;
     }
+    /* Add to the style section in HTML */
+
+.sp-debt-section {
+  background: linear-gradient(135deg, #1a1208, #0e0905);
+  border-radius: 8px;
+  padding: 10px;
+  margin: 8px 0;
+}
+
+.sp-payment-section {
+  background: #0e0905;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 8px 0;
+  border: 1px solid #2a1808;
+}
+
+.sp-payment-row, .sp-loan-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.sp-payment-input, .sp-loan-input {
+  flex: 1;
+  background: #2a1808;
+  border: 1px solid #c49a4e;
+  color: #f5c842;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.sp-payment-input:focus, .sp-loan-input:focus {
+  outline: none;
+  border-color: #f5c842;
+}
+
+.sp-payment-list {
+  margin-top: 8px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.sp-payment-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #2a1808;
+  font-size: 12px;
+}
+
+.sp-payment-row span:first-child {
+  color: #8a6a48;
+}
+
+.sp-payment-row .good {
+  color: #88dd88;
+}
+    /* Debt panel styles */
+    .sp-debt-section {
+      background: linear-gradient(135deg, #1a1208, #0e0905);
+      border-radius: 8px;
+      padding: 10px;
+      margin: 8px 0;
+    }
+
+    .sp-payment-section {
+      background: #0e0905;
+      border-radius: 8px;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #2a1808;
+    }
+
+    .sp-payment-row, .sp-loan-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .sp-payment-input, .sp-loan-input {
+      flex: 1;
+      background: #2a1808;
+      border: 1px solid #c49a4e;
+      color: #f5c842;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .sp-payment-input:focus, .sp-loan-input:focus {
+      outline: none;
+      border-color: #f5c842;
+    }
+
+    .sp-payment-list {
+      margin-top: 8px;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .sp-payment-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #2a1808;
+      font-size: 12px;
+    }
+
+    .sp-payment-row span:first-child {
+      color: #8a6a48;
+    }
+
+    .sp-payment-row .good {
+      color: #88dd88;
+    }
+
+    .sp-loan-input {
+      background: #1a3010;
+      border-color: #44aa44;
+    }
+
+    .sp-btn-on {
+      background: #1a3010;
+      color: #88ee88;
+      border: 1px solid #44aa44;
+      padding: 6px 12px;
+      font-family: 'Slackey', sans-serif;
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .sp-btn-on:hover {
+      background: #2a401a;
+    }
+
+    .sp-warn {
+      background: #2a0808;
+      border-left: 3px solid #e74c3c;
+      padding: 6px 8px;
+      font-size: 11px;
+      color: #e74c3c;
+      margin: 8px 0;
+      border-radius: 4px;
+    }
+
+    .sp-stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .sp-stat-lbl {
+      color: #8a6a48;
+      font-size: 12px;
+    }
+
+    .sp-stat-val {
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .sp-stat-val.good {
+      color: #88dd88;
+    }
+
+    .sp-stat-val.bad {
+      color: #e74c3c;
+    }
+
+    .sp-section-lbl {
+      font-family: 'Slackey', sans-serif;
+      font-size: 11px;
+      color: #c49a4e;
+      margin: 12px 0 6px;
+      letter-spacing: 0.05em;
+    }
+
+    /* Side panel styles */
+    .sp-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #3a2a18; background: #0e0905; }
+    .sp-title { font-family: 'Slackey', sans-serif; font-size: 14px; color: #f5c842; }
+    .sp-close { background: #2a1808; border: 1px solid #c49a4e; color: #f5c842; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
+    .sp-body { padding: 12px; overflow-y: auto; max-height: calc(100vh - 60px); }
+    .sp-empty { text-align: center; color: #8a6a48; font-style: italic; padding: 24px 0; }
+    .sp-stat-block { background: #1a1208; border: 1px solid #2a1808; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .sp-slider-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+    .sp-card { background: #1a1208; border: 1px solid #3a2a18; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+    .sp-card-on { border-color: #44aa44; background: #0a1a08; }
+    .sp-card-head { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .sp-card-name { font-family: 'Slackey', sans-serif; font-size: 13px; color: #f5c842; }
+    .sp-card-desc { font-size: 12px; color: #c8a878; margin-bottom: 4px; }
+    .sp-card-meta { font-size: 10px; color: #8a6a48; margin-bottom: 8px; }
+    .sp-card-foot { text-align: right; }
+    .sp-pill { font-size: 9px; background: #2a1808; padding: 2px 6px; border-radius: 12px; }
+    .sp-pill-on { background: #1a4a1a; color: #88ee88; }
+    .sp-log-row { display: flex; gap: 8px; padding: 8px; background: #1a1208; border: 1px solid #2a1808; border-radius: 6px; margin-bottom: 6px; }
+    .sp-log-icon { font-size: 16px; }
+    .sp-log-text { font-size: 12px; color: #e8d4a0; flex: 1; }
+    .sp-log-hint { font-size: 9px; color: #5a4030; display: block; margin-top: 2px; }
+    .sp-btn { padding: 6px 12px; font-family: 'Slackey', sans-serif; font-size: 12px; border-radius: 6px; cursor: pointer; border: none; }
+    .sp-btn-off { background: #2a0808; color: #ee8888; border: 1px solid #aa4444; }
+    .sp-btn-dim { opacity: 0.5; cursor: not-allowed; }
+
+    /* Event Modal Styles */
+    .edm-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.68); z-index: 95; }
+    .edm-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(420px, 92vw); background: #0e0905; border: 1px solid #8a6030; border-radius: 12px; z-index: 96; padding: 0 0 16px; max-height: 80vh; overflow-y: auto; }
+    .edm-header { display: flex; align-items: flex-start; gap: 10px; padding: 16px; border-bottom: 1px solid #3a2010; border-top: 4px solid #e67e22; }
+    .edm-icon { font-size: 26px; }
+    .edm-title { flex: 1; font-family: 'Oldenburg', serif; font-size: 14px; color: #f5c842; }
+    .edm-close { background: #2a1808; border: 1px solid #8a6030; color: #f5c842; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; }
+    .edm-body { padding: 12px 16px; }
+    .edm-section-label { font-family: 'Oldenburg', serif; font-size: 11px; color: #7a5030; text-transform: uppercase; border-bottom: 1px solid #2a1808; margin: 12px 0 8px; padding-bottom: 4px; }
+    .edm-impacts { display: flex; flex-direction: column; gap: 4px; }
+    .edm-impact-row { display: flex; justify-content: space-between; font-size: 13px; }
+    .edm-impact-label { color: #8a6040; }
+    .edm-impact-val { font-weight: bold; }
+    .edm-bad { color: #e74c3c; }
+    .edm-good { color: #88dd88; }
+    .edm-bld-list { display: flex; flex-direction: column; gap: 5px; }
+    .edm-bld-row { display: flex; justify-content: space-between; background: #1a1208; border: 1px solid #2a1808; padding: 5px 8px; border-radius: 4px; font-size: 13px; }
+    .edm-bld-name { color: #e8c87a; }
+    .edm-bld-lvl { color: #e74c3c; font-family: monospace; }
+    .edm-none { color: #5a4030; font-style: italic; padding: 6px 0; }
+    .edm-ok { display: block; margin: 16px auto 0; padding: 8px 32px; background: #2a1808; border: 1px solid #f5c842; border-radius: 6px; color: #f5c842; cursor: pointer; }
+    #loading-container {
+  width: 80%;
+  max-width: 280px;
+  margin: 20px auto;
+  text-align: center;
+}
+#loading-bar {
+  background-color: #3a2a1c;
+  border-radius: 8px;
+  height: 12px;
+  width: 100%;
+  overflow: hidden;
+}
+#loading-progress {
+  background-color: #f5c842;
+  width: 0%;
+  height: 100%;
+  transition: width 0.2s linear;
+}
+#loading-text {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #f5c842;
+  font-family: Oldenburg, serif;
+}
