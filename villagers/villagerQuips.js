@@ -1,3 +1,12 @@
+/* ═══════════════════════════════════════════════════════════════
+   Mini Bayan — villagers/villagerQuips.js  (with Resource Shortages)
+   
+   UPDATED: Calamity and shortage quips can now coexist
+   - Shortage quips appear regardless of calamity
+   - Calamity quips appear on separate cooldown
+   - Both can show simultaneously
+═══════════════════════════════════════════════════════════════ */
+
 import { perspScale, randInt, randRange } from '../utils/perspective.js';
 
 /* ══════════════════════════════════════════════════════════════
@@ -6,13 +15,20 @@ import { perspScale, randInt, randRange } from '../utils/perspective.js';
 var QUIP_DURATION        = 2.2;   /* ambient quips — gone quickly */
 var PLAYER_DURATION      = 2.8;   /* click response stays a touch longer */
 var CALAMITY_DURATION    = 3.0;   /* calamity reactions linger slightly */
+var SHORTAGE_DURATION    = 3.0;   /* shortage quips last longer */
 var QUIP_CHANCE_PER_SEC  = 0.014; /* per-villager ambient roll */
-var MAX_ACTIVE_QUIPS     = 5;     /* global cap (ambient only) */
+var MAX_ACTIVE_QUIPS     = 6;     /* global cap (increased to allow multiple types) */
 
 var CALAMITY_REACT_MIN   = 2;     /* min villagers that react per wave */
 var CALAMITY_REACT_MAX   = 4;     /* max villagers that react per wave */
 var _calamityReactCD     = 0;     /* cooldown between reaction waves */
 var CALAMITY_WAVE_SECS   = 6.0;   /* new wave fires every 6s */
+
+/* ── Resource shortage tracking ────────────────────────────── */
+var _lastShortageCheck = 0;
+var _shortageCheckInterval = 15;  /* Check every 15 seconds */
+var _lastShortageQuipTime = 0;
+var _shortageCooldown = 12;       /* Don't spam same shortage type */
 
 /* ══════════════════════════════════════════════════════════════
    QUIP POOLS
@@ -93,6 +109,52 @@ var FULLSCREEN_QUIPS = [
   'ifull screen mo boss',
   'sa settings',
   'kanan taas'
+];
+
+/* ── Resource shortage quip pools ─────────────────────────── */
+var LANGIS_SHORTAGE_QUIPS = [
+  'Angkat na kaya tayo ng langis boss!',
+  'Walang langis! Hindi gagana ang makina.',
+  'Magmina tayo ng langis, boss!',
+  'Ubos na ang langis!',
+  'Kailangan natin ng langis!',
+  'Walang langis, walang trabaho!',
+  'Saan na ang langis natin?',
+  'Kulang na kulang ang langis!',
+  'Mag-import na tayo ng langis!',
+  'Langis! Langis! Langis!',
+  'Hindi na gumagana ang makina dahil sa langis!',
+  'Boss, walang langis!',
+];
+
+var RICE_SHORTAGE_QUIPS = [
+  'Konti na lang ang bigas boss!',
+  'Gutom na ang mga bata!',
+  'Kailangan ng suporta sa bukid!',
+  'Ubos na ang bigas!',
+  'Nagugutom na kami!',
+  'Walang makain!',
+  'Saan na ang ani?',
+  'Kulang ang bigas sa bodega!',
+  'Magtanim pa tayo!',
+  'Gutom na ang nayon!',
+  'Wala nang pagkain!',
+  'Boss, kailangan ng bigas!',
+];
+
+var GOLD_SHORTAGE_QUIPS = [
+  'Ubos na ang pondo boss!',
+  'Walang pera ang bayan!',
+  'Kailangan ng mas maraming kita!',
+  'Barya na lang ang natira!',
+  'Walang pambayad sa mga gusali!',
+  'Nasa baba ang treasury!',
+  'Saan kukuha ng pondo?',
+  'Kailangan ng mas maraming minahan!',
+  'Boss, ubos na ang ginto!',
+  'Walang budget!',
+  'Hirap tayo sa pera!',
+  'Pautang naman boss!',
 ];
 
 /* ── Calamity-specific reaction pools ──────────────────────── */
@@ -285,9 +347,113 @@ export var REQUEST_EXPIRED_QUIPS = [
 export function getRandomQuip(pool) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
 function _getCalamityQuip(type) {
   var pool = CALAMITY_QUIPS[type] || CALAMITY_GENERIC;
   return pool[randInt(0, pool.length - 1)];
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESOURCE SHORTAGE DETECTION
+══════════════════════════════════════════════════════════════ */
+
+export function checkResourceShortages(VS) {
+  if (!VS) return { langis: false, rice: false, gold: false, shortages: [] };
+  
+  var shortages = [];
+  var now = Date.now() / 1000;
+  
+  // Check langis shortage (< 100)
+  var langisShortage = (VS.res.langis || 0) < 100;
+  if (langisShortage) shortages.push({ type: 'langis', quipPool: LANGIS_SHORTAGE_QUIPS });
+  
+  // Check rice shortage (< population × 10)
+  var riceThreshold = (VS.pop.cur || 0) * 10;
+  var riceShortage = (VS.res.rice || 0) < riceThreshold;
+  if (riceShortage) shortages.push({ type: 'rice', quipPool: RICE_SHORTAGE_QUIPS });
+  
+  // Check gold shortage (< 500)
+  var goldShortage = (VS.res.gold || 0) < 500;
+  if (goldShortage) shortages.push({ type: 'gold', quipPool: GOLD_SHORTAGE_QUIPS });
+  
+  return {
+    langis: langisShortage,
+    rice: riceShortage,
+    gold: goldShortage,
+    shortages: shortages,
+    any: langisShortage || riceShortage || goldShortage
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   triggerShortageQuip
+   Spawns a quip from a random idle villager about resource shortage
+══════════════════════════════════════════════════════════════ */
+export function triggerShortageQuip(villagers, shortageType, quipPool) {
+  if (!villagers || villagers.length === 0) return false;
+  
+  // Find idle villagers without active quips
+  var candidates = [];
+  for (var i = 0; i < villagers.length; i++) {
+    var v = villagers[i];
+    if (!v.isHome && !v.isInsideWork && !v._quip) {
+      candidates.push(v);
+    }
+  }
+  
+  if (candidates.length === 0) return false;
+  
+  // Pick a random candidate
+  var target = candidates[Math.floor(Math.random() * candidates.length)];
+  var quip = quipPool[Math.floor(Math.random() * quipPool.length)];
+  
+  target._quip = {
+    text: quip,
+    timer: SHORTAGE_DURATION,
+    maxTimer: SHORTAGE_DURATION,
+    isPlayer: false,
+    isCalamity: false,
+    isShortage: true
+  };
+  
+  return true;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   triggerCalamityQuipWave
+   Spawns multiple calamity quips (separate from shortage quips)
+══════════════════════════════════════════════════════════════ */
+function triggerCalamityQuipWave(villagers, calamityType) {
+  if (!villagers || villagers.length === 0) return;
+  
+  var candidates = [];
+  for (var i = 0; i < villagers.length; i++) {
+    var v = villagers[i];
+    // Can have both calamity and shortage quips on different villagers
+    if (!v.isHome && !v.isInsideWork) {
+      candidates.push(v);
+    }
+  }
+  
+  _shuffle(candidates);
+  var count = Math.min(
+    randInt(CALAMITY_REACT_MIN, CALAMITY_REACT_MAX),
+    candidates.length
+  );
+  
+  for (var r = 0; r < count; r++) {
+    // Only add if this villager doesn't already have a quip
+    if (!candidates[r]._quip) {
+      candidates[r]._quip = {
+        text: _getCalamityQuip(calamityType),
+        timer: CALAMITY_DURATION,
+        maxTimer: CALAMITY_DURATION,
+        isPlayer: false,
+        isCalamity: true,
+        isShortage: false
+      };
+    }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -319,9 +485,11 @@ function _shuffle(arr) {
 
 /* ══════════════════════════════════════════════════════════════
    tickQuips — call from main.js update() every fixed tick
-   dt        — fixed delta (seconds)
-   villagers — VS.villagers array
-   VS        — full village state; reads VS.events.calamity
+   
+   UPDATED: Calamity and shortage quips can now coexist
+   - Shortage quips checked on separate timer
+   - Calamity quips on separate wave timer
+   - Both can appear simultaneously
 ══════════════════════════════════════════════════════════════ */
 export function tickQuips(dt, villagers, VS) {
   /* Tick down all existing quips */
@@ -332,46 +500,51 @@ export function tickQuips(dt, villagers, VS) {
     }
   }
 
-  /* ── Calamity reaction waves ─────────────────────────────
-     While any calamity is active, every CALAMITY_WAVE_SECS a
-     random 2–4 visible idle villagers shout a calamity quip.
-     Normal ambient quips are fully suppressed during calamity.
-  ─────────────────────────────────────────────────────────── */
+  var currentTime = Date.now() / 1000;
+  var activeCount = _countActive(villagers);
+  
+  /* ── RESOURCE SHORTAGE QUIPS (always check, even during calamity) ── */
+  _lastShortageCheck += dt;
+  
+  if (_lastShortageCheck >= _shortageCheckInterval) {
+    _lastShortageCheck = 0;
+    
+    var shortageResult = checkResourceShortages(VS);
+    
+    if (shortageResult.any) {
+      if (currentTime - _lastShortageQuipTime >= _shortageCooldown) {
+        if (shortageResult.shortages.length > 0) {
+          var randomShortage = shortageResult.shortages[
+            Math.floor(Math.random() * shortageResult.shortages.length)
+          ];
+          
+          if (activeCount < MAX_ACTIVE_QUIPS) {
+            triggerShortageQuip(villagers, randomShortage.type, randomShortage.quipPool);
+            _lastShortageQuipTime = currentTime;
+            activeCount++; // Increment for cap check
+          }
+        }
+      }
+    }
+  }
+
+  /* ── CALAMITY REACTION WAVES (separate from shortage quips) ── */
   var calamity = VS && VS.events && VS.events.calamity;
   if (calamity && calamity.remaining > 0) {
     _calamityReactCD -= dt;
     if (_calamityReactCD <= 0) {
       _calamityReactCD = CALAMITY_WAVE_SECS;
-
-      var candidates = [];
-      for (var c = 0; c < villagers.length; c++) {
-        var vc = villagers[c];
-        if (!vc.isHome && !vc.isInsideWork && !vc._quip) candidates.push(vc);
-      }
-      _shuffle(candidates);
-      var count = Math.min(
-        randInt(CALAMITY_REACT_MIN, CALAMITY_REACT_MAX),
-        candidates.length
-      );
-      for (var r = 0; r < count; r++) {
-        candidates[r]._quip = {
-          text:       _getCalamityQuip(calamity.type),
-          timer:      CALAMITY_DURATION,
-          maxTimer:   CALAMITY_DURATION,
-          isPlayer:   false,
-          isCalamity: true,
-        };
-      }
+      
+      // Trigger calamity quips (can coexist with shortage quips)
+      triggerCalamityQuipWave(villagers, calamity.type);
     }
-    /* Suppress ambient while calamity active */
-    return;
+  } else {
+    /* Reset wave CD when no calamity */
+    _calamityReactCD = 0;
   }
 
-  /* Reset wave CD so first wave fires immediately on next calamity */
-  _calamityReactCD = 0;
-
-  /* ── Ambient quips (no calamity) ─────────────────────────── */
-  var activeCount = _countActive(villagers);
+  /* ── AMBIENT QUIPS (only if no calamity? Actually let's keep them too) ── */
+  // Ambient quips can still appear, but we need to respect the cap
   for (var j = 0; j < villagers.length; j++) {
     var v = villagers[j];
     if (v._quip) continue;
@@ -384,6 +557,7 @@ export function tickQuips(dt, villagers, VS) {
         maxTimer:   QUIP_DURATION,
         isPlayer:   false,
         isCalamity: false,
+        isShortage: false
       };
       activeCount++;
     }
@@ -391,15 +565,12 @@ export function tickQuips(dt, villagers, VS) {
 
   /* ── Fullscreen reminder (if not in fullscreen) ────────────────── */
   let _fullscreenQuipCooldown = 0;
-  // Retrieve the global variable or initialize it
   if (typeof window._fullscreenQuipCooldown === 'undefined') {
     window._fullscreenQuipCooldown = 0;
   }
   window._fullscreenQuipCooldown -= dt;
   if (!document.fullscreenElement && window._fullscreenQuipCooldown <= 0) {
-    // Only add if there's room for more quips and no calamity
     if (activeCount < MAX_ACTIVE_QUIPS) {
-      // Find a random idle villager without an active quip
       var candidates = [];
       for (var f = 0; f < villagers.length; f++) {
         var vf = villagers[f];
@@ -413,9 +584,10 @@ export function tickQuips(dt, villagers, VS) {
           maxTimer:   QUIP_DURATION,
           isPlayer:   false,
           isCalamity: false,
+          isShortage: false
         };
-        window._fullscreenQuipCooldown = 12; // 12 seconds cooldown
-        activeCount++; // increment to respect cap
+        window._fullscreenQuipCooldown = 12;
+        activeCount++;
       }
     }
   }
@@ -431,25 +603,13 @@ export function spawnPlayerQuip(villager) {
     maxTimer:   PLAYER_DURATION,
     isPlayer:   true,
     isCalamity: false,
+    isShortage: false
   };
 }
 
 /* ══════════════════════════════════════════════════════════════
    drawVillagerQuip
    Called in render loop after drawVillager(ctx, v).
-
-   ctx  — canvas 2d context (world-space camera transform active)
-   v    — villager object
-   zoom — cam.zoom (window._camZoom set by main.js gameLoop)
-
-   VISUAL
-   • Background: rgba(10,6,2,0.72) dark semi-transparent panel
-   • Border:     #c49a4e (--clr-accent-dim) for ambient
-                 #f5c842 (--clr-accent)     for player / calamity
-   • Text:       #f5c842 (--clr-accent) — matches HUD gold
-   • Font:       ~9px screen-stable — small, unobtrusive
-   • Fade: 0.2s in, 0.4s out
-   • Gentle sine float upward
 ══════════════════════════════════════════════════════════════ */
 export function drawVillagerQuip(ctx, v, zoom) {
   if (!v._quip || v._quip.timer <= 0) return;
@@ -505,8 +665,16 @@ export function drawVillagerQuip(ctx, v, zoom) {
   ctx.fillStyle = 'rgba(10,6,2,0.72)';
   ctx.fill();
 
-  /* Border — accent for player/calamity, dim-gold for ambient */
-  ctx.strokeStyle = (q.isPlayer || q.isCalamity) ? '#f5c842' : '#c49a4e';
+  /* Border — color based on quip type */
+  if (q.isShortage) {
+    ctx.strokeStyle = '#e67e22';  /* Orange for shortage warnings */
+  } else if (q.isPlayer) {
+    ctx.strokeStyle = '#f5c842';  /* Gold for player interactions */
+  } else if (q.isCalamity) {
+    ctx.strokeStyle = '#e74c3c';  /* Red for calamity reactions */
+  } else {
+    ctx.strokeStyle = '#c49a4e';  /* Dim gold for ambient */
+  }
   ctx.lineWidth   = 0.9 / z;
   ctx.stroke();
 

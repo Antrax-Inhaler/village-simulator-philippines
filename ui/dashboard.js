@@ -8,20 +8,13 @@
    social hub). It has a prominent tab/button on the left edge that reveals
    the full panel when clicked.
 
-   Four collapsible sections:
+   Five collapsible sections:
      1. NAYON      — resources (Ginto, Bigas, Langis, Tao)
      2. PAMAHALAAN — gov stats (Trabaho, Kasiyahan, Tiwala,
                      Pagkain, Korapsyon, Eleksyon)
      3. GOBERNADOR — personal finance
      4. NASAYANG   — wasted resources (overflow losses)
-
-   STATES
-   ─────────────────────────────────────────────────────────────
-   OPEN   (320px) — panel fully visible
-   CLOSED (0px)   — panel hidden, only the tab handle visible
-
-   The tab handle sits on the left edge, centered vertically.
-   Clicking the handle toggles the panel open/closed.
+     5. RANK       — leader rank and progression with animated badge
 
    EXPORTS
    ─────────────────────────────────────────────────────────────
@@ -34,14 +27,18 @@ import { getCorruptionState }  from '../government/corruption.js';
 import { getPolicyState }      from '../government/policy.js';
 import { getElectionState }    from '../government/election.js';
 import { getMainHallLevel, getMainHallRules } from '../buildings/building.js';
+import { getRankFromScore, getNextRank } from '../ranking/rankingSystem.js';
+import { RANK_DRAWERS, BADGE_SIZE } from '../ranking/rankBadges.js';
 
 /* ── State ────────────────────────────────────────────────── */
 var _injected    = false;
 var _panelOpen   = false;
-var _sections    = { nayon: true, gov: true, gobern: true, waste: true };
+var _sections    = { nayon: true, gov: true, gobern: true, waste: true, rank: true };
 var _prevValues  = {};
 var _floaters    = [];
 var _lastUpdate  = 0;
+var _rankCanvas   = null;
+var _rankAnimationFrame = null;
 
 var WASTE_WARN   = 200;   /* total waste threshold for warning */
 
@@ -57,6 +54,9 @@ export function initDashboard() {
   /* Ensure panel starts closed */
   var panel = document.getElementById('left-dashboard-panel');
   if (panel) panel.classList.remove('open');
+
+  /* Start rank badge animation */
+  _startRankBadgeAnimation();
 
   /* Hook for renderer.js updateWasteDisplay — writes into sidebar */
   window.updateWasteDisplay = function(ws) {
@@ -92,6 +92,32 @@ function _setWasteEl(id, amount) {
   else if (amount >= 100) el.classList.add('sb-waste-med');
 }
 
+/* Start rank badge animation */
+function _startRankBadgeAnimation() {
+  function animate() {
+    _updateRankBadgeCanvas();
+    _rankAnimationFrame = requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+/* Update rank badge canvas with animation */
+function _updateRankBadgeCanvas() {
+  if (!_rankCanvas) {
+    _rankCanvas = document.getElementById('sb-rank-badge-canvas');
+  }
+  if (!_rankCanvas || !window._VS) return;
+  
+  const rank = getRankFromScore(window._VS.rank.score);
+  const drawer = RANK_DRAWERS[rank.id];
+  if (drawer) {
+    const ctx = _rankCanvas.getContext('2d');
+    // Clear canvas before drawing
+    ctx.clearRect(0, 0, _rankCanvas.width, _rankCanvas.height);
+    // Draw the badge
+    drawer(ctx, _rankCanvas.width, _rankCanvas.height, performance.now());
+  }
+}
 /* ══════════════════════════════════════════════════════════════
    updateDashboard  — called every frame from main.js
 ══════════════════════════════════════════════════════════════ */
@@ -187,6 +213,9 @@ export function updateDashboard(VS, dayCount) {
   var gobSum = document.getElementById('sb-gobern-sum');
   if (gobSum) gobSum.textContent = '💼' + pfGold;
 
+  /* ── RANK ─────────────────────────────────────────────── */
+  _updateRankDisplay(VS);
+
   _tickFloaters(dt);
 }
 
@@ -281,10 +310,50 @@ function _avg(arr, field, fallback) {
   arr.forEach(function(v) { if (v[field] !== undefined) { s += v[field]; c++; } });
   return c > 0 ? s / c : fallback;
 }
+
 function _pctColor(v, bad, good) {
   return v >= good ? '#88dd88' : v >= bad ? '#f5c842' : '#e74c3c';
 }
 
+/* ── Rank Display Update ────────────────────────────────────── */
+function _updateRankDisplay(VS) {
+  if (!VS.rank) return;
+  
+  var rank = getRankFromScore(VS.rank.score);
+  var nextRank = getNextRank(VS.rank.score);
+  
+  var titleEl = document.getElementById('sb-rank-title');
+  var scoreEl = document.getElementById('sb-rank-score');
+  var progressLabel = document.getElementById('sb-rank-progress-label');
+  var progressBar = document.getElementById('sb-rank-progress-bar');
+  var progressText = document.getElementById('sb-rank-progress-text');
+  var bonusEl = document.getElementById('sb-rank-bonus');
+  
+  if (titleEl) titleEl.textContent = rank.title;
+  if (scoreEl) scoreEl.textContent = Math.floor(VS.rank.score) + ' pts';
+  if (bonusEl) bonusEl.textContent = '✨ +' + rank.bonus + '% approval bonus';
+  
+  if (nextRank) {
+    var pointsNeeded = nextRank.scoreRequired - VS.rank.score;
+    var pointsInRank = VS.rank.score - rank.scoreRequired;
+    var rankRange = nextRank.scoreRequired - rank.scoreRequired;
+    var percent = (pointsInRank / rankRange) * 100;
+    
+    if (progressLabel) progressLabel.textContent = 'Next: ' + nextRank.title;
+    if (progressBar) progressBar.style.width = Math.min(100, Math.max(0, percent)) + '%';
+    if (progressText) progressText.textContent = Math.floor(pointsInRank) + ' / ' + rankRange + ' points';
+  } else {
+    if (progressLabel) progressLabel.textContent = 'MAX RANK!';
+    if (progressBar) progressBar.style.width = '100%';
+    if (progressText) progressText.textContent = 'Legendary Leader!';
+  }
+  
+  var rankSum = document.getElementById('sb-rank-sum');
+  if (rankSum) rankSum.textContent = rank.badge + ' ' + rank.title;
+  
+  // Update the badge canvas
+  _updateRankBadgeCanvas();
+}
 /* ══════════════════════════════════════════════════════════════
    DOM builder
 ══════════════════════════════════════════════════════════════ */
@@ -320,7 +389,7 @@ function _buildDOM() {
   var panel = document.createElement('div');
   panel.id = 'left-dashboard-panel';
   
-  /* Create the handle/tab button - PROMINENT AND VISIBLE */
+  /* Create the handle/tab button */
   var handle = document.createElement('div');
   handle.id = 'dashboard-handle';
   handle.className = 'dashboard-handle';
@@ -396,18 +465,44 @@ function _buildDOM() {
         '</div>' +
         '<div class="sb-activity">Nasasayang kapag puno ang imbakan.</div>' +
       '</div>' +
+    '</div>' +
+
+    /* 5 — RANK (with animated badge canvas - FIXED SIZING) */
+    '<div class="sb-section" id="sb-section-rank" onclick="window.openRankModal && window.openRankModal(window._VS)">' +
+      _sectionHead('rank', '🏆', 'RANK', 'sb-rank-sum') +
+      '<div class="sb-body" id="sb-body-rank">' +
+        '<div class="rank-display-with-badge">' +
+          '<div class="rank-badge-wrapper-dashboard">' +
+            '<canvas class="rank-badge-dashboard" id="sb-rank-badge-canvas" width="80" height="80" style="width: 80px; height: 80px; display: block;"></canvas>' +
+          '</div>' +
+          '<div class="rank-info-dashboard">' +
+            '<div class="rank-title-dashboard" id="sb-rank-title">Humble Start</div>' +
+            '<div class="rank-score-dashboard" id="sb-rank-score">0 pts</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="rank-progress-container" id="sb-rank-progress-container">' +
+          '<div class="rank-progress-label" id="sb-rank-progress-label">Next: Rising Leader</div>' +
+          '<div class="rank-progress-bar-bg">' +
+            '<div class="rank-progress-bar" id="sb-rank-progress-bar" style="width:0%"></div>' +
+          '</div>' +
+          '<div class="rank-progress-text" id="sb-rank-progress-text">0 / 100 points</div>' +
+        '</div>' +
+        '<div class="rank-bonus-info" id="sb-rank-bonus">✨ +0% approval bonus</div>' +
+        '<div class="rank-click-hint">📊 I-click para tingnan ang lahat ng ranggo</div>' +
+      '</div>' +
     '</div>';
 
   panel.appendChild(handle);
   panel.appendChild(content);
   container.appendChild(panel);
   
-  /* Log that panel was created */
-  console.log('[Dashboard] Panel created with handle');
+  // Store reference to rank canvas for animation
+  _rankCanvas = document.getElementById('sb-rank-badge-canvas');
+  
+  console.log('[Dashboard] Panel created with animated rank badge');
 }
-
 /* ══════════════════════════════════════════════════════════════
-   Styles - FIXED: Handle is now properly visible
+   Styles - With badge canvas styles
 ══════════════════════════════════════════════════════════════ */
 function _injectStyles() {
   if (document.getElementById('db-styles')) return;
@@ -416,16 +511,8 @@ function _injectStyles() {
   s.textContent = `
 /* ═══════════════════════════════════════════════════════════════
    DASHBOARD PANEL — Slide-out left panel
-   HANDLE IS PROMINENT AND VISIBLE ON ALL SCREENS
 ═══════════════════════════════════════════════════════════════ */
 
-/* Main panel container - sits behind handle initially */
-/* ═══════════════════════════════════════════════════════════════
-   DASHBOARD PANEL — Slide-out left panel
-   FIXED: Handle z-index properly layered with dashboard
-═══════════════════════════════════════════════════════════════ */
-
-/* Main panel container - sits behind handle initially */
 #left-dashboard-panel {
   position: fixed;
   left: 0;
@@ -443,13 +530,12 @@ function _injectStyles() {
   height: 100vh;
 }
 
-/* Panel when open */
 #left-dashboard-panel.open {
   width: 320px;
   pointer-events: all;
 }
 
-/* HANDLE BUTTON - Proper z-index layering */
+/* HANDLE BUTTON */
 .dashboard-handle {
   position: fixed;
   left: 0;
@@ -471,13 +557,11 @@ function _injectStyles() {
   box-shadow: 3px 0 12px rgba(0,0,0,0.4);
 }
 
-/* When panel is open, handle should be behind or at same level */
 #left-dashboard-panel.open .dashboard-handle {
   z-index: 902;
   left: 320px;
 }
 
-/* HOVER EFFECT - 20% LARGER THAN ORIGINAL */
 .dashboard-handle:hover {
   width: 58px;
   height: 96px;
@@ -501,9 +585,6 @@ function _injectStyles() {
   left: 310px;
   width: 54px;
   height: 86px;
-  background: linear-gradient(135deg, #3a2a1a 0%, #2a1a0a 100%);
-  border-color: #f5c842;
-  box-shadow: 3px 0 15px rgba(245,200,66,0.4);
 }
 
 .dashboard-handle .handle-inner {
@@ -514,39 +595,6 @@ function _injectStyles() {
   gap: 6px;
   width: 100%;
   transition: all 0.2s ease;
-}
-
-.dashboard-handle:hover .handle-inner {
-  transform: scale(1.05);
-}
-
-.dashboard-handle .handle-icon {
-  font-size: 24px;
-  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
-  transition: font-size 0.2s ease;
-}
-
-.dashboard-handle:hover .handle-icon {
-  font-size: 28px;
-}
-
-.dashboard-handle .handle-text {
-  font-family: 'Slackey', sans-serif;
-  font-size: 9px;
-  color: #f5c842;
-  letter-spacing: 0.08em;
-  font-weight: bold;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-  background: rgba(0,0,0,0.3);
-  padding: 2px 5px;
-  border-radius: 10px;
-  transition: all 0.2s ease;
-}
-
-.dashboard-handle:hover .handle-text {
-  font-size: 10px;
-  padding: 2px 6px;
-  background: rgba(0,0,0,0.5);
 }
 
 .dashboard-handle .handle-arrow {
@@ -565,7 +613,7 @@ function _injectStyles() {
   font-size: 18px;
 }
 
-/* Panel content - should be above handle when open */
+/* Panel content */
 .dashboard-content {
   position: relative;
   z-index: 903;
@@ -580,16 +628,8 @@ function _injectStyles() {
 .dashboard-content::-webkit-scrollbar {
   width: 4px;
 }
-.dashboard-content::-webkit-scrollbar-track {
-  background: #2a1808;
-  border-radius: 3px;
-}
-.dashboard-content::-webkit-scrollbar-thumb {
-  background: #c49a4e;
-  border-radius: 3px;
-}
 
-/* Header with close button */
+/* Header */
 .db-header {
   display: flex;
   align-items: center;
@@ -598,6 +638,7 @@ function _injectStyles() {
   margin-bottom: 10px;
   border-bottom: 2px solid #3a2a18;
 }
+
 .db-title {
   display: flex;
   align-items: center;
@@ -607,11 +648,13 @@ function _injectStyles() {
   color: #f5c842;
   letter-spacing: 0.08em;
 }
+
 .db-title span {
   font-size: 11px;
   color: #c49a4e;
   letter-spacing: 0.05em;
 }
+
 .db-close-btn {
   background: rgba(42,24,12,0.9);
   border: 1px solid #c49a4e;
@@ -625,50 +668,35 @@ function _injectStyles() {
   align-items: center;
   justify-content: center;
   transition: all 0.15s;
-  position: relative;
-  z-index: 904;
-}
-.db-close-btn:hover {
-  background: #5a3a2a;
-  border-color: #ffdd88;
-  transform: scale(1.05);
 }
 
 /* Section styles */
 .sb-section {
   border-top: 1px solid #2a1a0a;
   margin-bottom: 6px;
-  position: relative;
-  z-index: 903;
-}
-.sb-section.sb-corrupt {
-  border-left: 2px solid #7a2010;
-  padding-left: 5px;
-}
-.sb-section.sb-waste-alert {
-  border-left: 2px solid #7a3000;
-  padding-left: 5px;
+  cursor: pointer;
 }
 
-/* Section header */
 .sb-section-head {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 10px 6px 8px 4px;
-  cursor: pointer;
   background: rgba(26,18,8,0.3);
   user-select: none;
   transition: background 0.15s;
   border-radius: 6px;
 }
+
 .sb-section-head:hover {
   background: rgba(58,38,22,0.7);
 }
+
 .sb-section-icon {
   font-size: 14px;
   flex-shrink: 0;
 }
+
 .sb-section-title {
   font-family: 'Oldenburg', serif;
   font-size: 12px;
@@ -677,6 +705,7 @@ function _injectStyles() {
   flex: 1;
   font-weight: bold;
 }
+
 .sb-section-sum {
   font-size: 10px;
   color: #c49a4e;
@@ -684,18 +713,124 @@ function _injectStyles() {
   white-space: nowrap;
   margin-right: 3px;
 }
+
 .sb-section-toggle {
   font-size: 11px;
   color: #8a6030;
   flex-shrink: 0;
 }
 
-/* Section body */
 .sb-body {
   padding: 6px 6px 10px 12px;
+  display: block;
+}
+.sb-body {
+  overflow: visible !important;
 }
 
-/* Row */
+#sb-body-rank {
+  overflow: visible !important;
+}
+/* Rank Display with Badge */
+.rank-display-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #2a1a0a, #1a1208);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #c49a4e;
+  overflow: visible;
+}
+
+.rank-badge-dashboard {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.rank-info-dashboard {
+  flex: 1;
+  min-width: 0;
+}
+.rank-title-dashboard {
+  font-family: 'Slackey', sans-serif;
+  font-size: 14px;
+  color: #f5c842;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank-score-dashboard {
+  font-family: monospace;
+  font-size: 11px;
+  color: #88dd88;
+}
+
+/* Progress bar */
+.rank-progress-container {
+  margin: 12px 0;
+}
+
+.rank-progress-label {
+  font-size: 10px;
+  color: #c49a4e;
+  margin-bottom: 4px;
+}
+
+.rank-progress-bar-bg {
+  background: #2a1a10;
+  border-radius: 12px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.rank-progress-bar {
+  background: linear-gradient(90deg, #f5c842, #ffdd88);
+  height: 100%;
+  width: 0%;
+  transition: width 0.5s ease;
+  border-radius: 12px;
+}
+
+.rank-progress-text {
+  font-size: 9px;
+  color: #8a6a48;
+  margin-top: 4px;
+  text-align: center;
+  font-family: monospace;
+}
+
+.rank-bonus-info {
+  font-size: 10px;
+  color: #88dd88;
+  text-align: center;
+  padding: 6px;
+  background: rgba(68,170,68,0.1);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.rank-click-hint {
+  font-size: 9px;
+  color: #c49a4e;
+  text-align: center;
+  margin-top: 8px;
+  padding: 4px;
+  border-top: 1px solid #2a1a0a;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+#sb-section-rank:hover .rank-click-hint {
+  opacity: 1;
+  color: #f5c842;
+}
+
+/* Other rows */
 .sb-row {
   display: flex;
   align-items: center;
@@ -703,6 +838,7 @@ function _injectStyles() {
   margin-bottom: 6px;
   position: relative;
 }
+
 .sb-lbl {
   font-size: 11px;
   color: #b88c54;
@@ -712,6 +848,7 @@ function _injectStyles() {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .sb-bar-wrap {
   flex: 1;
   height: 5px;
@@ -719,6 +856,7 @@ function _injectStyles() {
   border-radius: 3px;
   overflow: hidden;
 }
+
 .sb-bar {
   height: 100%;
   width: 50%;
@@ -726,6 +864,7 @@ function _injectStyles() {
   border-radius: 3px;
   transition: width 0.4s ease, background 0.4s ease;
 }
+
 .sb-val {
   font-size: 11px;
   color: #f0e0b0;
@@ -733,18 +872,7 @@ function _injectStyles() {
   min-width: 55px;
   white-space: nowrap;
 }
-.sb-corrupt-val {
-  color: #e74c3c;
-}
-.sb-waste-high {
-  color: #e74c3c !important;
-  font-weight: bold;
-}
-.sb-waste-med {
-  color: #e67e22 !important;
-}
 
-/* Election row */
 .sb-election-row {
   display: flex;
   align-items: center;
@@ -754,7 +882,6 @@ function _injectStyles() {
   margin-top: 5px;
 }
 
-/* Activity / footer */
 .sb-activity {
   font-size: 10px;
   color: #8a6a48;
@@ -764,7 +891,6 @@ function _injectStyles() {
   margin-top: 5px;
 }
 
-/* Waste warning */
 .sb-waste-warn {
   font-size: 10px;
   color: #ffaa77;
@@ -776,7 +902,6 @@ function _injectStyles() {
   line-height: 1.4;
 }
 
-/* Floaters */
 .sb-floater {
   position: absolute;
   font-family: monospace;
@@ -788,226 +913,52 @@ function _injectStyles() {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
-/* Desktop larger text */
-@media (min-width: 1200px) {
-  #left-dashboard-panel.open {
-    width: 360px;
-  }
-  #left-dashboard-panel.open .dashboard-handle {
-    left: 360px;
-  }
-  .dashboard-handle.open:hover {
-    left: 348px;
-  }
-  .sb-lbl {
-    font-size: 12px;
-    width: 95px;
-  }
-  .sb-val {
-    font-size: 12px;
-    min-width: 62px;
-  }
-  .sb-section-title {
-    font-size: 13px;
-  }
-  .db-title {
-    font-size: 14px;
-  }
-  .dashboard-handle {
-    width: 52px;
-    height: 86px;
-  }
-  .dashboard-handle:hover {
-    width: 62px;
-    height: 103px;
-  }
-}
-
-/* Mobile devices - ENHANCED RESPONSIVENESS */
+/* Mobile responsive */
 @media (max-width: 768px) {
   #left-dashboard-panel.open {
     width: 280px;
   }
-  
   #left-dashboard-panel.open .dashboard-handle {
     left: 280px;
   }
-  
-  .dashboard-handle {
-    width: 44px;
-    height: 72px;
+  .rank-badge-dashboard {
+    width: 60px !important;
+    height: 60px !important;
   }
-  
-  .dashboard-handle:hover {
-    width: 53px;
-    height: 86px;
+  .rank-title-dashboard {
+    font-size: 12px;
   }
-  
-  .dashboard-handle.open {
-    left: 280px;
-    width: 40px;
-    height: 64px;
-  }
-  
-  .dashboard-handle.open:hover {
-    left: 270px;
-    width: 48px;
-    height: 77px;
-  }
-  
   .sb-lbl {
     width: 75px;
     font-size: 10px;
   }
-  
   .sb-val {
     min-width: 50px;
     font-size: 10px;
   }
-  
-  .sb-section-title {
-    font-size: 11px;
-  }
-  
-  .db-title {
-    font-size: 12px;
-  }
-  
-  .db-title span {
-    font-size: 10px;
+      .rank-display-with-badge {
+    gap: 12px;
+    padding: 10px;
   }
 }
 
-/* Small mobile devices */
 @media (max-width: 480px) {
   #left-dashboard-panel.open {
     width: 260px;
   }
-  
   #left-dashboard-panel.open .dashboard-handle {
     left: 260px;
   }
-  
-  .dashboard-handle {
-    width: 40px;
-    height: 65px;
+  .rank-badge-dashboard {
+    width: 50px !important;
+    height: 50px !important;
   }
-  
-  .dashboard-handle:hover {
-    width: 48px;
-    height: 78px;
+  .rank-title-dashboard {
+    font-size: 11px;
   }
-  
-  .dashboard-handle.open {
-    left: 260px;
-    width: 36px;
-    height: 58px;
-  }
-  
-  .dashboard-handle.open:hover {
-    left: 250px;
-    width: 43px;
-    height: 70px;
-  }
-  
-  .sb-lbl {
-    width: 68px;
-    font-size: 9px;
-  }
-  
-  .sb-val {
-    min-width: 45px;
-    font-size: 9px;
-  }
-  
-  .sb-section-title {
-    font-size: 10px;
-  }
-  
-  .sb-section-icon {
-    font-size: 12px;
-  }
-  
-  .db-header {
-    padding: 4px 4px 10px 4px;
-  }
-}
-
-/* Mobile landscape adjustments */
-@media (max-height: 550px) and (orientation: landscape) {
-  #left-dashboard-panel.open {
-    width: 260px;
-  }
-  
-  #left-dashboard-panel.open .dashboard-handle {
-    left: 260px;
-  }
-  
-  .dashboard-handle {
-    width: 38px;
-    height: 60px;
-  }
-  
-  .dashboard-handle:hover {
-    width: 46px;
-    height: 72px;
-  }
-  
-  .dashboard-handle.open {
-    left: 260px;
-    width: 34px;
-    height: 54px;
-  }
-  
-  .dashboard-handle.open:hover {
-    left: 252px;
-    width: 41px;
-    height: 65px;
-  }
-  
-  .sb-section-head {
-    padding: 6px 4px 5px;
-  }
-  
-  .sb-body {
-    padding: 4px 4px 6px 8px;
-  }
-  
-  .sb-row {
-    margin-bottom: 4px;
-  }
-  
-  .sb-lbl {
-    font-size: 9px;
-    width: 65px;
-  }
-  
-  .sb-val {
-    font-size: 9px;
-    min-width: 45px;
-  }
-}
-
-/* Touch devices — larger tap target */
-@media (hover: none) and (pointer: coarse) {
-  .dashboard-handle {
-    width: 48px;
-    height: 80px;
-  }
-  
-  .dashboard-handle:active {
-    width: 58px;
-    height: 96px;
-    transform: translateY(-50%) scale(0.98);
-  }
-  
-  .sb-section-head {
-    padding: 12px 8px;
-  }
-  
-  .db-close-btn {
-    width: 32px;
-    height: 32px;
+      .rank-display-with-badge {
+    gap: 10px;
+    padding: 8px;
   }
 }
   `;

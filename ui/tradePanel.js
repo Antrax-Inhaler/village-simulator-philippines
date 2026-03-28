@@ -320,7 +320,7 @@ function _injectStyles() {
     '.tp-gold-row{font-size:13px; color:#6a5030; margin-top:2px;}',
     '.tp-pending-row{',
     '  font-size:14px; color:#c8a878;',
-    '  display:flex; flex-direction:column; gap:3px; margin-bottom:6px;',
+  '  display:flex; flex-direction:column; gap:3px; margin-bottom:6px;',
     '}',
     '.tp-pending-row>:first-child{display:flex; justify-content:space-between;}',
     '.tp-eta{font-family:monospace; font-size:13px; color:#4a8fc4;}',

@@ -76,6 +76,7 @@ export function renderFrame(canvas, ctx, state) {
   drawTimeOverlay(ctx, VW, VH, state.VS.time);
   drawHUD(ctx, state.VS, VW);
   drawZoomBadge(ctx, VW, VH);
+  drawRankBadge(ctx, VW, VH, state.VS);  // ADDED: Call rank badge drawing
   updateBarUI(state.VS, state.dayCount);
   updateBubblePositions(canvas, state.activeBubbles, state.VW, state.VH);
 
@@ -388,6 +389,52 @@ export function drawZoomBadge(ctx, VW, VH) {
   ctx.textBaseline = 'middle';
   ctx.fillText('🔍 ' + cam.zoom.toFixed(1) + 'x', x + 10, y + badgeHeight/2);
   ctx.restore();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   drawRankBadge
+   Draws the player's current rank and score at the bottom center.
+══════════════════════════════════════════════════════════════ */
+function drawRankBadge(ctx, VW, VH, VS) {
+  if (!VS || !VS.rank) return;
+  
+  // Import ranking functions dynamically
+  import('../ranking/rankingSystem.js').then(module => {
+    const rank = module.getRankFromScore(VS.rank.score);
+    
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.shadowBlur = 0;
+    
+    const isMobile = VW < 768;
+    const bottomMargin = isMobile ? 60 : 70;
+    const x = (VW / 2) - 65;
+    const y = VH - bottomMargin;
+    
+    const badgeWidth = 130;
+    const badgeHeight = 28;
+    
+    ctx.fillStyle = 'rgba(26, 18, 8, 0.85)';
+    ctx.strokeStyle = '#c49a4e';
+    ctx.lineWidth = 1;
+    rrect(ctx, x, y, badgeWidth, badgeHeight, 20);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#f5c842';
+    ctx.font = 'bold 11px "Oldenburg",serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${rank.badge} ${rank.title}`, x + 8, y + badgeHeight/2);
+    
+    ctx.fillStyle = '#88dd88';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText(`${Math.floor(VS.rank.score)} pts`, x + badgeWidth - 38, y + badgeHeight/2);
+    
+    ctx.restore();
+  }).catch(err => {
+    console.warn('[renderer] Failed to load ranking module:', err);
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════

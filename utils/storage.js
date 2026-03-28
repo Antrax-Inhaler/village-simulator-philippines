@@ -8,6 +8,7 @@
    - Uncollected langis in buildings
    - Langis resource nodes
    - All new citizen stats
+   - RANKING SYSTEM (score, history, previousDayStats)
 ═══════════════════════════════════════════════════════════════ */
 
 var SAVE_KEY      = 'miniBayan_save';
@@ -100,6 +101,28 @@ function _serializeDebt(debt) {
   };
 }
 
+/* ── Ranking serialisation (NEW) ──────────────────────────── */
+function _serializeRank(rank) {
+  if (!rank) return null;
+  return {
+    score:            rank.score || 0,
+    history:          (rank.history || []).slice(),
+    lastRankId:       rank.lastRankId || 1,
+    previousDayStats: rank.previousDayStats ? {
+      avgApproval:     rank.previousDayStats.avgApproval,
+      population:      rank.previousDayStats.population,
+      employed:        rank.previousDayStats.employed,
+      buildings:       rank.previousDayStats.buildings,
+      totalLevels:     rank.previousDayStats.totalLevels,
+      tradeProfit:     rank.previousDayStats.tradeProfit,
+      corruption:      rank.previousDayStats.corruption,
+      waste:           rank.previousDayStats.waste,
+      resolvedEvents:  rank.previousDayStats.resolvedEvents,
+      damagedBuildings: rank.previousDayStats.damagedBuildings
+    } : null
+  };
+}
+
 /* ── Corruption serialisation (unchanged) ─────────────────── */
 function _serializeCorruption(c) {
   if (!c) return null;
@@ -185,7 +208,7 @@ export function saveGame(VS, dayCount, slotKey, personalFinance) {
   try {
     var pf = personalFinance || { playerGold: 0, playerRice: 0, corruptionHistory: [] };
     var state = {
-      version:            5,  // Incremented version for debt and new fields
+      version:            6,  // Incremented version for ranking system
       savedAt:            Date.now(),
       dayCount:           dayCount,
       time:               VS.time,
@@ -202,6 +225,7 @@ export function saveGame(VS, dayCount, slotKey, personalFinance) {
       trade:              _serializeTrade(VS.trade),
       needs:              _serializeNeeds(VS.needs),
       debt:               _serializeDebt(VS.debt),          // NEW
+      rank:               _serializeRank(VS.rank),          // NEW - Ranking system
       unlockedZones:      (VS.unlockedZones || []).slice(),
       food:               VS.food ? Object.assign({}, VS.food) : null,
       /* Personal finance */
@@ -215,7 +239,7 @@ export function saveGame(VS, dayCount, slotKey, personalFinance) {
     console.warn('[storage] saveGame failed:', e.message);
     try {
       var minimal = {
-        version: 5, savedAt: Date.now(), dayCount: dayCount, time: VS.time,
+        version: 6, savedAt: Date.now(), dayCount: dayCount, time: VS.time,
         res: Object.assign({}, VS.res), resCap: Object.assign({}, VS.resCap),
         pop: Object.assign({}, VS.pop), villagers: [],
         buildings: _serializeBuildings(VS.buildings),
@@ -223,7 +247,7 @@ export function saveGame(VS, dayCount, slotKey, personalFinance) {
         corruption: _serializeCorruption(VS.corruption),
         policies: _serializePolicies(VS.policies),
         election: _serializeElection(VS.election),
-        events: null, trade: null, needs: null, debt: null,
+        events: null, trade: null, needs: null, debt: null, rank: null,
         unlockedZones: (VS.unlockedZones || []).slice(), food: null,
         playerGold: 0, playerRice: 0, corruptionHistory: [],
       };
@@ -243,12 +267,32 @@ export function loadGame(slotKey) {
     if (!raw) return null;
     var state = JSON.parse(raw);
     if (!state || !state.version) console.warn('[storage] Save has no version tag.');
-    if (state.version < 5) state = _upgradeToV5(state);
+    if (state.version < 6) state = _upgradeToV6(state);
     return state;
   } catch (e) {
     console.error('[storage] loadGame failed:', e.message);
     return null;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Upgrade to V6 (adds ranking system)
+══════════════════════════════════════════════════════════════ */
+function _upgradeToV6(s) {
+  // Upgrade from v5 to v6
+  if (s.version < 6) {
+    // Add ranking system
+    if (!s.rank) {
+      s.rank = {
+        score: 0,
+        history: [],
+        lastRankId: 1,
+        previousDayStats: null
+      };
+    }
+    s.version = 6;
+  }
+  return s;
 }
 
 /* ══════════════════════════════════════════════════════════════

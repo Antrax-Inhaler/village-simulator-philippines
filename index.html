@@ -29,17 +29,23 @@
   </div>
 
   <!-- Splash -->
-  <div id="splash">
-    <div id="splash-inner">
-      <div id="splash-deco">🌴</div>
-      <h1 id="splash-title">Ating Bayan</h1>
-      <p id="splash-sub">Isang Nayon, Isang Puso — A Village, One Heart</p>
+<div id="splash">
+  <div id="splash-inner">
+    <div id="splash-deco">🌴</div>
+    <h1 id="splash-title">Ating Bayan</h1>
+    <p id="splash-sub">Isang Nayon, Isang Puso — A Village, One Heart</p>
+    <div id="loading-container">
+      <div id="loading-bar"><div id="loading-progress"></div></div>
+      <p id="loading-text">Naglo-load...</p>
+    </div>
+    <div id="button-container" style="display:none;">
       <button id="btnContinue" style="display:none">▶ Ituloy ang Laro</button>
       <button id="btnStart">🌴 Bagong Laro</button>
-      <p id="splash-hint">I-click ang villager o gusali para makita ang impormasyon</p>
-      <p id="splash-save-info"></p>
     </div>
+    <p id="splash-hint">I-click ang villager o gusali para makita ang impormasyon</p>
+    <p id="splash-save-info"></p>
   </div>
+</div>
 
   <!-- Game Wrapper -->
   <div id="game-wrap">
@@ -259,6 +265,33 @@
     }
     document.getElementById('btnContinue').addEventListener('click', function() { _launch(true); });
     document.getElementById('btnStart').addEventListener('click', function() { _launch(false); });
+    // After checking for save, simulate loading for 1.2 seconds
+var btnCont = document.getElementById('btnContinue');
+var btnStart = document.getElementById('btnStart');
+var loadingContainer = document.getElementById('loading-container');
+var buttonContainer = document.getElementById('button-container');
+var progressBar = document.getElementById('loading-progress');
+var loadingText = document.getElementById('loading-text');
+
+function finishLoading() {
+  loadingContainer.style.display = 'none';
+  buttonContainer.style.display = 'block';
+  if (save && btnCont) btnCont.style.display = 'block';
+  if (infoEl && save) infoEl.textContent = (isAuto ? 'Auto-save' : 'Naligtas') + ': Araw ' + day + (date ? '  •  ' + date : '');
+}
+
+// Animate progress bar
+var startTime = Date.now();
+var duration = 1200; // 1.2 seconds
+var interval = setInterval(function() {
+  var elapsed = Date.now() - startTime;
+  var percent = Math.min(100, (elapsed / duration) * 100);
+  progressBar.style.width = percent + '%';
+  if (percent >= 100) {
+    clearInterval(interval);
+    finishLoading();
+  }
+}, 16);
   })();
   </script>
 

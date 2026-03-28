@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — main.js  (with Debt System)
+   Mini Bayan — main.js  (with Debt System & Resource Shortage Quips)
 ═══════════════════════════════════════════════════════════════ */
 
 import { ZONE_DEFS, getZoneAt, isZoneUnlocked, purchaseZone, drawZoneGrid, canBuildInZone, getZoneProductionMult } from './world/zones.js';
@@ -40,6 +40,13 @@ import { applyPolicies, getPolicyState, activatePolicy, deactivatePolicy } from 
 import { tickElection, getElectionState } from './government/election.js';
 import { tickEvents, setEventDayCount, getActiveCalamity } from './government/events.js';
 import { initPersonalFinance, serializePersonalFinance, resetPersonalFinance } from './government/personalFinance.js';
+import { openRankModal } from './ui/rankModal.js';
+
+// Import ranking system
+import { 
+  RANKS, getRankFromScore, getNextRank, 
+  calculateDailyScore, showDailyReport, showRankUpBanner 
+} from './ranking/rankingSystem.js';
 
 var canvas, ctx;
 var VW = 0, VH = 0;
@@ -61,7 +68,7 @@ var VS = {
   buildings: [],
   resourceNodes: [],
   waypoints: { all: [], mines: [], buildings: [] },
-  res: { gold: 800, rice: 500, langis: 20 },
+  res: { gold: 800, rice: 500, langis: 1000 },
   resCap: { gold: 2000, rice: 1500, langis: 800 },
   pop: { cur: 0, max: 30 },
   time: 12,
@@ -75,7 +82,13 @@ var VS = {
   economy: null,
   unlockedZones: [],
   food: { pool: 200, consumption: 0, buffer: 0 },
-  debt: null,  // Will be initialized by initDebt
+  debt: null,
+  rank: {
+    score: 0,
+    history: [],
+    lastRankId: 1,
+    previousDayStats: null
+  }
 };
 
 var _drawer = {
@@ -149,7 +162,11 @@ function gameLoop(ts) {
 function update(dt) {
   var prevH = Math.floor(VS.time);
   VS.time = advanceTime(dt, VS.time);
-  if (Math.floor(VS.time) < prevH) { dayCount++; _onNewDay(); }
+  if (Math.floor(VS.time) < prevH) { 
+    dayCount++; 
+    _onNewDay();
+    _calculateDailyRankScore();  // Calculate rank score at day change
+  }
 
   if (VS.time >= 18.0 && _lastNightSetup !== dayCount) {
     _lastNightSetup = dayCount;
@@ -246,6 +263,116 @@ function update(dt) {
     checkAndEmit(VS);
     refreshTradePanel(VS);
   }
+}
+
+/* ── Daily Rank Score Calculation ───────────────────────────────── */
+function _calculateDailyRankScore() {
+  // Initialize previous day stats if not exists
+  if (!VS.rank.previousDayStats) {
+    VS.rank.previousDayStats = {
+      avgApproval: _avgHappiness(),
+      population: VS.villagers.length,
+      employed: VS.villagers.filter(v => v.workBuilding).length,
+      buildings: VS.buildings.filter(b => !b.underConstruction).length,
+      totalLevels: VS.buildings.reduce((sum, b) => sum + (b.level || 1), 0),
+      tradeProfit: VS.trade?.todayProfit || 0,
+      corruption: VS.corruption?.exposureLevel || 0,
+      waste: _getWasteTotal(),
+      resolvedEvents: VS.events?.resolvedToday || 0,
+      damagedBuildings: VS.events?.damagedBuildingsToday || 0
+    };
+    return;
+  }
+  
+  // Calculate daily score
+  const result = calculateDailyScore(VS, VS.rank.previousDayStats);
+  const previousScore = VS.rank.score;
+  const newScore = previousScore + result.dailyScore;
+  const oldRank = getRankFromScore(previousScore);
+  const newRank = getRankFromScore(Math.max(0, newScore));
+  
+  // Update score (cannot go below 0)
+  VS.rank.score = Math.max(0, newScore);
+  
+  // Store history
+  VS.rank.history.unshift({
+    day: dayCount,
+    score: result.dailyScore,
+    total: VS.rank.score,
+    breakdown: result.breakdown
+  });
+  if (VS.rank.history.length > 30) VS.rank.history.pop();
+  
+  // Show daily report banner
+  showDailyReport(
+    dayCount, 
+    result.dailyScore, 
+    result.breakdown, 
+    previousScore, 
+    VS.rank.score, 
+    oldRank, 
+    getNextRank(VS.rank.score)
+  );
+  
+  // Check for rank up
+  if (newRank.id > oldRank.id) {
+    VS.rank.lastRankId = newRank.id;
+    showRankUpBanner(oldRank, newRank);
+    _onRankUp(newRank, oldRank);
+  }
+  
+  // Save current stats for next day
+  VS.rank.previousDayStats = result.newStats;
+}
+
+function _avgHappiness() {
+  if (!VS.villagers.length) return 50;
+  let s = 0;
+  VS.villagers.forEach(v => { s += v.happiness || 50; });
+  return s / VS.villagers.length;
+}
+
+function _getWasteTotal() {
+  let waste = 0;
+  if (VS.res.gold > VS.resCap.gold) waste += VS.res.gold - VS.resCap.gold;
+  if (VS.res.rice > VS.resCap.rice) waste += VS.res.rice - VS.resCap.rice;
+  if (VS.res.langis > VS.resCap.langis) waste += VS.res.langis - VS.resCap.langis;
+  return waste;
+}
+
+function _onRankUp(newRank, oldRank) {
+  // Apply rank bonuses
+  if (newRank.bonus > 0) {
+    VS.villagers.forEach(v => {
+      v.happiness = Math.min(100, (v.happiness || 50) + newRank.bonus);
+    });
+    showMsg(`🎉 Rank up! +${newRank.bonus}% approval bonus!`);
+  }
+  
+  // Unlock new building types based on rank
+  if (newRank.id >= 3) {
+    if (!window._unlockedBuildingTypes) window._unlockedBuildingTypes = [];
+    if (!window._unlockedBuildingTypes.includes('palengke')) {
+      window._unlockedBuildingTypes.push('palengke');
+      showMsg('🏪 Bagong gusali: Palengke!');
+    }
+  }
+  if (newRank.id >= 4) {
+    if (!window._unlockedBuildingTypes.includes('school')) {
+      window._unlockedBuildingTypes.push('school');
+      showMsg('📚 Bagong gusali: Paaralan!');
+    }
+  }
+  if (newRank.id >= 5) {
+    if (!window._unlockedBuildingTypes.includes('hospital')) {
+      window._unlockedBuildingTypes.push('hospital');
+      showMsg('🏥 Bagong gusali: Ospital!');
+    }
+  }
+  
+  // Play rank up sound if available
+  const rankUpAudio = document.getElementById('sfx-unlock');
+  if (rankUpAudio) rankUpAudio.play().catch(() => {});
 }
 
 function _recalcCaps() {
@@ -350,7 +477,6 @@ window._makeDebtPayment = function(amount) {
   if (makeDebtPayment) {
     makeDebtPayment(amount, VS, showMsg);
   } else {
-    // Fallback manual implementation
     if (VS.res.gold < amount) {
       showMsg('Kulang ang ginto!', 'danger');
       return false;
@@ -371,14 +497,13 @@ window._takeLoan = function(amount) {
   if (takeLoan) {
     takeLoan(amount, VS, showMsg);
   } else {
-    // Fallback manual implementation
     if (VS.debt && VS.debt.defaulted) {
       showMsg('Hindi ka na pwedeng umutang dahil sa nakaraang hindi pagbabayad.', 'danger');
       return false;
     }
-    var maxLoan = 1000;
+    var maxLoan = getMaxLoanAmount(VS);
     if (amount > maxLoan) {
-      showMsg(`Ang maximum na pwedeng utangin ay ${maxLoan} 🪙.`, 'warning');
+      showMsg(`Ang maximum na pwedeng utangin ay ${maxLoan} 🪙 batay sa credit score.`, 'warning');
       return false;
     }
     if (!VS.debt) VS.debt = { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] };
@@ -452,24 +577,27 @@ window.triggerSave = function() {
 };
 
 window.triggerLoad = function() {
-  var s = loadGame();
-  if (!s) { showMsg('Walang na-save.'); return; }
+  var savedState = loadGame();
+  if (!savedState) { showMsg('Walang na-save.'); return; }
   closeDrawer();
-  VS.res = s.res || VS.res;
-  VS.resCap = s.resCap || VS.resCap;
-  VS.pop = s.pop || VS.pop;
-  VS.time = s.time !== undefined ? s.time : VS.time;
-  dayCount = s.dayCount || 1;
-  VS.unlockedZones = s.unlockedZones || [];
-  if (s.corruption) VS.corruption = s.corruption;
-  if (s.policies) VS.policies = s.policies;
-  if (s.election) VS.election = s.election;
-  if (s.food) VS.food = s.food;
-  if (s.debt) VS.debt = s.debt;  // Load debt data
-  if (s.villagers && s.villagers.length) VS.villagers = rebuildVillagersFromSave(s.villagers);
-  if (s.buildings && s.buildings.length) VS.buildings = rebuildFromSave(s.buildings);
-  if (s.resourceNodes && s.resourceNodes.length) {
-    VS.resourceNodes = s.resourceNodes.map(function(d) {
+  VS.res = savedState.res || VS.res;
+  VS.resCap = savedState.resCap || VS.resCap;
+  VS.pop = savedState.pop || VS.pop;
+  VS.time = savedState.time !== undefined ? savedState.time : VS.time;
+  dayCount = savedState.dayCount || 1;
+  VS.unlockedZones = savedState.unlockedZones || [];
+  if (savedState.corruption) VS.corruption = savedState.corruption;
+  if (savedState.policies) VS.policies = savedState.policies;
+  if (savedState.election) VS.election = savedState.election;
+  if (savedState.food) VS.food = savedState.food;
+  if (savedState.debt) VS.debt = savedState.debt;
+  if (savedState.trade) VS.trade = savedState.trade;
+  if (savedState.needs) VS.needs = savedState.needs;
+  if (savedState.rank) VS.rank = savedState.rank;  // Load rank data
+  if (savedState.villagers && savedState.villagers.length) VS.villagers = rebuildVillagersFromSave(savedState.villagers);
+  if (savedState.buildings && savedState.buildings.length) VS.buildings = rebuildFromSave(savedState.buildings);
+  if (savedState.resourceNodes && savedState.resourceNodes.length) {
+    VS.resourceNodes = savedState.resourceNodes.map(function(d) {
       var n = new ResourceNode(d.type, d.x, d.y);
       n.id = d.id;
       n.amount = d.amount !== undefined ? d.amount : n.capacity;
@@ -480,18 +608,18 @@ window.triggerLoad = function() {
   assignHomes(VS.villagers, VS.buildings);
   assignWork(VS.villagers, VS.buildings);
   _recalcCaps();
-  if (s.playerGold !== undefined) {
+  if (savedState.playerGold !== undefined) {
     initPersonalFinance({
       VS: VS,
       showMsg: showMsg,
-      savedPlayerGold: s.playerGold || 0,
-      savedPlayerRice: s.playerRice || 0,
-      savedCorruptionHistory: s.corruptionHistory || [],
+      savedPlayerGold: savedState.playerGold || 0,
+      savedPlayerRice: savedState.playerRice || 0,
+      savedCorruptionHistory: savedState.corruptionHistory || [],
     });
   }
   showMsg('Na-load! Araw ' + dayCount);
 };
-
+window.openRankModal = openRankModal;
 function updateCanvasSizeForDevice() {
   if (!canvas) return;
   canvas.width = WORLD_W;
