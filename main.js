@@ -45,8 +45,11 @@ import { openRankModal } from './ui/rankModal.js';
 // Import ranking system
 import { 
   RANKS, getRankFromScore, getNextRank, 
-  calculateDailyScore, showDailyReport, showRankUpBanner 
+  calculateDailyScore, showRankUpBanner 
 } from './ranking/rankingSystem.js';
+
+// Import new daily report UI
+import { showDayCount, showDailyReport } from './ui/dailyReport.js';
 
 var canvas, ctx;
 var VW = 0, VH = 0;
@@ -165,7 +168,7 @@ function update(dt) {
   if (Math.floor(VS.time) < prevH) { 
     dayCount++; 
     _onNewDay();
-    _calculateDailyRankScore();  // Calculate rank score at day change
+    _calculateDailyRankScore();  // Calculate rank score at day change (async)
   }
 
   if (VS.time >= 18.0 && _lastNightSetup !== dayCount) {
@@ -265,8 +268,8 @@ function update(dt) {
   }
 }
 
-/* ── Daily Rank Score Calculation ───────────────────────────────── */
-function _calculateDailyRankScore() {
+/* ── Daily Rank Score Calculation with New UI ───────────────────────────────── */
+async function _calculateDailyRankScore() {
   // Initialize previous day stats if not exists
   if (!VS.rank.previousDayStats) {
     VS.rank.previousDayStats = {
@@ -303,18 +306,13 @@ function _calculateDailyRankScore() {
   });
   if (VS.rank.history.length > 30) VS.rank.history.pop();
   
-  // Show daily report banner
-  showDailyReport(
-    dayCount, 
-    result.dailyScore, 
-    result.breakdown, 
-    previousScore, 
-    VS.rank.score, 
-    oldRank, 
-    getNextRank(VS.rank.score)
-  );
+  // Show day count overlay first (3 seconds)
+  await showDayCount(dayCount);
   
-  // Check for rank up
+  // Then show daily report with the new minimal design
+  await showDailyReport(VS, dayCount, result, previousScore, VS.rank.score, oldRank, getNextRank(VS.rank.score));
+  
+  // Check for rank up after report is closed
   if (newRank.id > oldRank.id) {
     VS.rank.lastRankId = newRank.id;
     showRankUpBanner(oldRank, newRank);
@@ -620,6 +618,35 @@ window.triggerLoad = function() {
   showMsg('Na-load! Araw ' + dayCount);
 };
 window.openRankModal = openRankModal;
+
+// Debug function to test the report
+window.debugShowReport = async function() {
+  const oldRank = getRankFromScore(VS.rank.score);
+  const nextRank = getNextRank(VS.rank.score);
+  const mockResult = {
+    dailyScore: 18,
+    breakdown: {
+      positive: [
+        { label: 'Kasiyahan', change: 3.5, detail: '65% → 72%' },
+        { label: 'Populasyon', change: 16, detail: '+8 bagong mamamayan' },
+        { label: 'Bagong Gusali', change: 8, detail: '2 farms, 1 palengke' },
+        { label: 'Kalakalan', change: 5, detail: '+500🪙 profit' }
+      ],
+      negative: [
+        { label: 'Korapsyon', change: -12, detail: 'exposure +24%' },
+        { label: 'Nasayang', change: -3, detail: '1,500 resources' }
+      ]
+    }
+  };
+  await showDailyReport(VS, dayCount, mockResult, VS.rank.score, VS.rank.score + 18, oldRank, nextRank);
+};
+
+window.debugShowDayCount = async function() {
+  await showDayCount(dayCount);
+};
+
+console.log('Debug commands: debugShowReport(), debugShowDayCount()');
+
 function updateCanvasSizeForDevice() {
   if (!canvas) return;
   canvas.width = WORLD_W;

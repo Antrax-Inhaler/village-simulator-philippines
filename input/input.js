@@ -2,6 +2,7 @@
    Mini Bayan — input/input.js
    INPUT SYSTEM — fixed panning at all zoom levels, uses WORLD_W/H
    FIXED: Proper canvas coordinate scaling for mouse/touch events
+   FIXED: Added langis collection from resource bubbles
 ═══════════════════════════════════════════════════════════════ */
 
 import { perspScale, clamp, dist } from '../utils/perspective.js';
@@ -330,7 +331,7 @@ function _processClick(sx, sy) {
   const VS  = _deps.VS;
   const VT  = _deps.VILLAGER_TYPES;
 
-  /* Resource bubbles */
+  /* Resource bubbles - GOLD */
   for (var bc = 0; bc < VS.buildings.length; bc++) {
     const bld2 = VS.buildings[bc];
     const sc2  = perspScale(bld2.y);
@@ -344,6 +345,13 @@ function _processClick(sx, sy) {
         return;
       }
     }
+  }
+
+  /* Resource bubbles - RICE */
+  for (var bc = 0; bc < VS.buildings.length; bc++) {
+    const bld2 = VS.buildings[bc];
+    const sc2  = perspScale(bld2.y);
+    const bh2  = bld2.h * sc2;
     if ((bld2.uncollectedFood || 0) >= 5) {
       const bw2   = bld2.w * sc2;
       const fxOff = bld2.uncollectedGold >= 5 ? bw2 * 0.7 : 0;
@@ -353,6 +361,44 @@ function _processClick(sx, sy) {
         VS.res.rice = Math.min(VS.resCap.rice, VS.res.rice + Math.floor(foodAmt * 0.5));
         bld2.uncollectedFood = 0;
         _deps.showMsg('+' + foodAmt + ' 🌾 pagkain nakolekta!');
+        return;
+      }
+    }
+  }
+
+  /* Resource bubbles - LANGIS (FIXED) */
+  for (var bc = 0; bc < VS.buildings.length; bc++) {
+    const bld2 = VS.buildings[bc];
+    const sc2  = perspScale(bld2.y);
+    const bh2  = bld2.h * sc2;
+    
+    if ((bld2.uncollectedLangis || 0) >= 5) {
+      const bw2 = bld2.w * sc2;
+      let xOff = 0;
+      
+      // Determine offset based on other indicators (matches building.js draw logic)
+      const hasGold = (bld2.uncollectedGold || 0) >= 5;
+      const hasFood = (bld2.uncollectedFood || 0) >= 5;
+      
+      if (hasGold && hasFood) {
+        xOff = -bw2 * 0.5;
+      } else if (hasGold) {
+        xOff = bw2 * 0.35;
+      } else if (hasFood) {
+        xOff = -bw2 * 0.35;
+      }
+      
+      // Langis indicator position with bob animation (matches building.js)
+      const bobL = Math.sin(Date.now() / 800 + bld2.x + 2) * 3 * sc2;
+      const indicatorX = bld2.x + xOff;
+      const indicatorY = bld2.y - bh2 * 1.55 + bobL;
+      const radius = 18 * sc2;
+      
+      if (dist(wp2.x, wp2.y, indicatorX, indicatorY) < radius) {
+        const langisAmt = Math.floor(bld2.uncollectedLangis);
+        VS.res.langis = Math.min(VS.resCap.langis, (VS.res.langis || 0) + langisAmt);
+        bld2.uncollectedLangis = 0;
+        _deps.showMsg('+' + langisAmt + ' ⛽ langis nakolekta!');
         return;
       }
     }

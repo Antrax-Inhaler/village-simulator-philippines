@@ -1,7 +1,7 @@
-// FILE: ranking/rankBadges.js (with transparent backgrounds)
+// FILE: ranking/rankBadges.js (with transparent backgrounds + restored glow & animations)
 /* ═══════════════════════════════════════════════════════════════
    Mini Bayan — Rank Badge Drawer (Transparent Backgrounds)
-   Beautiful animated badges with transparent backgrounds
+   Restored glowing effects, bottom reflections, and float animations
 ═══════════════════════════════════════════════════════════════ */
 
 const S = 160; // Badge canvas size
@@ -51,35 +51,86 @@ function diamond(ctx, cx, cy, w, h) {
   ctx.closePath();
 }
 
-function glowRing(ctx, cx, cy, r, col, alpha, lw) {
+// Enhanced glow ring with multiple layers
+function glowRing(ctx, cx, cy, r, col, alpha, lw, blur = 14) {
   ctx.save();
   ctx.globalAlpha = alpha || 0.4;
   ctx.strokeStyle = col;
   ctx.lineWidth = lw || 1.5;
   ctx.shadowColor = col;
-  ctx.shadowBlur = 14;
+  ctx.shadowBlur = blur;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
 
+// Multiple glowing rings like the HTML version
+function glowRings(ctx, cx, cy, r, col) {
+  glowRing(ctx, cx, cy, r, col, 0.55, 2.5);
+  glowRing(ctx, cx, cy, r + 5, col, 0.2, 1);
+  glowRing(ctx, cx, cy, r + 10, col, 0.08, 1);
+}
+
+// Bottom reflection/shadow like HTML
+function bottomGlow(ctx, cx, cy, r, col, t) {
+  ctx.save();
+  let pulse = 0.25 + Math.sin(t * 1.5) * 0.1;
+  let grad = ctx.createRadialGradient(cx, cy + r * 0.6, r * 0.2, cx, cy + r * 0.8, r * 0.8);
+  grad.addColorStop(0, col.replace(')', ',' + (pulse * 0.6) + ')').replace('rgb', 'rgba'));
+  grad.addColorStop(0.6, col.replace(')', ',' + (pulse * 0.3) + ')').replace('rgb', 'rgba'));
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + r * 0.7, r * 0.7, r * 0.25, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function innerPanel(ctx, cx, cy, r, bg, rimCol) {
-  // Make background more transparent - use radial gradient that fades to fully transparent
   let ig = ctx.createRadialGradient(cx, cy - r * 0.3, r * 0.05, cx, cy, r);
-  ig.addColorStop(0, bg + 'cc');  // Slightly more opaque at center
-  ig.addColorStop(0.7, bg + '66'); // More transparent towards edge
-  ig.addColorStop(1, 'rgba(0,0,0,0)'); // Fully transparent at outer edge
+  ig.addColorStop(0, bg + 'dd');
+  ig.addColorStop(0.7, bg + '88');
+  ig.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = ig;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = rimCol;
   ctx.lineWidth = 1.5;
-  ctx.globalAlpha = 0.4;  // More transparent rim
+  ctx.globalAlpha = 0.5;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.globalAlpha = 1;
+  // Engrave effect like HTML
+  engrave(ctx, cx, cy, r - 2, rimCol, 3, 0.5);
+}
+
+function engrave(ctx, cx, cy, r, col, n, lw) {
+  ctx.strokeStyle = col;
+  ctx.lineWidth = lw || 0.6;
+  for (let i = 0; i < n; i++) {
+    ctx.globalAlpha = 0.15 + (i / n) * 0.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - i * 2.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function ticks(ctx, cx, cy, r1, r2, n, col, majEvery) {
+  for (let i = 0; i < n; i++) {
+    let a = rad(i * (360 / n));
+    let isMaj = i % majEvery === 0;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = isMaj ? 1.5 : 0.6;
+    ctx.globalAlpha = isMaj ? 0.7 : 0.3;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.lineTo(cx + Math.cos(a) * (isMaj ? r2 + 3 : r2), cy + Math.sin(a) * (isMaj ? r2 + 3 : r2));
+    ctx.stroke();
+  }
   ctx.globalAlpha = 1;
 }
 
@@ -89,8 +140,8 @@ function drawNumeral(ctx, cx, cy, text, col, shadowCol, sz) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = 'bold ' + sz + 'px "Bebas Neue", sans-serif';
-  ctx.globalAlpha = 0.3;
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
   ctx.fillText(text, cx + 1.5, cy + 2);
   ctx.globalAlpha = 0.9;
   ctx.shadowColor = shadowCol;
@@ -109,7 +160,7 @@ function shimmer(ctx, cx, cy, radius, t, col) {
   let sx = cx - radius + phase * radius * 2.5;
   let sg = ctx.createLinearGradient(sx - 30, cy - radius, sx + 30, cy + radius);
   sg.addColorStop(0, 'rgba(255,255,255,0)');
-  sg.addColorStop(0.5, 'rgba(255,255,255,0.08)');
+  sg.addColorStop(0.5, 'rgba(255,255,255,0.12)');
   sg.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.save();
   ctx.beginPath();
@@ -122,8 +173,8 @@ function shimmer(ctx, cx, cy, radius, t, col) {
 
 function gloss(ctx, cx, cy, w, h) {
   let g = ctx.createRadialGradient(cx - w * 0.1, cy - h * 0.25, 0, cx, cy, h * 0.7);
-  g.addColorStop(0, 'rgba(255,255,255,0.22)');
-  g.addColorStop(0.4, 'rgba(255,255,255,0.06)');
+  g.addColorStop(0, 'rgba(255,255,255,0.28)');
+  g.addColorStop(0.4, 'rgba(255,255,255,0.1)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g;
   ctx.beginPath();
@@ -251,24 +302,51 @@ function orbitDots(ctx, cx, cy, r, n, speed, t, col, dotR) {
 }
 
 function pulseAura(ctx, cx, cy, r, col, t) {
-  let pulse = 0.06 + Math.sin(t * 2) * 0.04;
-  let pg = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 1.4);
+  let pulse = 0.08 + Math.sin(t * 2) * 0.06;
+  let pg = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r * 1.5);
   pg.addColorStop(0, 'rgba(0,0,0,0)');
-  pg.addColorStop(0.7, col.replace(')', ',' + pulse + ')').replace('rgb', 'rgba'));
+  pg.addColorStop(0.5, col.replace(')', ',' + pulse * 0.8 + ')').replace('rgb', 'rgba'));
+  pg.addColorStop(0.8, col.replace(')', ',' + pulse * 0.4 + ')').replace('rgb', 'rgba'));
   pg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = pg;
   ctx.beginPath();
-  ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
   ctx.fill();
 }
 
-// All draw functions now have transparent backgrounds - no ctx.fillRect backgrounds
+function drawGem(ctx, cx, cy, r, col1, col2) {
+  diamond(ctx, cx, cy, r * 2, r * 2.8);
+  let dg = ctx.createRadialGradient(cx, cy - r * 0.5, 0, cx, cy, r * 1.5);
+  dg.addColorStop(0, '#ffffff');
+  dg.addColorStop(0.3, col1);
+  dg.addColorStop(1, col2);
+  ctx.fillStyle = dg;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r * 1.4);
+  ctx.lineTo(cx, cy + r * 1.4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - r, cy);
+  ctx.lineTo(cx + r, cy);
+  ctx.stroke();
+  diamond(ctx, cx, cy, r * 2, r * 2.8);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+}
+
+// All draw functions now have restored glow, bottom reflection, and animations
 
 function drawRank1(ctx, w, h, now) {
   let cx = w / 2, cy = h / 2, t = now * 0.001;
   
   pulseAura(ctx, cx, cy, 64, 'rgb(154,160,180)', t);
   glowRing(ctx, cx, cy, 70, '#5a6070', 0.12 + Math.sin(t * 1.5) * 0.04, 12);
+  bottomGlow(ctx, cx, cy, 64, 'rgb(154,160,180)', t);
+  
   polygon(ctx, cx, cy, 64, 5, -90);
   let pg = ctx.createLinearGradient(cx - 20, cy - 64, cx + 20, cy + 64);
   pg.addColorStop(0, '#44484e');
@@ -280,18 +358,22 @@ function drawRank1(ctx, w, h, now) {
   ctx.strokeStyle = '#70788a';
   ctx.lineWidth = 3;
   ctx.stroke();
+  
   polygon(ctx, cx, cy, 52, 5, -90);
-  ctx.strokeStyle = 'rgba(154,160,176,0.18)';
+  ctx.strokeStyle = 'rgba(154,160,176,0.25)';
   ctx.lineWidth = 1;
   ctx.stroke();
+  
   innerPanel(ctx, cx, cy, 32, '#1e222a', '#7a8090');
   ctx.fillStyle = '#7a8090';
   ctx.fillRect(cx - 12, cy - 3, 24, 6);
   ctx.fillRect(cx - 3, cy - 14, 6, 28);
   ctx.fillRect(cx - 12, cy + 9, 24, 5);
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
   ctx.fillRect(cx - 12, cy - 3, 24, 2.5);
   ctx.fillRect(cx - 3, cy - 14, 2.5, 28);
+  
+  orbitDots(ctx, cx, cy, 56, 5, 8, t, 'rgb(154,160,180)', 1.5);
   shimmer(ctx, cx, cy, 64, t, '#aaa');
   gloss(ctx, cx, cy, 64, 64);
   drawNumeral(ctx, cx, cy + 2, 'I', '#b0b8c8', '#9aa0b0', 32);
@@ -302,6 +384,8 @@ function drawRank2(ctx, w, h, now) {
   
   pulseAura(ctx, cx, cy, 66, 'rgb(208,168,104)', t);
   glowRing(ctx, cx, cy, 72, '#8a5a20', 0.15 + Math.sin(t * 1.8) * 0.05, 14);
+  bottomGlow(ctx, cx, cy, 66, 'rgb(208,168,104)', t);
+  
   polygon(ctx, cx, cy, 66, 6, 0);
   let hg = ctx.createLinearGradient(cx - 30, cy - 66, cx + 30, cy + 66);
   hg.addColorStop(0, '#6a4020');
@@ -313,11 +397,15 @@ function drawRank2(ctx, w, h, now) {
   ctx.strokeStyle = '#c08040';
   ctx.lineWidth = 3;
   ctx.stroke();
+  
   polygon(ctx, cx, cy, 58, 6, 0);
-  ctx.strokeStyle = 'rgba(200,150,70,0.3)';
+  ctx.strokeStyle = 'rgba(200,150,70,0.4)';
   ctx.lineWidth = 1.2;
   ctx.stroke();
+  
   innerPanel(ctx, cx, cy, 34, '#1e1008', '#c09050');
+  ticks(ctx, cx, cy, 34, 40, 24, '#c09050', 4);
+  
   ctx.fillStyle = '#e0b060';
   ctx.globalAlpha = 0.8;
   ctx.beginPath();
@@ -330,7 +418,12 @@ function drawRank2(ctx, w, h, now) {
   ctx.lineTo(cx - 10, cy - 4);
   ctx.closePath();
   ctx.fill();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(cx - 4, cy - 18, 4, 32);
   ctx.globalAlpha = 1;
+  
+  orbitDots(ctx, cx, cy, 58, 6, -10, t, 'rgb(208,168,104)', 2);
   shimmer(ctx, cx, cy, 66, t, '#c08040');
   gloss(ctx, cx, cy, 66, 66);
   drawNumeral(ctx, cx, cy + 4, 'II', '#f0c870', '#d0a040', 30);
@@ -341,6 +434,8 @@ function drawRank3(ctx, w, h, now) {
   
   pulseAura(ctx, cx, cy, 67, 'rgb(184,208,224)', t);
   glowRing(ctx, cx, cy, 74, '#8098b0', 0.14 + Math.sin(t * 1.3) * 0.04, 14);
+  bottomGlow(ctx, cx, cy, 67, 'rgb(184,208,224)', t);
+  
   polygon(ctx, cx, cy, 67, 7, -90);
   let sg = ctx.createLinearGradient(cx - 20, cy - 67, cx + 20, cy + 67);
   sg.addColorStop(0, '#505a68');
@@ -353,11 +448,15 @@ function drawRank3(ctx, w, h, now) {
   ctx.strokeStyle = '#a0b8cc';
   ctx.lineWidth = 3;
   ctx.stroke();
+  
   polygon(ctx, cx, cy, 60, 7, -90);
-  ctx.strokeStyle = 'rgba(160,184,204,0.3)';
+  ctx.strokeStyle = 'rgba(160,184,204,0.4)';
   ctx.lineWidth = 1.2;
   ctx.stroke();
+  ticks(ctx, cx, cy, 54, 62, 56, '#a0b8cc', 7);
+  
   innerPanel(ctx, cx, cy, 35, '#16202a', '#90a8bc');
+  
   ctx.fillStyle = '#b0c8dc';
   ctx.globalAlpha = 0.7;
   ctx.beginPath();
@@ -369,7 +468,18 @@ function drawRank3(ctx, w, h, now) {
   ctx.lineTo(cx - 12, cy - 14);
   ctx.closePath();
   ctx.fill();
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 18);
+  ctx.lineTo(cx + 12, cy - 14);
+  ctx.lineTo(cx + 12, cy + 2);
+  ctx.quadraticCurveTo(cx + 12, cy + 16, cx, cy + 16);
+  ctx.closePath();
+  ctx.fill();
   ctx.globalAlpha = 1;
+  
+  orbitDots(ctx, cx, cy, 59, 7, 7, t, 'rgb(160,184,204)', 1.5);
   shimmer(ctx, cx, cy, 67, t, '#a0b8cc');
   gloss(ctx, cx, cy, 67, 67);
   drawNumeral(ctx, cx, cy + 4, 'III', '#d8eaf4', '#a0b8cc', 26);
@@ -379,7 +489,9 @@ function drawRank4(ctx, w, h, now) {
   let cx = w / 2, cy = h / 2, t = now * 0.001;
   
   pulseAura(ctx, cx, cy, 68, 'rgb(245,200,66)', t);
-  glowRing(ctx, cx, cy, 78, '#d4a820', 0.1, 1);
+  glowRings(ctx, cx, cy, 70, '#d4a820');
+  bottomGlow(ctx, cx, cy, 68, 'rgb(245,200,66)', t);
+  
   polygon(ctx, cx, cy, 68, 8, 22.5);
   let og = ctx.createLinearGradient(cx - 30, cy - 68, cx + 30, cy + 68);
   og.addColorStop(0, '#6a4808');
@@ -392,19 +504,27 @@ function drawRank4(ctx, w, h, now) {
   ctx.strokeStyle = '#e8b030';
   ctx.lineWidth = 3.5;
   ctx.stroke();
+  
   polygon(ctx, cx, cy, 61, 8, 22.5);
-  ctx.strokeStyle = 'rgba(240,190,60,0.35)';
+  ctx.strokeStyle = 'rgba(240,190,60,0.45)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
+  polygon(ctx, cx, cy, 55, 8, 22.5);
+  ctx.strokeStyle = 'rgba(240,190,60,0.3)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  
   star(ctx, cx, cy, 50, 22, 4, -45);
-  ctx.strokeStyle = 'rgba(240,190,60,0.15)';
+  ctx.strokeStyle = 'rgba(240,190,60,0.2)';
   ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.fillStyle = 'rgba(240,190,60,0.05)';
+  ctx.fillStyle = 'rgba(240,190,60,0.08)';
   ctx.fill();
+  
   innerPanel(ctx, cx, cy, 36, '#1e1604', '#e8b030');
   laurel(ctx, cx, cy + 6, 28, -1, '#b89028', 10);
   laurel(ctx, cx, cy + 6, 28, 1, '#b89028', 10);
+  
   star(ctx, cx, cy - 2, 16, 8, 5, -90);
   let sg2 = ctx.createRadialGradient(cx, cy - 8, 0, cx, cy, 16);
   sg2.addColorStop(0, '#fff8c0');
@@ -414,6 +534,8 @@ function drawRank4(ctx, w, h, now) {
   ctx.strokeStyle = '#fff0a0';
   ctx.lineWidth = 0.8;
   ctx.stroke();
+  
+  orbitDots(ctx, cx, cy, 60, 8, 12, t, 'rgb(240,190,60)', 2);
   shimmer(ctx, cx, cy, 68, t, '#e8b030');
   gloss(ctx, cx, cy, 68, 68);
   drawNumeral(ctx, cx, cy + 10, 'IV', '#fff8c0', '#f5c842', 28);
@@ -423,6 +545,8 @@ function drawRank5(ctx, w, h, now) {
   let cx = w / 2, cy = h / 2 + 4, t = now * 0.001;
   
   pulseAura(ctx, cx, cy, 56, 'rgb(112,176,255)', t);
+  bottomGlow(ctx, cx, cy, 56, 'rgb(112,176,255)', t);
+  
   shield(ctx, cx, cy, 108, 114);
   let shg = ctx.createLinearGradient(cx - 54, cy - 57, cx + 54, cy + 57);
   shg.addColorStop(0, '#1e3060');
@@ -434,6 +558,7 @@ function drawRank5(ctx, w, h, now) {
   ctx.strokeStyle = '#5090f0';
   ctx.lineWidth = 3;
   ctx.stroke();
+  
   star(ctx, cx, cy - 32, 13, 6.5, 5, -90);
   let stg = ctx.createRadialGradient(cx, cy - 38, 0, cx, cy - 32, 13);
   stg.addColorStop(0, '#d0e8ff');
@@ -443,17 +568,21 @@ function drawRank5(ctx, w, h, now) {
   ctx.strokeStyle = '#b0d4ff';
   ctx.lineWidth = 1;
   ctx.stroke();
+  
   innerPanel(ctx, cx, cy + 16, 28, '#0c1a38', '#5090f0');
+  
   ctx.fillStyle = '#5090f0';
   ctx.beginPath();
   ctx.arc(cx, cy + 16, 8, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgba(200,220,255,0.6)';
+  ctx.fillStyle = 'rgba(200,220,255,0.7)';
   ctx.beginPath();
   ctx.arc(cx - 2, cy + 14, 3, 0, Math.PI * 2);
   ctx.fill();
+  
   laurel(ctx, cx, cy + 20, 26, -1, '#3060b0', 8);
   laurel(ctx, cx, cy + 20, 26, 1, '#3060b0', 8);
+  
   shimmer(ctx, cx, cy, 54, t, '#5090f0');
   gloss(ctx, cx, cy - 4, 56, 62);
   drawNumeral(ctx, cx, cy + 30, 'V', '#b0d4ff', '#5090f0', 28);
@@ -463,6 +592,9 @@ function drawRank6(ctx, w, h, now) {
   let cx = w / 2, cy = h / 2, t = now * 0.001;
   
   pulseAura(ctx, cx, cy, 68, 'rgb(64,232,200)', t);
+  glowRings(ctx, cx, cy, 73, '#20c8a0');
+  bottomGlow(ctx, cx, cy, 68, 'rgb(64,232,200)', t);
+  
   star(ctx, cx, cy, 68, 30, 10, -90);
   let tg = ctx.createRadialGradient(cx, cy, 8, cx, cy, 68);
   tg.addColorStop(0, '#1a3c38');
@@ -473,22 +605,28 @@ function drawRank6(ctx, w, h, now) {
   ctx.strokeStyle = '#25c8a0';
   ctx.lineWidth = 2.5;
   ctx.stroke();
+  
   star(ctx, cx, cy, 60, 26, 10, -90);
-  ctx.strokeStyle = 'rgba(37,200,160,0.2)';
+  ctx.strokeStyle = 'rgba(37,200,160,0.3)';
   ctx.lineWidth = 1;
   ctx.stroke();
+  
   innerPanel(ctx, cx, cy, 34, '#081e1c', '#20c8a0');
+  ticks(ctx, cx, cy, 34, 40, 40, '#20c8a0', 5);
+  
   ctx.fillStyle = '#20c8a0';
   ctx.beginPath();
   ctx.arc(cx, cy, 5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgba(200,255,240,0.7)';
+  ctx.fillStyle = 'rgba(200,255,240,0.8)';
   ctx.beginPath();
   ctx.arc(cx - 1, cy - 1, 2, 0, Math.PI * 2);
   ctx.fill();
+  
   orbitDots(ctx, cx, cy, 62, 10, 15, t, 'rgb(64,200,160)', 2);
   laurel(ctx, cx, cy, 28, -1, '#18a888', 8);
   laurel(ctx, cx, cy, 28, 1, '#18a888', 8);
+  
   shimmer(ctx, cx, cy, 68, t, '#20c8a0');
   gloss(ctx, cx, cy, 68, 68);
   drawNumeral(ctx, cx, cy + 2, 'VI', '#80f0d0', '#20c8a0', 26);
@@ -498,6 +636,11 @@ function drawRank7(ctx, w, h, now) {
   let cx = w / 2, cy = h / 2, t = now * 0.001;
   
   pulseAura(ctx, cx, cy, 68, 'rgb(232,112,208)', t);
+  for (let i = 0; i < 3; i++) {
+    glowRing(ctx, cx, cy, 76 - i * 4, '#b030b0', 0.1 - i * 0.02, 2 - i * 0.5);
+  }
+  bottomGlow(ctx, cx, cy, 68, 'rgb(232,112,208)', t);
+  
   star(ctx, cx, cy, 68, 30, 12, -90);
   let mg = ctx.createLinearGradient(cx - 30, cy - 68, cx + 30, cy + 68);
   mg.addColorStop(0, '#441060');
@@ -509,14 +652,18 @@ function drawRank7(ctx, w, h, now) {
   ctx.strokeStyle = '#c840c0';
   ctx.lineWidth = 2.5;
   ctx.stroke();
+  
   star(ctx, cx, cy, 60, 26, 12, -90);
-  ctx.strokeStyle = 'rgba(200,64,192,0.22)';
+  ctx.strokeStyle = 'rgba(200,64,192,0.32)';
   ctx.lineWidth = 1;
   ctx.stroke();
+  
   innerPanel(ctx, cx, cy, 33, '#160828', '#c040c0');
   crown(ctx, cx, cy - 28, 12, '#b030b0', '#e080e0', ['#ff8888', '#ffe080', '#8888ff', '#ff8888', '#ffe080']);
   laurel(ctx, cx, cy + 6, 26, -1, '#9020a0', 9);
   laurel(ctx, cx, cy + 6, 26, 1, '#9020a0', 9);
+  
+  orbitDots(ctx, cx, cy, 60, 12, -18, t, 'rgb(200,80,200)', 2);
   shimmer(ctx, cx, cy, 68, t, '#c040c0');
   gloss(ctx, cx, cy, 68, 68);
   drawNumeral(ctx, cx, cy + 8, 'VII', '#f090e8', '#c040c0', 24);
@@ -526,6 +673,9 @@ function drawRank8(ctx, w, h, now) {
   let cx = w / 2, cy = h / 2, t = now * 0.001;
   
   pulseAura(ctx, cx, cy, 68, 'rgb(255,128,80)', t);
+  glowRings(ctx, cx, cy, 72, '#ff5020');
+  bottomGlow(ctx, cx, cy, 68, 'rgb(255,128,80)', t);
+  
   star(ctx, cx, cy, 68, 30, 8, -22.5);
   let rg = ctx.createRadialGradient(cx, cy, 8, cx, cy, 68);
   rg.addColorStop(0, '#6a1808');
@@ -536,14 +686,25 @@ function drawRank8(ctx, w, h, now) {
   ctx.strokeStyle = '#e84818';
   ctx.lineWidth = 3;
   ctx.stroke();
+  
   star(ctx, cx, cy, 60, 26, 8, -22.5);
-  ctx.strokeStyle = 'rgba(255,80,30,0.2)';
+  ctx.strokeStyle = 'rgba(255,80,30,0.3)';
   ctx.lineWidth = 1;
   ctx.stroke();
+  
   innerPanel(ctx, cx, cy, 34, '#200808', '#ff5020');
   crown(ctx, cx, cy - 28, 13, '#c83010', '#ff7040', ['#ffaa60', '#ff3010', '#ffcc30', '#ff3010', '#ffaa60']);
   laurel(ctx, cx, cy + 6, 27, -1, '#c02808', 9);
   laurel(ctx, cx, cy + 6, 27, 1, '#c02808', 9);
+  
+  // Spinning fire ticks
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(t * 0.8);
+  ctx.translate(-cx, -cy);
+  ticks(ctx, cx, cy, 34, 40, 32, '#ff5020', 4);
+  ctx.restore();
+  
   shimmer(ctx, cx, cy, 68, t, '#ff5020');
   gloss(ctx, cx, cy, 68, 68);
   drawNumeral(ctx, cx, cy + 8, 'VIII', '#ffc090', '#ff5020', 22);
@@ -553,6 +714,9 @@ function drawRank9(ctx, w, h, now) {
   let cx = w / 2, cy = h / 2, t = now * 0.001;
   
   pulseAura(ctx, cx, cy, 75, 'rgb(144,216,255)', t);
+  glowRings(ctx, cx, cy, 75, '#60b8ff');
+  bottomGlow(ctx, cx, cy, 75, 'rgb(144,216,255)', t);
+  
   star(ctx, cx, cy, 70, 32, 12, -90);
   let dg = ctx.createLinearGradient(cx - 70, cy, cx + 70, cy);
   dg.addColorStop(0, '#0e2a50');
@@ -565,15 +729,26 @@ function drawRank9(ctx, w, h, now) {
   ctx.strokeStyle = '#68b8ff';
   ctx.lineWidth = 2.5;
   ctx.stroke();
+  
   star(ctx, cx, cy, 62, 28, 12, -90);
-  ctx.strokeStyle = 'rgba(104,184,255,0.2)';
+  ctx.strokeStyle = 'rgba(104,184,255,0.3)';
   ctx.lineWidth = 1;
   ctx.stroke();
+  
   innerPanel(ctx, cx, cy, 34, '#0a1e38', '#68b8ff');
   orbitDots(ctx, cx, cy, 63, 12, 20, t, 'rgb(144,216,255)', 1.8);
   crown(ctx, cx, cy - 29, 13, '#5090d0', '#b0d8ff', ['#60b0ff', '#ffffff', '#a0d0ff', '#ffffff', '#60b0ff']);
   laurel(ctx, cx, cy + 6, 27, -1, '#3070b0', 9);
   laurel(ctx, cx, cy + 6, 27, 1, '#3070b0', 9);
+  
+  // Counter-rotating ticks
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-t * 0.3);
+  ctx.translate(-cx, -cy);
+  ticks(ctx, cx, cy, 34, 40, 36, '#68b8ff', 6);
+  ctx.restore();
+  
   shimmer(ctx, cx, cy, 70, t, '#68b8ff');
   gloss(ctx, cx, cy, 70, 70);
   drawNumeral(ctx, cx, cy + 8, 'IX', '#c0e8ff', '#60b8ff', 28);
@@ -583,6 +758,28 @@ function drawRank10(ctx, w, h, now) {
   let cx = w / 2, cy = h / 2, t = now * 0.001;
   
   pulseAura(ctx, cx, cy, 76, 'rgb(255,232,128)', t);
+  glowRings(ctx, cx, cy, 76, '#f0c030');
+  bottomGlow(ctx, cx, cy, 76, 'rgb(255,232,128)', t);
+  
+  // Radiant rays animation
+  for (let layer = 0; layer < 3; layer++) {
+    let rayCount = layer === 0 ? 24 : layer === 1 ? 16 : 8;
+    let rStart = layer === 0 ? 38 : layer === 1 ? 42 : 46;
+    let rEnd = layer === 0 ? 76 : layer === 1 ? 72 : 68;
+    let speed = layer === 0 ? 6 : layer === 1 ? -4 : 8;
+    let alpha = layer === 0 ? 0.14 : layer === 1 ? 0.1 : 0.18;
+    for (let i = 0; i < rayCount; i++) {
+      let a = rad(i * (360 / rayCount) + t * speed);
+      let rA = alpha + Math.sin(t * 1.5 + i * 0.4) * 0.04;
+      ctx.strokeStyle = 'rgba(255,200,40,' + rA + ')';
+      ctx.lineWidth = layer === 0 ? 1.5 : layer === 1 ? 1 : 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * rStart, cy + Math.sin(a) * rStart);
+      ctx.lineTo(cx + Math.cos(a) * rEnd, cy + Math.sin(a) * rEnd);
+      ctx.stroke();
+    }
+  }
+  
   star(ctx, cx, cy, 70, 32, 16, -90);
   let lg = ctx.createRadialGradient(cx, cy, 8, cx, cy, 70);
   lg.addColorStop(0, '#6a4a08');
@@ -595,15 +792,19 @@ function drawRank10(ctx, w, h, now) {
   ctx.strokeStyle = '#f5c842';
   ctx.lineWidth = 3.5;
   ctx.stroke();
+  
   star(ctx, cx, cy, 62, 28, 16, -90);
-  ctx.strokeStyle = 'rgba(245,200,66,0.22)';
+  ctx.strokeStyle = 'rgba(245,200,66,0.32)';
   ctx.lineWidth = 1.2;
   ctx.stroke();
   star(ctx, cx, cy, 55, 24, 16, -90);
-  ctx.strokeStyle = 'rgba(245,200,66,0.1)';
+  ctx.strokeStyle = 'rgba(245,200,66,0.2)';
   ctx.lineWidth = 0.8;
   ctx.stroke();
+  
   innerPanel(ctx, cx, cy, 36, '#20180a', '#f5c842');
+  
+  // Pulsing sun core
   let sunc = ctx.createRadialGradient(cx, cy, 0, cx, cy, 12 + Math.sin(t * 3) * 2);
   sunc.addColorStop(0, '#ffe880');
   sunc.addColorStop(0.5, '#f5c842');
@@ -617,18 +818,29 @@ function drawRank10(ctx, w, h, now) {
   ctx.beginPath();
   ctx.arc(cx, cy, 12, 0, Math.PI * 2);
   ctx.stroke();
+  
   orbitDots(ctx, cx, cy, 64, 16, 25, t, 'rgb(245,200,66)', 2.2);
   crown(ctx, cx, cy - 31, 15, '#d4a020', '#fff8b0', ['#ff7060', '#fff880', '#8080ff', '#fff880', '#ff7060']);
   laurel(ctx, cx, cy + 8, 30, -1, '#c89020', 11);
   laurel(ctx, cx, cy + 8, 30, 1, '#c89020', 11);
+  
+  // Spinning outer ticks
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(t * 0.5);
+  ctx.translate(-cx, -cy);
+  ticks(ctx, cx, cy, 36, 42, 40, '#f5c842', 5);
+  ctx.restore();
+  
   shimmer(ctx, cx, cy, 70, t, '#f5c842');
   gloss(ctx, cx, cy, 70, 70);
+  
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = 'bold 30px "Bebas Neue", sans-serif';
   ctx.globalAlpha = 0.4;
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
   ctx.fillText('X', cx + 2, cy + 12);
   ctx.globalAlpha = 1;
   ctx.shadowColor = 'rgba(255,220,40,1)';

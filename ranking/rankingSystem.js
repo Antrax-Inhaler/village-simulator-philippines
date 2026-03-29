@@ -1,6 +1,3 @@
-// ============================================
-// FILE: ranking/rankingSystem.js (NEW FILE)
-// ============================================
 /* ═══════════════════════════════════════════════════════════════
    Mini Bayan — Ranking System
 
@@ -10,16 +7,16 @@
 
 // Rank definitions
 export const RANKS = [
-  { id: 1, title: "Humble Start", scoreRequired: 0, bonus: 0, badge: "🌱" },
-  { id: 2, title: "Rising Leader", scoreRequired: 100, bonus: 5, badge: "📈" },
-  { id: 3, title: "Respected Noble", scoreRequired: 250, bonus: 8, badge: "👑" },
-  { id: 4, title: "Town Leader", scoreRequired: 450, bonus: 10, badge: "🏛️" },
-  { id: 5, title: "Provincial Leader", scoreRequired: 700, bonus: 12, badge: "🌾" },
-  { id: 6, title: "National Figure", scoreRequired: 1000, bonus: 15, badge: "🇵🇭" },
-  { id: 7, title: "Monument to the People", scoreRequired: 1400, bonus: 18, badge: "🏆" },
-  { id: 8, title: "Living Hero", scoreRequired: 1900, bonus: 20, badge: "⭐" },
-  { id: 9, title: "People's Chosen", scoreRequired: 2500, bonus: 25, badge: "👑✨" },
-  { id: 10, title: "Legend", scoreRequired: 3200, bonus: 30, badge: "🏆🌟" }
+  { id: 1, title: "Humble Start", scoreRequired: 0, bonus: 0, badge: "🌱", color: "#6c757d", darkColor: "#495057" },
+  { id: 2, title: "Rising Leader", scoreRequired: 100, bonus: 5, badge: "📈", color: "#e67e22", darkColor: "#b85e0a" },
+  { id: 3, title: "Respected Noble", scoreRequired: 250, bonus: 8, badge: "👑", color: "#3498db", darkColor: "#1f618d" },
+  { id: 4, title: "Town Leader", scoreRequired: 450, bonus: 10, badge: "🏛️", color: "#f1c40f", darkColor: "#b8860b" },
+  { id: 5, title: "Provincial Leader", scoreRequired: 700, bonus: 12, badge: "🌾", color: "#2ecc71", darkColor: "#1f8a4c" },
+  { id: 6, title: "National Figure", scoreRequired: 1000, bonus: 15, badge: "🇵🇭", color: "#1abc9c", darkColor: "#117a65" },
+  { id: 7, title: "Monument to the People", scoreRequired: 1400, bonus: 18, badge: "🏆", color: "#9b59b6", darkColor: "#6c3483" },
+  { id: 8, title: "Living Hero", scoreRequired: 1900, bonus: 20, badge: "⭐", color: "#e74c3c", darkColor: "#c0392b" },
+  { id: 9, title: "People's Chosen", scoreRequired: 2500, bonus: 25, badge: "👑✨", color: "#3498db", darkColor: "#1f618d" },
+  { id: 10, title: "Legend", scoreRequired: 3200, bonus: 30, badge: "🏆🌟", color: "#f39c12", darkColor: "#d35400" }
 ];
 
 // Get current rank from score
@@ -60,7 +57,7 @@ export function calculateDailyScore(VS, previousDayStats) {
     breakdown[type].push({
       label: "Kasiyahan",
       change: approvalScore,
-      detail: `${previousDayStats.avgApproval.toFixed(0)}% → ${currentApproval.toFixed(0)}%`,
+      detail: `${Math.round(previousDayStats.avgApproval)}% → ${Math.round(currentApproval)}%`,
       icon: approvalScore > 0 ? "😊" : "😞"
     });
     details.approval = approvalScore;
@@ -113,9 +110,8 @@ export function calculateDailyScore(VS, previousDayStats) {
   }
 
   // 5. Building upgrades (level ups)
-  let newUpgrades = (previousDayStats.totalLevels !== undefined) 
-    ? (VS.buildings.reduce((sum, b) => sum + (b.level || 1), 0) - previousDayStats.totalLevels)
-    : 0;
+  let currentTotalLevels = VS.buildings.reduce((sum, b) => sum + (b.level || 1), 0);
+  let newUpgrades = currentTotalLevels - (previousDayStats.totalLevels || 0);
   if (newUpgrades > 0) {
     let gain = newUpgrades * 1;
     dailyScore += gain;
@@ -129,22 +125,24 @@ export function calculateDailyScore(VS, previousDayStats) {
   }
 
   // 6. Trade profit
-  let tradeProfit = (VS.trade?.todayProfit || 0) - (previousDayStats.tradeProfit || 0);
-  if (Math.abs(tradeProfit) > 50) {
-    let gain = Math.floor(tradeProfit / 100);
+  let currentTradeProfit = VS.trade?.todayProfit || 0;
+  let tradeProfitChange = currentTradeProfit - (previousDayStats.tradeProfit || 0);
+  if (Math.abs(tradeProfitChange) > 50) {
+    let gain = Math.floor(tradeProfitChange / 100);
     dailyScore += gain;
     let type = gain > 0 ? 'positive' : 'negative';
     breakdown[type].push({
       label: "Kalakalan",
       change: gain,
-      detail: `${tradeProfit > 0 ? '+' : ''}${Math.floor(tradeProfit)}🪙 tubo`,
+      detail: `${tradeProfitChange > 0 ? '+' : ''}${Math.floor(tradeProfitChange)}🪙 tubo`,
       icon: gain > 0 ? "⚓" : "📉"
     });
     details.trade = gain;
   }
 
   // 7. Corruption penalty
-  let corruptionGain = (VS.corruption?.exposureLevel || 0) - (previousDayStats.corruption || 0);
+  let currentCorruption = VS.corruption?.exposureLevel || 0;
+  let corruptionGain = currentCorruption - (previousDayStats.corruption || 0);
   if (corruptionGain > 0) {
     let penalty = Math.floor(corruptionGain * 0.5);
     dailyScore -= penalty;
@@ -158,8 +156,8 @@ export function calculateDailyScore(VS, previousDayStats) {
   }
 
   // 8. Waste penalty
-  let wasteStats = _getWasteTotal(VS);
-  let wasteGenerated = wasteStats - (previousDayStats.waste || 0);
+  let currentWaste = _getWasteTotal(VS);
+  let wasteGenerated = currentWaste - (previousDayStats.waste || 0);
   if (wasteGenerated > 0) {
     let penalty = Math.floor(wasteGenerated / 500);
     if (penalty > 0) {
@@ -189,7 +187,8 @@ export function calculateDailyScore(VS, previousDayStats) {
   }
 
   // 10. Resolved events
-  let resolvedEvents = (VS.events?.resolvedToday || 0) - (previousDayStats.resolvedEvents || 0);
+  let currentResolvedEvents = VS.events?.resolvedToday || 0;
+  let resolvedEvents = currentResolvedEvents - (previousDayStats.resolvedEvents || 0);
   if (resolvedEvents > 0) {
     let gain = resolvedEvents * 5;
     dailyScore += gain;
@@ -203,7 +202,8 @@ export function calculateDailyScore(VS, previousDayStats) {
   }
 
   // 11. Calamity damage
-  let damagedBuildings = (VS.events?.damagedBuildingsToday || 0) - (previousDayStats.damagedBuildings || 0);
+  let currentDamagedBuildings = VS.events?.damagedBuildingsToday || 0;
+  let damagedBuildings = currentDamagedBuildings - (previousDayStats.damagedBuildings || 0);
   if (damagedBuildings > 0) {
     let penalty = damagedBuildings * 2;
     dailyScore -= penalty;
@@ -233,18 +233,23 @@ export function calculateDailyScore(VS, previousDayStats) {
   // Round daily score to nearest integer
   dailyScore = Math.round(dailyScore);
   
-  return { dailyScore, breakdown, details, newStats: {
-    avgApproval: currentApproval,
-    population: VS.villagers.length,
-    employed: currentEmployed,
-    buildings: currentBuildings,
-    totalLevels: VS.buildings.reduce((sum, b) => sum + (b.level || 1), 0),
-    tradeProfit: VS.trade?.todayProfit || 0,
-    corruption: VS.corruption?.exposureLevel || 0,
-    waste: wasteStats,
-    resolvedEvents: VS.events?.resolvedToday || 0,
-    damagedBuildings: VS.events?.damagedBuildingsToday || 0
-  }};
+  return { 
+    dailyScore, 
+    breakdown, 
+    details, 
+    newStats: {
+      avgApproval: currentApproval,
+      population: VS.villagers.length,
+      employed: currentEmployed,
+      buildings: currentBuildings,
+      totalLevels: currentTotalLevels,
+      tradeProfit: currentTradeProfit,
+      corruption: currentCorruption,
+      waste: currentWaste,
+      resolvedEvents: currentResolvedEvents,
+      damagedBuildings: currentDamagedBuildings
+    }
+  };
 }
 
 function _avg(arr, field, fallback) {
@@ -262,7 +267,7 @@ function _getWasteTotal(VS) {
   return waste;
 }
 
-// Generate daily report HTML
+// Generate daily report HTML (kept for compatibility, but not used by new UI)
 export function generateDailyReport(dayCount, dailyScore, breakdown, previousScore, newScore, rank, nextRank) {
   let positiveItems = breakdown.positive || [];
   let negativeItems = breakdown.negative || [];
@@ -391,7 +396,7 @@ export function generateRankUpBanner(oldRank, newRank, newBonuses) {
   `;
 }
 
-// Show daily report banner
+// Show daily report banner (legacy - kept for compatibility)
 export function showDailyReport(dayCount, dailyScore, breakdown, previousScore, newScore, rank, nextRank) {
   const html = generateDailyReport(dayCount, dailyScore, breakdown, previousScore, newScore, rank, nextRank);
   _showBanner(html, 'daily-report-banner');
@@ -454,3 +459,9 @@ window.closeRankUpBanner = function() {
     }, 500);
   }
 };
+
+// Export rank colors for other modules
+export function getRankColor(rankId) {
+  const rank = RANKS.find(r => r.id === rankId);
+  return rank ? { color: rank.color, darkColor: rank.darkColor } : { color: '#6c757d', darkColor: '#495057' };
+}

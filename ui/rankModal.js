@@ -4,7 +4,7 @@
    Enhanced 3D holographic card design with hype animations
 ═══════════════════════════════════════════════════════════════ */
 
-import { getRankFromScore, getNextRank } from '../ranking/rankingSystem.js';
+import { getRankFromScore, getNextRank, getRankColor } from '../ranking/rankingSystem.js';
 import { RANK_DRAWERS, BADGE_SIZE } from '../ranking/rankBadges.js';
 
 let modalContainer = null;
@@ -139,16 +139,16 @@ function renderRankModal(VS) {
       statusIcon = '👑';
     } else if (isUnlocked) {
       statusClass = 'unlocked-seamless';
-      statusText = '✓ ACHIEVED';
+      statusText = 'ACHIEVED';
       statusIcon = '🏅';
     } else if (isNext) {
       statusClass = 'next-seamless';
-      statusText = 'NEXT TARGET';
+      statusText = 'NEXT';
       statusIcon = '🎯';
     } else {
       statusClass = 'locked-seamless';
-      statusText = '🔒 LOCKED';
-      statusIcon = '❓';
+      statusText = 'LOCKED';
+      statusIcon = '🔒';
     }
     
     // Calculate points needed hype message
@@ -175,7 +175,7 @@ function renderRankModal(VS) {
       progressHtml = `
         <div class="rank-progress-seamless">
           <div class="rank-progress-bar-seamless">
-            <div class="rank-progress-fill-seamless" style="width: ${progressPercent}%"></div>
+            <div class="rank-progress-fill-seamless" style="width: ${Math.min(100, Math.max(0, progressPercent))}%"></div>
           </div>
           <div class="rank-progress-text-seamless">${Math.floor(progressPercent)}% to ${isCurrent ? (nextRank?.name || rank.name) : rank.name}</div>
         </div>
@@ -190,11 +190,12 @@ function renderRankModal(VS) {
     
     // 3D holographic gradient background
     const bgGradient = `linear-gradient(145deg, ${rank.color}, ${rank.darkColor})`;
-    const holographicOverlay = `linear-gradient(125deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 30%, rgba(0,0,0,0.1) 70%, rgba(255,255,255,0.08) 100%)`;
+    
+    // Card animation delay for staggered entrance
+    const animationDelay = index * 0.05;
     
     html += `
-      <div class="rank-card-seamless ${statusClass}" data-rank="${rank.id}" style="background: ${bgGradient}">
-        <div class="rank-holographic-overlay"></div>
+      <div class="rank-card-seamless ${statusClass}" data-rank="${rank.id}" style="background: ${bgGradient}; animation-delay: ${animationDelay}s">
         <div class="rank-card-inner-seamless">
           <div class="rank-status-seamless ${statusClass}">
             <span class="status-icon">${statusIcon}</span>
@@ -261,7 +262,7 @@ function renderRankModal(VS) {
           <div class="summary-next">→ ${nextRank.title} (${nextRank.scoreRequired - currentScore} pts left)</div>
           <div class="summary-progress">
             <div class="summary-progress-bar">
-              <div class="summary-progress-fill" style="width: ${Math.min(100, progressPercent)}%"></div>
+              <div class="summary-progress-fill" style="width: ${Math.min(100, Math.max(0, progressPercent))}%"></div>
             </div>
           </div>
           <div class="summary-hype">${hypeEmoji} ${Math.floor(nextRank.scoreRequired - currentScore)} points to glory! ${hypeEmoji}</div>
@@ -270,7 +271,7 @@ function renderRankModal(VS) {
     `;
   }
   
-  // Add hover sound effect on cards (visual only)
+  // Add hover effects to cards
   attachCardHoverEffects();
 }
 
@@ -280,6 +281,8 @@ function attachCardHoverEffects() {
   cards.forEach(card => {
     card.removeEventListener('mouseenter', onCardHover);
     card.addEventListener('mouseenter', onCardHover);
+    card.removeEventListener('mouseleave', onCardLeave);
+    card.addEventListener('mouseleave', onCardLeave);
   });
 }
 
@@ -296,18 +299,16 @@ function onCardHover(e) {
     }, 300);
   } else if (isCurrent) {
     card.style.transform = 'translateY(-4px) scale(1.01)';
+    card.style.transition = 'transform 0.2s ease';
   } else {
     card.style.transform = 'translateY(-6px) scale(1.02)';
-    const glow = card.querySelector('.rank-holographic-overlay');
-    if (glow) glow.style.opacity = '0.6';
-    setTimeout(() => {
-      if (glow) glow.style.opacity = '';
-    }, 200);
+    card.style.transition = 'transform 0.2s ease';
   }
-  
-  setTimeout(() => {
-    if (card) card.style.transform = '';
-  }, 250);
+}
+
+function onCardLeave(e) {
+  const card = e.currentTarget;
+  card.style.transform = '';
 }
 
 // Update holographic effects (glow, shine)
@@ -322,14 +323,15 @@ function updateHolographicEffects() {
     
     if (isCurrent) {
       // Pulsing glow for current rank
-      const intensity = 0.3 + Math.sin(holographicTime * 3 + idx) * 0.15;
-      card.style.boxShadow = `0 0 ${20 + Math.sin(holographicTime * 4) * 5}px rgba(245, 200, 66, ${0.4 + Math.sin(holographicTime * 5) * 0.15})`;
+      const pulseIntensity = 0.3 + Math.sin(holographicTime * 4) * 0.15;
+      card.style.boxShadow = `0 0 ${20 + Math.sin(holographicTime * 5) * 5}px rgba(245, 200, 66, ${0.4 + Math.sin(holographicTime * 6) * 0.15})`;
+      card.style.transition = 'box-shadow 0.05s linear';
     } else if (isNext) {
-      const intensity = 0.2 + Math.sin(holographicTime * 2.5 + idx) * 0.1;
-      card.style.boxShadow = `0 0 ${15 + Math.sin(holographicTime * 3) * 4}px rgba(230, 126, 34, ${0.3 + Math.sin(holographicTime * 4) * 0.1})`;
+      const pulseIntensity = 0.2 + Math.sin(holographicTime * 3) * 0.1;
+      card.style.boxShadow = `0 0 ${15 + Math.sin(holographicTime * 4) * 4}px rgba(230, 126, 34, ${0.3 + Math.sin(holographicTime * 5) * 0.1})`;
     } else if (isUnlocked) {
-      const intensity = 0.1 + Math.sin(holographicTime * 1.5 + idx) * 0.05;
-      card.style.boxShadow = `0 0 ${10 + Math.sin(holographicTime * 2) * 3}px rgba(68, 170, 68, ${0.2 + Math.sin(holographicTime * 3) * 0.08})`;
+      const pulseIntensity = 0.1 + Math.sin(holographicTime * 2) * 0.05;
+      card.style.boxShadow = `0 0 ${10 + Math.sin(holographicTime * 3) * 3}px rgba(68, 170, 68, ${0.2 + Math.sin(holographicTime * 4) * 0.08})`;
     }
   });
 }
@@ -356,6 +358,17 @@ function updateRankBadgeAnimations() {
       console.warn(`Failed to draw rank badge:`, e);
     }
   });
+}
+
+// Draw rank badge (fallback)
+function drawRankBadge(canvas, rankId) {
+  if (!canvas || !rankId) return;
+  const ctx = canvas.getContext('2d');
+  const drawer = RANK_DRAWERS[rankId];
+  if (drawer) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawer(ctx, canvas.width, canvas.height, performance.now());
+  }
 }
 
 // Expose to window
