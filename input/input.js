@@ -409,6 +409,9 @@ function _processClick(sx, sy) {
     const v  = VS.villagers[i];
     const vt = VT[v.typeIdx] || VT[0];
     if (dist(wp2.x, wp2.y, v.x, v.y) < 16 * perspScale(v.y) * vt.scale) {
+      if (typeof window.playSound === 'function') {
+        window.playSound(v.gender === 'female' ? 'sfx-villager-female' : 'sfx-villager-male');
+      }
       _deps.openDrawer(v, 'villager'); return;
     }
   }

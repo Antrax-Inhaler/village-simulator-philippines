@@ -84,11 +84,8 @@ function injectStyles() {
     }
     
     .daily-report-content-minimal {
-      width: 90%;
-      max-width: 900px;
-      max-height: 85vh;
+      width: 100%;
       padding: 30px 24px;
-      background: rgba(10, 8, 6, 0.6);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       border-radius: 28px;
@@ -99,8 +96,7 @@ function injectStyles() {
       flex-direction: column;
       align-items: center;
       overflow-y: auto;
-      border: 1px solid rgba(245, 200, 66, 0.2);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      height: 100vh;
     }
     
     @keyframes slideUpFade {
@@ -160,7 +156,6 @@ function injectStyles() {
       display: flex;
       align-items: center;
       gap: 16px;
-      backdrop-filter: blur(10px);
       border-radius: 60px;
       width: 100%;
       margin-bottom: 20px;
@@ -277,7 +272,7 @@ function injectStyles() {
       display: flex;
       gap: 12px;
       min-width: min-content;
-      justify-content: flex-start;
+      justify-content: center;
       padding: 4px 2px;
     }
     
@@ -386,10 +381,7 @@ function injectStyles() {
     /* Mobile Responsive - Portrait */
     @media (max-width: 768px) {
       .daily-report-content-minimal {
-        width: 95%;
-        max-height: 90vh;
         padding: 20px 16px;
-        border-radius: 20px;
       }
       
       .rank-progress-row-minimal {
@@ -417,9 +409,8 @@ function injectStyles() {
     /* Small Mobile Devices */
     @media (max-width: 480px) {
       .daily-report-content-minimal {
-        width: 98%;
+        width: 100%;
         padding: 16px 12px;
-        border-radius: 16px;
       }
       
       .rank-progress-row-minimal {
@@ -465,7 +456,6 @@ function injectStyles() {
     /* Landscape Mobile */
     @media (max-width: 900px) and (orientation: landscape) {
       .daily-report-content-minimal {
-        max-height: 95vh;
         padding: 12px 20px;
       }
       

@@ -19,6 +19,26 @@ import { clamp, randRange, randInt } from '../utils/perspective.js';
 import { isPolicyActive }             from './policy.js';
 import { canScandalFire, triggerScandal } from './corruption.js';
 
+/* ── SOUND TOGGLE ─────────────────────────────────────────────
+   Set SOUNDS_ENABLED = false while developing to silence all
+   event / calamity sound effects. Flip back to true for release.
+──────────────────────────────────────────────────────────── */
+var SOUNDS_ENABLED = true; // ← change to false to mute all event sounds
+
+function _playSound(id, opts) {
+  if (!SOUNDS_ENABLED) return;
+  if (typeof window !== 'undefined' && typeof window.playSound === 'function') {
+    window.playSound(id, opts);
+  }
+}
+
+function _stopAllCalamitySounds() {
+  if (!SOUNDS_ENABLED) return;
+  if (typeof window !== 'undefined' && typeof window.stopAllCalamitySounds === 'function') {
+    window.stopAllCalamitySounds();
+  }
+}
+
 var BASE_ROLL_CHANCE = 0.00006;
 var EVENT_COOLDOWN   = 90;
 var _lastEventTime   = 0;
@@ -36,9 +56,7 @@ function _setCalamity(VS, type, durationTicks) {
     remaining: durationTicks,
     total:     durationTicks,
   };
-  if (typeof window !== 'undefined' && window.playSound) {
-    window.playSound('sfx-calamity-' + type, { loop: true });
-  }
+  _playSound('sfx-calamity-' + type, { loop: true });
 }
 
 function _countBld(VS, type) {
@@ -281,9 +299,7 @@ export function tickEvents(dt, VS, notifyFn) {
     VS.events.calamity.remaining -= dt;
     VS.events.calamity.intensity  = clamp(VS.events.calamity.remaining / VS.events.calamity.total, 0, 1);
     if (VS.events.calamity.remaining <= 0) {
-      if (typeof window !== 'undefined' && window.stopAllCalamitySounds) {
-        window.stopAllCalamitySounds();
-      }
+      _stopAllCalamitySounds();
       VS.events.calamity = null;
     }
   }

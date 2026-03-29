@@ -51,6 +51,19 @@ import {
 // Import new daily report UI
 import { showDayCount, showDailyReport } from './ui/dailyReport.js';
 
+/* ── SOUND TOGGLE ─────────────────────────────────────────────
+   Set SOUNDS_ENABLED = false while developing to mute all sounds.
+   Flip back to true for release.
+──────────────────────────────────────────────────────────── */
+var SOUNDS_ENABLED = true; // ← change to false to mute everything
+
+/* Central safe sound player — always use this instead of calling
+   window.playSound directly, so the toggle is respected everywhere. */
+function _playSound(id, opts) {
+  if (!SOUNDS_ENABLED) return;
+  if (typeof window.playSound === 'function') window.playSound(id, opts);
+}
+
 var canvas, ctx;
 var VW = 0, VH = 0;
 var BAR_H = 0;
@@ -168,7 +181,8 @@ function update(dt) {
   if (Math.floor(VS.time) < prevH) { 
     dayCount++; 
     _onNewDay();
-    _calculateDailyRankScore();  // Calculate rank score at day change (async)
+    // Call without await - fire and forget
+    _calculateDailyRankScore();
   }
 
   if (VS.time >= 18.0 && _lastNightSetup !== dayCount) {
@@ -269,7 +283,7 @@ function update(dt) {
 }
 
 /* ── Daily Rank Score Calculation with New UI ───────────────────────────────── */
-async function _calculateDailyRankScore() {
+function _calculateDailyRankScore() {
   // Initialize previous day stats if not exists
   if (!VS.rank.previousDayStats) {
     VS.rank.previousDayStats = {
@@ -307,17 +321,19 @@ async function _calculateDailyRankScore() {
   if (VS.rank.history.length > 30) VS.rank.history.pop();
   
   // Show day count overlay first (3 seconds)
-  await showDayCount(dayCount);
-  
-  // Then show daily report with the new minimal design
-  await showDailyReport(VS, dayCount, result, previousScore, VS.rank.score, oldRank, getNextRank(VS.rank.score));
-  
-  // Check for rank up after report is closed
-  if (newRank.id > oldRank.id) {
-    VS.rank.lastRankId = newRank.id;
-    showRankUpBanner(oldRank, newRank);
-    _onRankUp(newRank, oldRank);
-  }
+  showDayCount(dayCount).then(() => {
+    // Then show daily report with the new minimal design
+    return showDailyReport(VS, dayCount, result, previousScore, VS.rank.score, oldRank, getNextRank(VS.rank.score));
+  }).then(() => {
+    // Check for rank up after report is closed
+    if (newRank.id > oldRank.id) {
+      VS.rank.lastRankId = newRank.id;
+      showRankUpBanner(oldRank, newRank);
+      _onRankUp(newRank, oldRank);
+    }
+  }).catch(err => {
+    console.error('Error showing daily report:', err);
+  });
   
   // Save current stats for next day
   VS.rank.previousDayStats = result.newStats;
@@ -368,9 +384,8 @@ function _onRankUp(newRank, oldRank) {
     }
   }
   
-  // Play rank up sound if available
-  const rankUpAudio = document.getElementById('sfx-unlock');
-  if (rankUpAudio) rankUpAudio.play().catch(() => {});
+  // Play rank up sound
+  _playSound('sfx-unlock');
 }
 
 function _recalcCaps() {
@@ -591,7 +606,7 @@ window.triggerLoad = function() {
   if (savedState.debt) VS.debt = savedState.debt;
   if (savedState.trade) VS.trade = savedState.trade;
   if (savedState.needs) VS.needs = savedState.needs;
-  if (savedState.rank) VS.rank = savedState.rank;  // Load rank data
+  if (savedState.rank) VS.rank = savedState.rank;
   if (savedState.villagers && savedState.villagers.length) VS.villagers = rebuildVillagersFromSave(savedState.villagers);
   if (savedState.buildings && savedState.buildings.length) VS.buildings = rebuildFromSave(savedState.buildings);
   if (savedState.resourceNodes && savedState.resourceNodes.length) {
@@ -620,7 +635,7 @@ window.triggerLoad = function() {
 window.openRankModal = openRankModal;
 
 // Debug function to test the report
-window.debugShowReport = async function() {
+window.debugShowReport = function() {
   const oldRank = getRankFromScore(VS.rank.score);
   const nextRank = getNextRank(VS.rank.score);
   const mockResult = {
@@ -638,14 +653,17 @@ window.debugShowReport = async function() {
       ]
     }
   };
-  await showDailyReport(VS, dayCount, mockResult, VS.rank.score, VS.rank.score + 18, oldRank, nextRank);
+  showDayCount(dayCount).then(() => {
+    return showDailyReport(VS, dayCount, mockResult, VS.rank.score, VS.rank.score + 18, oldRank, nextRank);
+  });
 };
 
-window.debugShowDayCount = async function() {
-  await showDayCount(dayCount);
+window.debugShowDayCount = function() {
+  return showDayCount(dayCount);
 };
 
 console.log('Debug commands: debugShowReport(), debugShowDayCount()');
+console.log('To trigger day change: _VS.time = 23.9');
 
 function updateCanvasSizeForDevice() {
   if (!canvas) return;

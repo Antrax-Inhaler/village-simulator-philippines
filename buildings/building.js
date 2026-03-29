@@ -868,7 +868,7 @@ function _drawMinalangis(ctx, sc, w, h, def, level) {
     ctx.fillStyle = '#2a1808';
     ctx.beginPath(); ctx.ellipse(w*0.44, -h*0.22, 5*sc, 7*sc, 0, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#5a3010'; ctx.lineWidth = 1 * sc;
-    ctx.beginPath(); ctx.ellipse(w*0.44, -h*0.22, 5*sc, 2*sc, 0, Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(w*0.44, -h*0.22, 5*sc, 2*sc, 0, 0, Math.PI); ctx.stroke();
   }
 }
 
