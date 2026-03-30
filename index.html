@@ -107,14 +107,95 @@
       <div class="fab-item" onclick="openSidePanel('trade')" data-label="Kalakalan">⚓</div>
     </div>
 
-    <!-- Shop Button -->
-    <div id="shop-btn-container">
-      <div id="shop-btn" class="shop-btn" onclick="openShop()">
-        <div class="shop-btn-icon">🏗️</div>
-        <div class="shop-btn-text">TINDAHAN</div>
+    <!-- Bottom Button Row: Attack + Shop -->
+    <div id="bottom-btn-row">
+      <div class="bottom-game-btn attack-game-btn" onclick="openAttackScreen()">
+        <div class="bgb-icon">⚔️</div>
+        <div class="bgb-text">LUSUBIN</div>
+      </div>
+      <div id="shop-btn-container" style="position:relative;bottom:auto;right:auto;">
+        <div id="shop-btn" class="shop-btn" onclick="openShop()">
+          <div class="shop-btn-icon">🏗️</div>
+          <div class="shop-btn-text">TINDAHAN</div>
+        </div>
       </div>
     </div>
 
+    <!-- ══════════ ATTACK SCREEN FULL OVERLAY ══════════ -->
+<div id="attack-screen" style="display:none;">
+ 
+      <!-- The battle canvas — click to deploy troops in battle mode -->
+      <canvas id="enemy-canvas"></canvas>
+ 
+      <!-- Top HUD bar -->
+      <div id="atk-hud-top">
+        <button class="atk-btn-pill" onclick="window._atkClose()">◀ Bumalik</button>
+        <div id="atk-village-name">...</div>
+        <button class="atk-btn-pill" onclick="window._atkNewVillage()">🔀 Ibang Nayon</button>
+      </div>
+ 
+      <!-- Info pills under top bar -->
+      <div id="atk-info-strip">
+        <div class="atk-pill">⭐ <span id="atk-level">1</span></div>
+        <div class="atk-pill">👑 <span id="atk-leader">—</span></div>
+        <div class="atk-pill def-pill">🛡️ <span id="atk-def">0</span></div>
+        <div class="atk-pill loot-pill">🪙 <span id="atk-gold">0</span></div>
+        <div class="atk-pill loot-pill">🌾 <span id="atk-rice">0</span></div>
+      </div>
+ 
+      <!-- Destruction progress bar (visible once battle starts) -->
+      <div id="atk-dest-bar-wrap">
+        <div id="atk-dest-bg"><div id="atk-dest-fill"></div></div>
+        <div id="atk-dest-label">0% nasira</div>
+      </div>
+ 
+      <!-- ── PLAN PANEL (shown before Lusubin) ────────────── -->
+      <div id="atk-plan-panel" id="atk-bottom-panel">
+        <div id="atk-bottom-panel" style="
+          position: absolute;
+          bottom: 0; left: 0; right: 0;
+          background: linear-gradient(0deg, rgba(6,3,1,0.97) 0%, rgba(6,3,1,0.90) 75%, transparent 100%);
+          padding: 14px 14px 20px;
+          z-index: 10;
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        ">
+          <div class="atk-panel-header">
+            <span>🪖 Piliin ang Sundalo</span>
+            <span id="atk-power-label">💥 0 vs 🛡️ <span id="atk-def-v">0</span></span>
+          </div>
+          <!-- Troop cards with +/- selectors -->
+          <div id="atk-troop-row"></div>
+          <!-- Win chance bar -->
+          <div id="atk-win-wrap">
+            <div id="atk-win-label">Tsansa ng Tagumpay: <b id="atk-win-pct">—</b></div>
+            <div id="atk-win-bg"><div id="atk-win-fill"></div></div>
+          </div>
+          <!-- Commit troops and switch to deploy mode -->
+          <button id="atk-go-btn" onclick="window._atkLusubin()" disabled>⚔️ LUSUBIN!</button>
+        </div>
+      </div>
+ 
+      <!-- ── DEPLOY PANEL (shown after Lusubin — click canvas to drop troops) ── -->
+      <div id="atk-deploy-panel">
+        <!-- Filled dynamically by attack_controller.js _updateDeployUI() -->
+      </div>
+ 
+    </div><!-- end #attack-screen -->
+
+    <!-- Battle result -->
+    <div id="battle-result" style="display:none;">
+      <div id="battle-result-box">
+        <div id="br-anim"></div>
+        <div id="br-title"></div>
+        <div id="br-body"></div>
+        <button onclick="
+          document.getElementById('battle-result').style.display='none';
+          window._atkClose();
+        ">Sige!</button>
+      </div>
+    </div>
     <!-- Side Panel -->
     <div id="side-panel">
       <div id="side-panel-inner"></div>
@@ -134,10 +215,12 @@
   <audio id="sfx-calamity-tagtuyot" preload="auto" loop><source src="audio/sfx/drought.mp3"    type="audio/mpeg"></audio>
  
   <!-- One-shot SFX -->
-  <audio id="sfx-protest"  preload="auto"><source src="audio/sfx/protest.mp3"  type="audio/mpeg"></audio>
-  <audio id="sfx-election" preload="auto"><source src="audio/sfx/election.mp3" type="audio/mpeg"></audio>
-  <audio id="sfx-birth"    preload="auto"><source src="audio/sfx/birth.mp3"    type="audio/mpeg"></audio>
-  <audio id="sfx-unlock"   preload="auto"><source src="audio/sfx/unlock.mp3"   type="audio/mpeg"></audio>
+  <audio id="sfx-protest"          preload="auto"><source src="audio/sfx/protest.mp3"  type="audio/mpeg"></audio>
+  <audio id="sfx-election"         preload="auto"><source src="audio/sfx/election.mp3" type="audio/mpeg"></audio>
+  <audio id="sfx-birth"            preload="auto"><source src="audio/sfx/birth.mp3"    type="audio/mpeg"></audio>
+  <audio id="sfx-unlock"           preload="auto"><source src="audio/sfx/unlock.mp3"   type="audio/mpeg"></audio>
+  <audio id="sfx-villager-male"    preload="auto"><source src="audio/sfx/male.mp3"     type="audio/mpeg"></audio>
+  <audio id="sfx-villager-female"  preload="auto"><source src="audio/sfx/female.mp3"   type="audio/mpeg"></audio>
  
   <!-- Background Music -->
   <audio id="bgm-day"   preload="auto" loop><source src="audio/bgm/day.mp3"   type="audio/mpeg"></audio>
@@ -1107,5 +1190,6 @@ setInterval(function() {
     })();
   </script>
   <script type="module" src="main.js"></script>
+  <script type="module" src="attack/attack_controller.js"></script>
 </body>
 </html>

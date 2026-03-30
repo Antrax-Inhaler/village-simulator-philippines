@@ -3538,3 +3538,412 @@ canvas.mode-view  { cursor: default; }
     font-size: 10px;
   }
 }
+/* ═══════════════════════════════════════════════════════════
+   ATTACK SYSTEM STYLES
+══════════════════════════════════════════════════════════ */
+
+/* Bottom row: Attack button + Tindahan on same line */
+#bottom-btn-row {
+  position: fixed;
+  bottom: 16px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 25;
+  pointer-events: none;
+}
+#bottom-btn-row > * { pointer-events: all; }
+#shop-btn-container  { position: relative !important; bottom: auto !important; right: auto !important; }
+
+/* Attack button style */
+.bottom-game-btn {
+  background: linear-gradient(145deg, #2a1a0a 0%, #1a1208 100%);
+  border: 2px solid #f5c842;
+  border-radius: 40px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+.bgb-icon { font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.bgb-text {
+  font-family: 'Slackey', sans-serif;
+  font-size: 12px; font-weight: bold;
+  color: #f5c842; letter-spacing: 0.08em;
+}
+.attack-game-btn {
+  background: linear-gradient(145deg, #2a0808 0%, #1a0404 100%) !important;
+  border-color: #e74c3c !important;
+}
+.attack-game-btn .bgb-text { color: #ff9999 !important; }
+.attack-game-btn:hover {
+  background: linear-gradient(145deg, #4a1010 0%, #2a0808 100%) !important;
+  border-color: #ff6666 !important;
+  box-shadow: 0 6px 20px rgba(231,76,60,0.45) !important;
+  transform: scale(1.02) translateY(-2px);
+}
+
+/* ── Full-screen attack overlay ── */
+#attack-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  overflow: hidden;
+  background: #2a4a30;
+  display: none;
+}
+#enemy-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Top HUD bar */
+#atk-hud-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 54px;
+  background: linear-gradient(180deg, rgba(8,4,2,0.94) 0%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: 10;
+  gap: 8px;
+}
+.atk-btn-pill {
+  font-family: 'Oldenburg', serif;
+  font-size: 12px;
+  background: rgba(10,6,2,0.88);
+  border: 1.5px solid #c49a4e;
+  color: #f5c842;
+  border-radius: 20px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.18s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.atk-btn-pill:hover { background: rgba(40,20,8,0.96); border-color: #f5c842; }
+#atk-village-name {
+  font-family: 'Slackey', sans-serif;
+  font-size: 14px;
+  color: #f5e090;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+  flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Info strip */
+#atk-info-strip {
+  position: absolute;
+  top: 54px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 5px;
+  z-index: 10; padding: 4px 0;
+  flex-wrap: wrap; justify-content: center;
+  max-width: 96vw;
+}
+.atk-pill {
+  background: rgba(8,4,2,0.84);
+  border: 1px solid #c49a4e;
+  border-radius: 14px;
+  padding: 3px 9px;
+  font-family: 'Oldenburg', serif;
+  font-size: 11px; color: #f5c842;
+  white-space: nowrap;
+}
+.def-pill  { border-color: #e74c3c; color: #ff9999; }
+.loot-pill { border-color: #27ae60; color: #8ddc8d; }
+
+/* Bottom troop panel */
+#atk-bottom-panel {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(0deg, rgba(6,3,1,0.97) 0%, rgba(6,3,1,0.90) 75%, transparent 100%);
+  padding: 14px 14px 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.atk-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Oldenburg', serif;
+  font-size: 11px;
+  color: #c49a4e;
+}
+
+/* Troop slots */
+#atk-troop-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+#atk-troop-row::-webkit-scrollbar { height: 3px; }
+#atk-troop-row::-webkit-scrollbar-thumb { background: rgba(196,154,78,0.4); border-radius: 2px; }
+
+.troop-slot {
+  background: rgba(18,10,3,0.92);
+  border: 1.5px solid #c49a4e;
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 82px;
+  flex-shrink: 0;
+}
+.ts-icon  { font-size: 22px; }
+.ts-name  { font-family:'Oldenburg',serif; font-size:10px; color:#f5c842; }
+.ts-avail { font-size:9px; color:#a08040; }
+.ts-ctrl  { display:flex; align-items:center; gap:6px; margin-top:2px; }
+.ts-ctrl button {
+  background: rgba(196,154,78,0.15);
+  border: 1px solid #c49a4e;
+  color: #f5c842;
+  border-radius: 50%;
+  width: 22px; height: 22px;
+  font-size: 16px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.ts-ctrl button:hover { background: rgba(196,154,78,0.32); }
+.ts-ctrl span { font-family:monospace; font-size:14px; color:#fff; min-width:20px; text-align:center; }
+
+/* Win bar */
+#atk-win-wrap { display:flex; flex-direction:column; gap:4px; }
+#atk-win-label { font-family:'Oldenburg',serif; font-size:11px; color:#c49a4e; }
+#atk-win-bg { background:rgba(255,255,255,0.09); border-radius:5px; height:9px; overflow:hidden; }
+#atk-win-fill { height:100%; border-radius:5px; transition:width 0.3s, background 0.3s; width:0%; }
+
+/* Lusubin button */
+#atk-go-btn {
+  background: linear-gradient(135deg, #7a1a1a, #4a0a0a);
+  border: 2px solid #e74c3c;
+  color: #ffaaaa;
+  font-family: 'Slackey', sans-serif;
+  font-size: 16px; letter-spacing: 0.08em;
+  padding: 13px;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+#atk-go-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #9a2a2a, #6a1a1a);
+  box-shadow: 0 4px 22px rgba(231,76,60,0.55);
+  transform: translateY(-2px);
+}
+#atk-go-btn:disabled { opacity:0.35; cursor:not-allowed; }
+
+/* ── Battle result modal ── */
+#battle-result {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.84);
+  z-index: 400;
+  display: flex;
+  align-items: center; justify-content: center;
+}
+#battle-result-box {
+  background: linear-gradient(180deg,#1a1008,#0d0806);
+  border: 2px solid #c49a4e;
+  border-radius: 20px;
+  padding: 30px 26px 24px;
+  max-width: 340px; width: 90%;
+  text-align: center;
+  box-shadow: 0 12px 60px rgba(0,0,0,0.92);
+}
+#br-anim { font-size: 58px; margin-bottom: 12px; }
+#br-title {
+  font-family: 'Slackey', sans-serif;
+  font-size: 18px; margin-bottom: 14px;
+}
+#br-body {
+  font-family: 'Crimson Pro', serif;
+  font-size: 14px; color: #d0c080;
+  margin-bottom: 20px; line-height: 1.65;
+}
+.res-loot { font-size:20px; color:#8ddc8d; font-family:'Slackey',sans-serif; margin:4px 0; }
+.res-cas  { color:#e74c3c; font-size:13px; margin-top:8px; }
+#battle-result-box > button {
+  background: linear-gradient(135deg,#2a1808,#1a1004);
+  border: 1.5px solid #c49a4e;
+  color: #f5c842;
+  font-family: 'Oldenburg', serif;
+  font-size: 13px; padding: 10px 32px;
+  border-radius: 24px; cursor: pointer; transition: all 0.2s;
+}
+#battle-result-box > button:hover {
+  background: linear-gradient(135deg,#3a2010,#2a1808);
+  box-shadow: 0 4px 12px rgba(196,154,78,0.35);
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  #bottom-btn-row { bottom: 12px; left: 10px; right: 10px; }
+  .bgb-icon { font-size: 20px; }
+  .bgb-text  { font-size: 11px; }
+  #atk-village-name { font-size: 12px; }
+  .atk-pill { font-size: 10px; padding: 2px 7px; }
+  .troop-slot { min-width: 72px; padding: 6px 7px; }
+}
+.troop-slot-active {
+  box-shadow: 0 0 0 2px #f5c842, 0 0 16px rgba(245,200,66,0.5);
+  transform: translateY(-2px) scale(1.04);
+  transition: all 0.15s;
+}
+.ts-stats {
+  font-size: 9px;
+  color: #7a9a5a;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+ 
+/* ── Deploy panel (replaces bottom panel in battle mode) ─── */
+#atk-deploy-panel {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(0deg, rgba(4,2,1,0.97) 0%, rgba(4,2,1,0.85) 80%, transparent 100%);
+  padding: 14px 14px 22px;
+  z-index: 10;
+  display: none;          /* shown once Lusubin is pressed */
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: all;
+}
+ 
+/* ── Deploy slot card ────────────────────────────────────── */
+.deploy-slot {
+  background: rgba(18,10,3,0.92);
+  border: 1.5px solid #c49a4e;
+  border-radius: 10px;
+  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Oldenburg', serif;
+  font-size: 12px;
+  color: #f5c842;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.deploy-slot:hover {
+  background: rgba(40,20,6,0.96);
+  border-color: #f5c842;
+}
+.deploy-active {
+  border-color: #f5c842 !important;
+  box-shadow: 0 0 0 2px rgba(245,200,66,0.45), 0 0 18px rgba(245,200,66,0.3);
+  transform: scale(1.04);
+}
+.deploy-count {
+  font-family: monospace;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(245,200,66,0.15);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+ 
+/* ── Canvas deploy cursor ────────────────────────────────── */
+#enemy-canvas.deploy-mode {
+  cursor: crosshair;
+}
+ 
+/* ── Battle stats strip ──────────────────────────────────── */
+.battle-stat-strip {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: #a08040;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+ 
+/* ── Star rating in result modal ─────────────────────────── */
+#br-stars {
+  font-size: 28px;
+  letter-spacing: 5px;
+  margin-bottom: 6px;
+}
+#br-pct {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 10px;
+}
+ 
+/* ── Destruction progress bar at top ────────────────────── */
+#atk-dest-bar-wrap {
+  position: absolute;
+  top: 54px; left: 0; right: 0;
+  display: none;           /* shown once battle starts */
+  flex-direction: column;
+  align-items: center;
+  z-index: 11;
+  padding: 4px 12px;
+  pointer-events: none;
+}
+#atk-dest-bar-wrap.visible { display: flex; }
+#atk-dest-bg {
+  background: rgba(0,0,0,0.55);
+  border-radius: 5px;
+  height: 8px;
+  width: 200px;
+  max-width: 80vw;
+  overflow: hidden;
+}
+#atk-dest-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #e74c3c, #f39c12, #27ae60);
+  transition: width 0.4s;
+  width: 0%;
+}
+#atk-dest-label {
+  font-size: 10px;
+  color: #c49a4e;
+  margin-top: 2px;
+}
+ 
+/* ── Troop deploy tooltip ────────────────────────────────── */
+#atk-deploy-tip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(8,4,2,0.85);
+  border: 1px solid #c49a4e;
+  border-radius: 12px;
+  padding: 12px 22px;
+  font-family: 'Oldenburg', serif;
+  font-size: 13px;
+  color: #f5c842;
+  text-align: center;
+  pointer-events: none;
+  z-index: 15;
+  transition: opacity 0.3s;
+}
+#atk-deploy-tip.hidden { opacity: 0; }
+ 
+/* ── Mobile tweaks ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .deploy-slot { font-size: 11px; padding: 6px 9px; }
+  #atk-dest-bg { width: 150px; }
+}
+ 

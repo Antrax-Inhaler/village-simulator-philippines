@@ -171,7 +171,7 @@ export var BUILDING_DEFS = {
     maxUncollectedGold: 0,
     maxUncollectedFood: 0,
     maxUncollectedLangis: 0,
-    trainsRoles:['bantay','bayani'],
+    trainsRoles:['bantay','bayani','marine','airforce'],
   },
 
   templo: {
@@ -351,24 +351,60 @@ export function getMainHallRules(buildings) {
   return MAIN_HALL_RULES[clamp(lv - 1, 0, MAIN_HALL_RULES.length - 1)];
 }
 
-export function canPlaceBuilding(type, buildings, unlockedZones) {
+/* ══════════════════════════════════════════════════════════════
+   canPlaceBuilding(type, buildings, wx, wy, unlockedZones, getZoneAt)
+   ─────────────────────────────────────────────────────────────
+   wx, wy          — world coordinates of the intended placement
+   unlockedZones   — array of zone keys the player owns (e.g. ['dagat'])
+   getZoneAt       — optional fn(wx, wy) → zone key string | null
+                     supplied by input.js via _deps so building.js
+                     stays decoupled from zones.js
+
+   Checks (in order):
+     1. Hall level requirement
+     2. Max-building cap
+     3. If def.requiredZone set → zone type must be unlocked
+     4. If getZoneAt provided → placement must lie inside that zone
+        (prevents dragging a zone-locked building onto open land)
+══════════════════════════════════════════════════════════════ */
+export function canPlaceBuilding(type, buildings, wx, wy, unlockedZones, getZoneAt) {
   var def = BUILDING_DEFS[type];
   if (!def) return { ok: false, msg: 'Hindi kilala ang uri ng gusali.' };
+
   var mhLv  = getMainHallLevel(buildings);
   var rules = getMainHallRules(buildings);
   var count = buildings.filter(function(b) { return b.type !== 'mainHall'; }).length;
+
   if (mhLv < def.minHallLevel) {
     return { ok: false, msg: def.label + ' ay nangangailangan ng Bahay-Bayan Level ' + def.minHallLevel + '.' };
   }
   if (count >= rules.maxBuildings) {
     return { ok: false, msg: 'Puno na ang lugar! I-upgrade ang Bahay-Bayan (Lv' + mhLv + ').' };
   }
+
   if (def.requiredZone) {
     var zones = unlockedZones || [];
+
+    /* Zone type must be unlocked */
     if (zones.indexOf(def.requiredZone) === -1) {
-      return { ok: false, msg: def.label + ' ay nangangailangan ng ' + def.requiredZone + ' zone.' };
+      return {
+        ok: false,
+        msg: def.label + ' ay nangangailangan ng ' + def.requiredZone + ' zone. I-unlock muna.',
+      };
+    }
+
+    /* Placement coordinates must lie inside a matching owned zone */
+    if (typeof getZoneAt === 'function' && wx !== undefined && wy !== undefined) {
+      var zoneAtPos = getZoneAt(wx, wy);
+      if (zoneAtPos !== def.requiredZone) {
+        return {
+          ok: false,
+          msg: def.label + ' ay dapat ilagay sa loob ng ' + def.requiredZone + ' zone.',
+        };
+      }
     }
   }
+
   return { ok: true, msg: '' };
 }
 

@@ -32,10 +32,25 @@
      Set by politics.js based on trust/anger history.
      Leader citizens count 3× in elections.
 
-   EVERYTHING STRUCTURALLY UNCHANGED
-     VILLAGER_TYPES, TRAINING_MAP, drawing code, reproduction,
-     growth, bedtime, night behaviour — all original logic kept.
-     New fields are additive, not replacing.
+   MILITARY VISUAL OVERHAUL (v4)
+     Bantay, Bayani, Marine, Air Force now use _drawArmedBody()
+     which renders:
+       • Armour breastplate over torso
+       • Pauldron shoulder pads
+       • Helmet with visor slit (bantay/bayani) or baret (marine/airforce)
+       • Weapon in right hand — spear (bantay), sword (bayani),
+         rifle (marine/airforce)
+       • Rank stripe on left arm
+     Civilian types continue to use the original _drawBody().
+
+   NEW TYPES (v4)
+     typeIdx 13 — Marine     (trains at Cuartel level 4)
+     typeIdx 14 — Air Force  (trains at Cuartel level 5)
+
+   TRAINING MAP minLevel support
+     Each cuartel entry now has an optional minLevel field that
+     startTraining / drawer.js should check against building.level
+     before offering the course.
 
    COMPLETE VILLAGER OBJECT SHAPE
    ─────────────────────────────────────────────────────────────
@@ -102,6 +117,7 @@ export var VILLAGER_TYPES = [
     waypointBias:'mines', sleeps:true, nightOwl:false, canReproduce:true,
     workBias:'farm', workStayChance:0.72, workRadius:55,
     workWaitMin:3, workWaitMax:9,
+    isArmed:false,
   },
   /* 1 */ {
     type:'mangangalakal', typeIdx:1, role:'Mangangalakal',
@@ -111,15 +127,17 @@ export var VILLAGER_TYPES = [
     waypointBias:'buildings', sleeps:true, nightOwl:false, canReproduce:true,
     workBias:'palengke', workStayChance:0.65, workRadius:60,
     workWaitMin:2, workWaitMax:7,
+    isArmed:false,
   },
   /* 2 */ {
     type:'bantay', typeIdx:2, role:'Bantay',
     scale:1.0, clothColor:'#2C3E50', skinColor:'#F0DDB0',
-    hat:'helm', hatColor:'#7F8C8D',
+    hat:'helm', hatColor:'#566573',
     carryChance:0.1, carryIcon:'🗡️', waitMin:3, waitMax:6, spd:20,
     waypointBias:'buildings', sleeps:false, nightOwl:true, canReproduce:false,
     workBias:'defence', workStayChance:0.55, workRadius:100,
     workWaitMin:4, workWaitMax:10,
+    isArmed:true, armedType:'bantay',
   },
   /* 3 */ {
     type:'matanda', typeIdx:3, role:'Matanda',
@@ -129,6 +147,7 @@ export var VILLAGER_TYPES = [
     waypointBias:'all', sleeps:true, nightOwl:false, canReproduce:false,
     workBias:null, workStayChance:0, workRadius:0,
     workWaitMin:5, workWaitMax:12,
+    isArmed:false,
   },
   /* 4 */ {
     type:'bata', typeIdx:4, role:'Bata',
@@ -138,6 +157,7 @@ export var VILLAGER_TYPES = [
     waypointBias:'all', sleeps:true, nightOwl:false, canReproduce:false,
     workBias:'home', workStayChance:0.60, workRadius:70,
     workWaitMin:1, workWaitMax:4,
+    isArmed:false,
   },
   /* 5 */ {
     type:'guro', typeIdx:5, role:'Guro',
@@ -147,6 +167,7 @@ export var VILLAGER_TYPES = [
     waypointBias:'buildings', sleeps:true, nightOwl:false, canReproduce:true,
     workBias:'paaralan', workStayChance:0.75, workRadius:45,
     workWaitMin:3, workWaitMax:8,
+    isArmed:false,
   },
   /* 6 */ {
     type:'mangingisda', typeIdx:6, role:'Mangingisda',
@@ -156,6 +177,7 @@ export var VILLAGER_TYPES = [
     waypointBias:'mines', sleeps:true, nightOwl:false, canReproduce:true,
     workBias:'river', workStayChance:0.70, workRadius:50,
     workWaitMin:4, workWaitMax:10,
+    isArmed:false,
   },
   /* 7 */ {
     type:'albularyo', typeIdx:7, role:'Albularyo',
@@ -165,6 +187,7 @@ export var VILLAGER_TYPES = [
     waypointBias:'all', sleeps:true, nightOwl:true, canReproduce:true,
     workBias:'templo', workStayChance:0.55, workRadius:65,
     workWaitMin:3, workWaitMax:9,
+    isArmed:false,
   },
   /* 8 */ {
     type:'doktor', typeIdx:8, role:'Doktor',
@@ -174,6 +197,7 @@ export var VILLAGER_TYPES = [
     waypointBias:'buildings', sleeps:true, nightOwl:false, canReproduce:true,
     workBias:'ospital', workStayChance:0.78, workRadius:40,
     workWaitMin:2, workWaitMax:6,
+    isArmed:false,
   },
   /* 9 */ {
     type:'driver', typeIdx:9, role:'Driver',
@@ -183,6 +207,7 @@ export var VILLAGER_TYPES = [
     waypointBias:'buildings', sleeps:true, nightOwl:false, canReproduce:true,
     workBias:'kalye', workStayChance:0.50, workRadius:80,
     workWaitMin:1, workWaitMax:5,
+    isArmed:false,
   },
   /* 10 */ {
     type:'estudyante', typeIdx:10, role:'Estudyante',
@@ -192,15 +217,17 @@ export var VILLAGER_TYPES = [
     waypointBias:'buildings', sleeps:true, nightOwl:false, canReproduce:false,
     workBias:'paaralan', workStayChance:0.65, workRadius:50,
     workWaitMin:2, workWaitMax:6,
+    isArmed:false,
   },
   /* 11 */ {
     type:'bayani', typeIdx:11, role:'Bayani',
-    scale:1.15, clothColor:'#C0392B', skinColor:'#F0DDB0',
-    hat:'helm', hatColor:'#8B0000',
-    carryChance:0.15, carryIcon:'⚔️', waitMin:2, waitMax:5, spd:22,
+    scale:1.15, clothColor:'#922B21', skinColor:'#F0DDB0',
+    hat:'helm', hatColor:'#7B241C',
+    carryChance:0.05, carryIcon:'⚔️', waitMin:2, waitMax:5, spd:22,
     waypointBias:'buildings', sleeps:false, nightOwl:true, canReproduce:false,
     workBias:'cuartel', workStayChance:0.60, workRadius:90,
     workWaitMin:3, workWaitMax:8,
+    isArmed:true, armedType:'bayani',
   },
   /* 12 */ {
     type:'konstruktor', typeIdx:12, role:'Konstruktor',
@@ -210,6 +237,29 @@ export var VILLAGER_TYPES = [
     waypointBias:'buildings', sleeps:true, nightOwl:false, canReproduce:true,
     workBias:'construction', workStayChance:0.90, workRadius:30,
     workWaitMin:1, workWaitMax:4,
+    isArmed:false,
+  },
+  /* 13 — Marine (unlocks at Cuartel level 4) ─────────────── */
+  {
+    type:'marine', typeIdx:13, role:'Marine',
+    scale:1.1, clothColor:'#1B4F72', skinColor:'#F0DDB0',
+    hat:'helm', hatColor:'#1A5276',
+    carryChance:0.05, carryIcon:'🔱', waitMin:2, waitMax:5, spd:28,
+    waypointBias:'buildings', sleeps:false, nightOwl:true, canReproduce:false,
+    workBias:'defence', workStayChance:0.65, workRadius:120,
+    workWaitMin:3, workWaitMax:9,
+    isArmed:true, armedType:'marine',
+  },
+  /* 14 — Air Force (unlocks at Cuartel level 5) ──────────── */
+  {
+    type:'airforce', typeIdx:14, role:'Air Force',
+    scale:1.1, clothColor:'#1C2833', skinColor:'#F0DDB0',
+    hat:'cap', hatColor:'#17202A',
+    carryChance:0.05, carryIcon:'✈️', waitMin:2, waitMax:4, spd:32,
+    waypointBias:'buildings', sleeps:false, nightOwl:true, canReproduce:false,
+    workBias:'defence', workStayChance:0.60, workRadius:150,
+    workWaitMin:3, workWaitMax:8,
+    isArmed:true, armedType:'airforce',
   },
 ];
 
@@ -217,6 +267,8 @@ export var VILLAGER_TYPES = [
    TRAINING MAP
    Maps building type → array of training course entries.
    duration is in real-seconds.
+   minLevel (optional) — minimum building level required.
+   drawer.js / startTraining should check building.level >= minLevel.
 ══════════════════════════════════════════════════════════════ */
 export var TRAINING_MAP = {
   paaralan: [
@@ -226,11 +278,13 @@ export var TRAINING_MAP = {
     { typeIdx:1,  label:'Mangangalakal',   cost:{ gold:80,  rice:20 }, duration:240 },
     { typeIdx:6,  label:'Mangingisda',     cost:{ gold:60,  rice:30 }, duration:180 },
     { typeIdx:7,  label:'Albularyo',       cost:{ gold:120, rice:40 }, duration:360 },
-    { typeIdx:12, label:'Konstruktor',      cost:{ gold:80,  rice:20 }, duration:150 },
+    { typeIdx:12, label:'Konstruktor',     cost:{ gold:80,  rice:20 }, duration:150 },
   ],
   cuartel: [
-    { typeIdx:2,  label:'Bantay',          cost:{ gold:80,  rice:20 }, duration:200 },
-    { typeIdx:11, label:'Bayani',          cost:{ gold:200, rice:60 }, duration:600 },
+    { typeIdx:2,  label:'Bantay',          cost:{ gold:80,  rice:20 }, duration:200,  minLevel:1 },
+    { typeIdx:11, label:'Bayani',          cost:{ gold:200, rice:60 }, duration:600,  minLevel:2 },
+    { typeIdx:13, label:'Marine',          cost:{ gold:320, rice:80 }, duration:700,  minLevel:4 },
+    { typeIdx:14, label:'Air Force',       cost:{ gold:450, rice:100}, duration:900,  minLevel:5 },
   ],
 };
 
@@ -274,9 +328,9 @@ export function createVillager(typeIdx, x, y, parentA, parentB) {
     /* Home + work */
     homeBuilding:   null,
     isHome:         false,
-    isInsideWork:   false,   /* true while inside workBuilding during shift */
+    isInsideWork:   false,
     workBuilding:   null,
-    workTimer:      randRange(10, 60),  /* staggered start so not all rush at once */
+    workTimer:      randRange(10, 60),
     workShiftTimer: 0,
     roamTimer:      0,
 
@@ -285,7 +339,7 @@ export function createVillager(typeIdx, x, y, parentA, parentB) {
     _hoverStopped:     false,
     _savedWaitT:       0,
 
-    /* Type reference cache (set once, avoids repeated array lookup) */
+    /* Type reference cache */
     _typeDef:   vt,
     _typeScale: vt.scale,
 
@@ -301,65 +355,50 @@ export function createVillager(typeIdx, x, y, parentA, parentB) {
     growthTimer: typeIdx === 4 ? 0 : -1,
 
     /* Reproduction */
-    parentA:         parentA || null,
-    parentB:         parentB || null,
-    reproTimer:      randRange(60, 200),
-    hp:              100,
+    parentA:    parentA || null,
+    parentB:    parentB || null,
+    reproTimer: randRange(60, 200),
+    hp:         100,
 
-    /* HP (legacy — kept for building defenceHP compat) */
-    hp: 100,
+    /* ── GDD citizen stats ─────────────────────────────── */
+    hunger:    20,
+    health:    80,
+    govTrust:  40,
+    happiness: 45,
+    anger:     0,
+    income:    0,
 
-    /* ── NEW GDD citizen stats ─────────────────────────── */
-    hunger:    20,       /* 0 = full, 100 = starving */
-    health:    80,       /* 0 = dying, 100 = perfect */
-    govTrust:  40,       /* starts skeptical — player must earn trust */
-    happiness: 45,       /* starts neutral-low — player must improve conditions */
-    anger:     0,        /* 0 = calm, 100 = rioting */
-    income:    0,        /* gold per in-game day (set by economy.js) */
-
-    /* Politics flag — set by politics.js */
+    /* Politics */
     isLeader:  false,
 
-    /* Computed by other systems each tick */
-    _hungerSpeedMult:   1.0,   /* set by resource.js tickFoodPool */
-    _policyHungerMult:  1.0,   /* set by policy.js applyPolicies */
-    _policyIncomeBonus: 0,     /* set by policy.js applyPolicies */
+    /* Computed each tick by other systems */
+    _hungerSpeedMult:   1.0,
+    _policyHungerMult:  1.0,
+    _policyIncomeBonus: 0,
 
-    /* Floating head quip — managed by villagerQuips.js */
+    /* Floating quip */
     _quip: null,
   };
 }
 
 /* ══════════════════════════════════════════════════════════════
    updateVillager
-   Per-tick movement and state update.
-   Called from main.js for every non-sleeping villager.
 ══════════════════════════════════════════════════════════════ */
-/* ── In-game time constants ──────────────────────────────────
-   time.js: 1 real second = 2 in-game minutes at speed 1
-   → 1 in-game hour = 30 real seconds at speed 1
-   Work shift: 6–8 in-game hours = 180–240 real seconds
-   Roam break:  1–2 in-game hours = 30–60 real seconds
-─────────────────────────────────────────────────────────── */
 var REAL_SECS_PER_GAME_HOUR = 30;
-var WORK_SHIFT_MIN_S = 6  * REAL_SECS_PER_GAME_HOUR;   /* 180s */
-var WORK_SHIFT_MAX_S = 8  * REAL_SECS_PER_GAME_HOUR;   /* 240s */
-var ROAM_BREAK_MIN_S = 1  * REAL_SECS_PER_GAME_HOUR;   /* 30s  */
-var ROAM_BREAK_MAX_S = 2  * REAL_SECS_PER_GAME_HOUR;   /* 60s  */
-var ENTER_RADIUS     = 22; /* px — snap inside when within this distance */
+var WORK_SHIFT_MIN_S = 6  * REAL_SECS_PER_GAME_HOUR;
+var WORK_SHIFT_MAX_S = 8  * REAL_SECS_PER_GAME_HOUR;
+var ROAM_BREAK_MIN_S = 1  * REAL_SECS_PER_GAME_HOUR;
+var ROAM_BREAK_MAX_S = 2  * REAL_SECS_PER_GAME_HOUR;
+var ENTER_RADIUS     = 22;
 
 export function updateVillager(v, dt, waypoints) {
-  // Use the hunger speed multiplier from resource.js
   var hungerMult = v._hungerSpeedMult !== undefined ? v._hungerSpeedMult : 1.0;
   var healthMult = 1.0;
-  
   if (v.health !== undefined && v.health < 30) {
     healthMult = clamp(v.health / 30, 0.3, 1.0);
   }
-  
   var speedMult = hungerMult * healthMult;
 
-  /* ── TRAINING: locked inside trainBuilding ─────────────── */
   if (v.isTraining) {
     if (v.trainBuilding) {
       v.x = lerp(v.x, v.trainBuilding.x, 0.1);
@@ -368,13 +407,11 @@ export function updateVillager(v, dt, waypoints) {
     return;
   }
 
-  /* ── INSIDE WORK BUILDING: count down shift then exit ──── */
   if (v.isInsideWork) {
     v.workShiftTimer = Math.max(0, v.workShiftTimer - dt);
     if (v.workShiftTimer <= 0) {
       v.isInsideWork = false;
       if (v.workBuilding) {
-        var vt0 = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
         v.x = v.workBuilding.x + randRange(-20, 20);
         v.y = v.workBuilding.y + 16;
       }
@@ -384,19 +421,13 @@ export function updateVillager(v, dt, waypoints) {
     return;
   }
 
-  /* ── HAS WORK: walk to building and enter after roam break  */
-  // Check if hunger prevents work
   if (v._canWork === false && v.hunger > 80) {
-    // Too hungry to work - stay home/roam
-    v.workTimer = 999; // Delay work indefinitely
+    v.workTimer = 999;
     if (!v.isInsideWork && v.workBuilding) {
-      // Don't go to work, just roam
-      if (v.waitT <= 0) {
-        chooseNextWaypoint(v, waypoints);
-      }
+      if (v.waitT <= 0) chooseNextWaypoint(v, waypoints);
     }
   }
-  
+
   if (v.workBuilding && v.workTimer > 0 && v._canWork !== false) {
     v.workTimer -= dt;
   }
@@ -404,23 +435,19 @@ export function updateVillager(v, dt, waypoints) {
   if (v.workBuilding && v.workTimer <= 0 && !v.isInsideWork && v._canWork !== false) {
     var wb   = v.workBuilding;
     var dToW = dist(v.x, v.y, wb.x, wb.y);
-
     if (dToW <= ENTER_RADIUS) {
       v.isInsideWork   = true;
       v.workShiftTimer = randRange(WORK_SHIFT_MIN_S, WORK_SHIFT_MAX_S);
-      v.x              = wb.x;
-      v.y              = wb.y;
-      v.waitT          = 0;
+      v.x = wb.x; v.y = wb.y;
+      v.waitT = 0;
       return;
     }
-
     if (v.waitT <= 0 || (dist(v.destX, v.destY, wb.x, wb.y) > ENTER_RADIUS * 2)) {
       v.destX = wb.x + randRange(-10, 10);
       v.destY = wb.y + randRange(-6, 6);
     }
   }
 
-  /* ── WAIT TIMER ────────────────────────────────────────── */
   if (v.waitT > 0) {
     v.waitT -= dt;
     if (v.waitT <= 0) {
@@ -431,24 +458,21 @@ export function updateVillager(v, dt, waypoints) {
     return;
   }
 
-  /* ── MOVEMENT ──────────────────────────────────────────── */
   var dx  = v.destX - v.x;
   var dy  = v.destY - v.y;
   var d   = Math.sqrt(dx * dx + dy * dy);
   var spd = v.spd * perspScale(v.y) * speedMult;
 
   if (d < spd * dt + 1) {
-    v.x = v.destX;
-    v.y = v.destY;
-
-    if (v.workBuilding && v.workTimer <= 0 && dist(v.x, v.y, v.workBuilding.x, v.workBuilding.y) <= ENTER_RADIUS && v._canWork !== false) {
+    v.x = v.destX; v.y = v.destY;
+    if (v.workBuilding && v.workTimer <= 0 &&
+        dist(v.x, v.y, v.workBuilding.x, v.workBuilding.y) <= ENTER_RADIUS &&
+        v._canWork !== false) {
       v.isInsideWork   = true;
       v.workShiftTimer = randRange(WORK_SHIFT_MIN_S, WORK_SHIFT_MAX_S);
-      v.x              = v.workBuilding.x;
-      v.y              = v.workBuilding.y;
+      v.x = v.workBuilding.x; v.y = v.workBuilding.y;
       return;
     }
-
     var vt2 = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
     v.waitT = randRange(vt2.waitMin, vt2.waitMax);
     chooseNextWaypoint(v, waypoints);
@@ -465,8 +489,6 @@ export function updateVillager(v, dt, waypoints) {
   _updateMood(v, dt);
 }
 
-
-/* ── Choose a work-biased waypoint ────────────────────────── */
 function _chooseWorkWaypoint(v, vt) {
   if (!v.workBuilding) return;
   var wb = v.workBuilding;
@@ -476,108 +498,67 @@ function _chooseWorkWaypoint(v, vt) {
   v.workTimer = randRange(vt.workWaitMin || 3, vt.workWaitMax || 9);
 }
 
-/* ── Mood drift based on GDD stats ────────────────────────── */
 function _updateMood(v, dt) {
-  /* Don't drift if fixed by a recent event */
   if (Math.random() > 0.0003) return;
-
-  if (v.hunger > 70)     { v.mood = 'stressed'; return; }
-  if (v.health < 30)     { v.mood = 'tired';    return; }
-  if (v.happiness > 75)  { v.mood = 'masaya';   return; }
-  if (v.anger > 60)      { v.mood = 'stressed'; return; }
-  if (v.govTrust > 70)   { v.mood = 'happy';    return; }
-
+  if (v.hunger > 70)    { v.mood = 'stressed'; return; }
+  if (v.health < 30)    { v.mood = 'tired';    return; }
+  if (v.happiness > 75) { v.mood = 'masaya';   return; }
+  if (v.anger > 60)     { v.mood = 'stressed'; return; }
+  if (v.govTrust > 70)  { v.mood = 'happy';    return; }
   var moods = ['happy', 'masaya', 'tired'];
   v.mood = moods[randInt(0, moods.length - 1)];
 }
 
-/* ══════════════════════════════════════════════════════════════
-   chooseNextWaypoint
-   Picks a destination from the waypoints pool.
-   Respects workBias when workTimer > 0.
-══════════════════════════════════════════════════════════════ */
 export function chooseNextWaypoint(v, waypoints) {
   var vt = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
-
-  /* Work bias: go near workBuilding */
   if (v.workBuilding && vt.workStayChance > 0 && Math.random() < vt.workStayChance) {
     _chooseWorkWaypoint(v, vt);
     return;
   }
-
-  /* Waypoint pool selection */
   var pool = waypoints.all;
   if (vt.waypointBias === 'mines'     && waypoints.mines.length)     pool = waypoints.mines;
   if (vt.waypointBias === 'buildings' && waypoints.buildings.length) pool = waypoints.buildings;
-
   if (!pool || pool.length === 0) return;
-
   var wp = pool[randInt(0, pool.length - 1)];
   v.destX = wp.wx + randRange(-20, 20);
   v.destY = wp.wy + randRange(-10, 10);
 }
 
-/* ══════════════════════════════════════════════════════════════
-   assignHomes
-   Distributes villagers to house buildings.
-   Houses have a capacity (popBonus × level). Called from main.js
-   _onNewDay() and after any building change.
-══════════════════════════════════════════════════════════════ */
 export function assignHomes(villagers, buildings) {
-  /* Clear existing assignments */
   villagers.forEach(function(v) { v.homeBuilding = null; });
   buildings.forEach(function(b) { b._occupants = []; });
-
-  /* Collect home buildings sorted by distance centroid */
   var homes = buildings.filter(function(b) { return b.getDef().isHome; });
-
   villagers.forEach(function(v) {
-    /* Find the least-full home with capacity remaining */
     var best = null, bestScore = Infinity;
     homes.forEach(function(h) {
       var cap = h.getCapacity();
       if (cap <= 0) return;
-      var occ   = h._occupants.length;
+      var occ = h._occupants.length;
       if (occ >= cap) return;
-      /* Score: prefer closer + less full */
       var d = dist(v.x, v.y, h.x, h.y);
       var score = d + occ * 200;
       if (score < bestScore) { bestScore = score; best = h; }
     });
-    if (best) {
-      v.homeBuilding = best;
-      best._occupants.push(v);
-    }
+    if (best) { v.homeBuilding = best; best._occupants.push(v); }
   });
 }
 
-/* ══════════════════════════════════════════════════════════════
-   assignWork
-   Assigns each villager to a work building matching their workBias.
-   Called from main.js _onNewDay() after assignHomes.
-══════════════════════════════════════════════════════════════ */
 export function assignWork(villagers, buildings) {
-  /* Clear existing work assignments */
   villagers.forEach(function(v) { v.workBuilding = null; });
-
   villagers.forEach(function(v) {
     var vt = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
     if (!vt.workBias) return;
-
     var candidates;
     if (vt.workBias === 'defence') {
       candidates = buildings.filter(function(b) { return b.getDef().category === 'defence'; });
     } else if (vt.workBias === 'home') {
       candidates = buildings.filter(function(b) { return b.getDef().isHome; });
     } else if (vt.workBias === 'construction') {
-      /* Konstruktors go to the nearest building under construction */
       candidates = buildings.filter(function(b) { return b.underConstruction; });
     } else {
       candidates = buildings.filter(function(b) { return b.type === vt.workBias; });
     }
-
     if (!candidates.length) return;
-
     var best = null, bestDist = Infinity;
     candidates.forEach(function(b) {
       var d = dist(v.x, v.y, b.x, b.y);
@@ -586,13 +567,11 @@ export function assignWork(villagers, buildings) {
     if (best) v.workBuilding = best;
   });
 
-  /* Reset all worker tracking */
   buildings.forEach(function(b) {
     b.workers          = [];
     b._assignedWorkers = [];
   });
 
-  /* Register assigned workers into building._assignedWorkers */
   villagers.forEach(function(v) {
     if (v.workBuilding && !v.workBuilding.underConstruction) {
       var slots = v.workBuilding.getWorkerSlots ? v.workBuilding.getWorkerSlots() : 0;
@@ -602,7 +581,6 @@ export function assignWork(villagers, buildings) {
     }
   });
 
-  /* Construction sites: Konstruktors + unemployed adults as helpers */
   var constructionSites = buildings.filter(function(b) { return b.underConstruction; });
   villagers.forEach(function(v) {
     var vt = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
@@ -612,9 +590,7 @@ export function assignWork(villagers, buildings) {
         var d = dist(v.x, v.y, b.x, b.y);
         if (d < nearestDist) { nearestDist = d; nearest = b; }
       });
-      if (nearest && nearest.workers.length < 5) {
-        v.workBuilding = nearest;
-      }
+      if (nearest && nearest.workers.length < 5) v.workBuilding = nearest;
     }
     if (v.workBuilding && v.workBuilding.underConstruction) {
       if (v.workBuilding.workers.indexOf(v.id) === -1 && v.workBuilding.workers.length < 5) {
@@ -624,21 +600,16 @@ export function assignWork(villagers, buildings) {
   });
 }
 
-/* ══════════════════════════════════════════════════════════════
-   getBedtime / updateNightBehaviour
-   Night cycle: villagers go home at bedtime, stay until dawn.
-══════════════════════════════════════════════════════════════ */
 export function getBedtime(v) {
   var vt = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
-  if (!vt.sleeps) return Infinity;           /* night owls never sleep */
-  return 20 + randRange(-1.5, 1.5);         /* sleep 20:00 ± variance */
+  if (!vt.sleeps) return Infinity;
+  return 20 + randRange(-1.5, 1.5);
 }
 
 export function updateNightBehaviour(v, currentHour, bedtime) {
-  var vt      = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
+  var vt = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
   var wakeHour = 6.0;
 
-  /* ── SLEEPING: already inside home ────────────────────── */
   if (v.isHome) {
     if (currentHour >= wakeHour && currentHour < bedtime) {
       v.isHome = false;
@@ -647,125 +618,69 @@ export function updateNightBehaviour(v, currentHour, bedtime) {
     return 'home';
   }
 
-  /* ── BEDTIME ───────────────────────────────────────────── */
   if (vt.sleeps && currentHour >= bedtime) {
-    /* Exit work building */
     v.isInsideWork = false;
-
-    if (!v.homeBuilding) {
-      /* Homeless — just disappear (hide) */
-      v.isHome = true;
-      return 'home';
-    }
-
+    if (!v.homeBuilding) { v.isHome = true; return 'home'; }
     var hb = v.homeBuilding;
     var dh = dist(v.x, v.y, hb.x, hb.y);
-
     if (dh <= ENTER_RADIUS) {
-      /* At the door — go inside */
-      v.isHome = true;
-      v.x      = hb.x;
-      v.y      = hb.y;
-      v.waitT  = 0;
+      v.isHome = true; v.x = hb.x; v.y = hb.y; v.waitT = 0;
       return 'home';
     }
-
-    /* Walk straight toward home door — override any other destination */
-    v.destX = hb.x;
-    v.destY = hb.y;
-    v.waitT = 0;  /* don't pause, keep walking */
-    return 'awake';  /* still awake but walking home */
+    v.destX = hb.x; v.destY = hb.y; v.waitT = 0;
+    return 'awake';
   }
-
   return 'awake';
 }
 
-/* ══════════════════════════════════════════════════════════════
-   updateReproduction
-   Randomly pairs compatible adults and spawns a child.
-   spawnFn is called with (typeIdx=4, x, y, parentA, parentB).
-══════════════════════════════════════════════════════════════ */
 export function updateReproduction(villagers, dt, VS, spawnFn) {
   if (villagers.length >= VS.pop.max) return;
-
   for (var i = 0; i < villagers.length; i++) {
     var v = villagers[i];
     var vt = VILLAGER_TYPES[v.typeIdx] || VILLAGER_TYPES[0];
     if (!vt.canReproduce || v.isChild || v.isTraining) continue;
-
     v.reproTimer -= dt;
     if (v.reproTimer > 0) continue;
     v.reproTimer = randRange(120, 300);
-
-    /* Find a nearby compatible partner */
     for (var j = i + 1; j < villagers.length; j++) {
-      var p = villagers[j];
+      var p  = villagers[j];
       var pt = VILLAGER_TYPES[p.typeIdx] || VILLAGER_TYPES[0];
       if (!pt.canReproduce || p.isChild || p.isTraining) continue;
       if (v.gender === p.gender) continue;
       if (dist(v.x, v.y, p.x, p.y) > 60) continue;
-
-      /* Happiness and health influence reproduction chance */
       var happMult   = ((v.happiness || 60) + (p.happiness || 60)) / 200;
       var healthMult = ((v.health    || 80) + (p.health    || 80)) / 200;
       var chance     = 0.25 * happMult * healthMult;
-
-      if (Math.random() < chance) {
-        spawnFn(4, (v.x + p.x) / 2, (v.y + p.y) / 2, v, p);
-      }
+      if (Math.random() < chance) spawnFn(4, (v.x + p.x) / 2, (v.y + p.y) / 2, v, p);
       break;
     }
   }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   updateGrowth
-   Children age up to adult (random type) after growthTimer.
-══════════════════════════════════════════════════════════════ */
-/* ── Growth stages ────────────────────────────────────────
-   Bata (child, typeIdx=4):
-     0  →  90s  : baby — stays as Bata, small scale
-     90 → 180s  : teen — becomes Estudyante (typeIdx=10)
-                  Can now enroll in Paaralan for a profession
-     After training graduates → chosen adult profession
-   
-   If no Paaralan / not enrolled after 300 real seconds:
-     auto-graduates to a default adult profession (magsasaka)
-─────────────────────────────────────────────────────── */
-var TEEN_AGE_SECS   = 90;    /* 90 real sec = 3 in-game hours  */
-var ADULT_AUTO_SECS = 300;   /* 300 real sec = 10 in-game hours */
+var TEEN_AGE_SECS   = 90;
+var ADULT_AUTO_SECS = 300;
 
 export function updateGrowth(villagers, dt, VS, notifyFn) {
   for (var i = 0; i < villagers.length; i++) {
     var v = villagers[i];
-    if (v.typeIdx !== 4 && v.typeIdx !== 10) continue;  /* only bata / estudyante */
+    if (v.typeIdx !== 4 && v.typeIdx !== 10) continue;
     if (v.isTraining) continue;
-
-    /* Don't keep incrementing for waiting estudyantes - just hold at cap */
     if (!(v.typeIdx === 10 && v.growthTimer >= ADULT_AUTO_SECS)) {
       v.growthTimer += dt;
     }
-
-    /* Stage 1: Baby → Teen (Estudyante) after 90 real seconds */
     if (v.typeIdx === 4 && v.growthTimer >= TEEN_AGE_SECS) {
-      v.typeIdx    = 10;   /* Estudyante */
+      v.typeIdx    = 10;
       v._typeDef   = VILLAGER_TYPES[10];
       v._typeScale = VILLAGER_TYPES[10].scale;
       v.spd        = VILLAGER_TYPES[10].spd;
       v.isChild    = false;
-      /* Reset workBuilding — they should now go to paaralan */
       v.workBuilding = null;
       if (notifyFn) notifyFn(v.label + ' ay naging Estudyante na! I-enroll sa Paaralan.', 'info');
     }
-
-    /* Stage 2: Estudyante auto-graduates if not enrolled after 300s */
     if (v.typeIdx === 10 && v.growthTimer >= ADULT_AUTO_SECS && !v.isTraining) {
-      /* Check if there is a paaralan they could enroll in */
       var hasPaaralan = VS && VS.buildings && VS.buildings.some(function(b) { return b.type === 'paaralan' && !b.underConstruction; });
-      /* Auto-graduate to magsasaka (most common need in a village) */
-      var adultIdx = hasPaaralan ? 10 : 0;   /* stay estudyante if paaralan exists so player can enroll */
       if (!hasPaaralan) {
-        v.typeIdx    = 0;   /* magsasaka */
+        v.typeIdx    = 0;
         v._typeDef   = VILLAGER_TYPES[0];
         v._typeScale = VILLAGER_TYPES[0].scale;
         v.spd        = VILLAGER_TYPES[0].spd;
@@ -775,52 +690,42 @@ export function updateGrowth(villagers, dt, VS, notifyFn) {
         v.health      = 80;
         if (notifyFn) notifyFn(v.label + ' ay naging Magsasaka (walang Paaralan).', 'info');
       }
-      /* If paaralan exists, stay as estudyante until enrolled or player acts */
     }
   }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   updateTraining
-   Ticks training progress. Calls completion when done.
-   Training speed can be boosted by Pondo sa Edukasyon policy.
-══════════════════════════════════════════════════════════════ */
 export function updateTraining(villagers, dt) {
   for (var i = 0; i < villagers.length; i++) {
     var v = villagers[i];
     if (!v.isTraining || !v.trainEntry) continue;
-
-    /* Policy speed bonus via _policyTrainingMult */
     var speedMult = v._policyTrainingMult || 1.0;
     var tickRate  = dt / v.trainEntry.duration;
     v.trainingProgress = Math.min(1.0, v.trainingProgress + tickRate * speedMult);
-
     if (v.trainingProgress >= 1.0) {
-      /* Graduate — change type */
       var newIdx   = v.trainEntry.typeIdx;
       v.typeIdx    = newIdx;
       v._typeDef   = VILLAGER_TYPES[newIdx];
       v._typeScale = VILLAGER_TYPES[newIdx].scale;
       v.spd        = VILLAGER_TYPES[newIdx].spd;
-      /* Clear training state */
       v.isTraining       = false;
       v.trainingProgress = 0;
       v.trainBuilding    = null;
       v.trainEntry       = null;
-      /* Small govTrust boost on graduation */
       v.govTrust = clamp((v.govTrust || 50) + 5, 0, 100);
     }
   }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   startTraining
-   Begins a training course for a villager at a building.
-   Called from ui/drawer.js when player picks a course.
-══════════════════════════════════════════════════════════════ */
 export function startTraining(villager, building, entry, VS) {
   if (villager.isTraining) {
     return { ok: false, msg: villager.label + ' ay nag-aaral na.' };
+  }
+  /* Check building level for minLevel-gated courses */
+  if (entry.minLevel && building.level < entry.minLevel) {
+    return {
+      ok:  false,
+      msg: 'Kailangan ng Cuartel Level ' + entry.minLevel + ' para mag-train ng ' + entry.label + '.',
+    };
   }
   if (VS.res.gold < entry.cost.gold || VS.res.rice < entry.cost.rice) {
     return {
@@ -828,31 +733,22 @@ export function startTraining(villager, building, entry, VS) {
       msg: 'Kulang! ' + entry.cost.gold + ' ginto at ' + entry.cost.rice + ' bigas.',
     };
   }
-
   VS.res.gold -= entry.cost.gold;
   VS.res.rice -= entry.cost.rice;
-
   villager.isTraining       = true;
   villager.trainingProgress = 0;
   villager.trainBuilding    = building;
   villager.trainEntry       = entry;
-  villager.waitT            = 9999;  /* freeze movement */
-
+  villager.waitT            = 9999;
   return {
     ok:  true,
     msg: villager.label + ' nagsimulang mag-aral bilang ' + entry.label + '!',
   };
 }
 
-/* ══════════════════════════════════════════════════════════════
-   rebuildVillagersFromSave
-   Reconstructs villager objects from a save state array.
-   Handles both v2 saves (missing new fields) and v3 saves.
-══════════════════════════════════════════════════════════════ */
 export function rebuildVillagersFromSave(savedVillagers) {
   return savedVillagers.map(function(d) {
     var v = createVillager(d.typeIdx || 0, d.x, d.y);
-    /* Restore identity */
     v.id          = d.id;
     v.label       = d.label       || v.label;
     v.gender      = d.gender      || v.gender;
@@ -860,7 +756,6 @@ export function rebuildVillagersFromSave(savedVillagers) {
     v.personality = d.personality || v.personality;
     v.carrying    = d.carrying    !== undefined ? d.carrying : v.carrying;
     v.hp          = d.hp          !== undefined ? d.hp : 100;
-    /* Restore GDD stats with safe fallbacks for v2 saves */
     v.hunger         = d.hunger    !== undefined ? d.hunger    : 20;
     v.health         = d.health    !== undefined ? d.health    : 80;
     v.govTrust       = d.govTrust  !== undefined ? d.govTrust  : 40;
@@ -874,8 +769,7 @@ export function rebuildVillagersFromSave(savedVillagers) {
 
 /* ══════════════════════════════════════════════════════════════
    drawVillager
-   Canvas rendering — unchanged visual logic from original.
-   Reads new stats only for the health-based alpha fade.
+   Reads isArmed / armedType to route to the correct body renderer.
 ══════════════════════════════════════════════════════════════ */
 export function drawVillager(ctx, v) {
   if (v.isHome || v.isInsideWork) return;
@@ -900,44 +794,52 @@ export function drawVillager(ctx, v) {
   ctx.globalAlpha = healthAlpha;
   ctx.translate(v.x, v.y - bob);
 
+  /* Shadow */
   ctx.fillStyle = 'rgba(0,0,0,0.22)';
   ctx.beginPath();
   ctx.ellipse(0, 3 * sc + bob, 9 * sc * (1 - bob * 0.02), 3 * sc, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  _drawBody(ctx, vt, sc, v.isChild, walkAmt, moving);
-  if (vt.hat !== 'none') _drawHat(ctx, vt, sc);
+  /* Body — armed units get a distinct military renderer */
+  if (vt.isArmed) {
+    var _anim = (v.attackAnimation && v.attackAnimation.progress < 1) ? v.attackAnimation : null;
+    _drawArmedBody(ctx, vt, sc, walkAmt, moving, _anim);
+  } else {
+    _drawBody(ctx, vt, sc, v.isChild, walkAmt, moving);
+  }
+
+  /* Hat — only for non-armed (armed body draws its own headgear) */
+  if (!vt.isArmed && vt.hat !== 'none') _drawHat(ctx, vt, sc);
+
+  /* Carry icon */
   if (v.carrying && v.carryIcon) {
-    ctx.font      = (13 * sc) + 'px serif';
-    ctx.textAlign = 'center';
+    ctx.font         = (13 * sc) + 'px serif';
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.globalAlpha *= 0.9;
     ctx.fillText(v.carryIcon, 12 * sc, -18 * sc);
   }
 
-  /* Enhanced hunger indicator - color changes based on severity */
+  /* Hunger indicator */
   if (v.hunger !== undefined) {
     if (v.hunger > 80) {
-      // Severe hunger - red exclamation + red aura
       ctx.globalAlpha = 0.7 + Math.sin(t * 8) * 0.3;
-      ctx.fillStyle = '#e74c3c';
-      ctx.font = 'bold ' + (12 * sc) + 'px sans-serif';
+      ctx.fillStyle   = '#e74c3c';
+      ctx.font        = 'bold ' + (12 * sc) + 'px sans-serif';
       ctx.fillText('!!!', 0, -32 * sc);
       ctx.globalAlpha = 0.3;
-      ctx.fillStyle = '#ff4444';
+      ctx.fillStyle   = '#ff4444';
       ctx.beginPath();
       ctx.arc(0, -20 * sc, 12 * sc, 0, Math.PI * 2);
       ctx.fill();
     } else if (v.hunger > 60) {
-      // Moderate hunger - orange warning
       ctx.globalAlpha = 0.6;
-      ctx.fillStyle = '#ff8844';
-      ctx.font = 'bold ' + (10 * sc) + 'px sans-serif';
+      ctx.fillStyle   = '#ff8844';
+      ctx.font        = 'bold ' + (10 * sc) + 'px sans-serif';
       ctx.fillText('!', 0, -32 * sc);
     } else if (v.hunger > 30) {
-      // Mild hunger - small yellow dot
       ctx.globalAlpha = 0.8;
-      ctx.fillStyle = '#ffaa44';
+      ctx.fillStyle   = '#ffaa44';
       ctx.beginPath();
       ctx.arc(6 * sc, -28 * sc, 2.2 * sc, 0, Math.PI * 2);
       ctx.fill();
@@ -958,55 +860,668 @@ export function drawVillager(ctx, v) {
   if (v._quip) drawVillagerQuip(ctx, v, window._camZoom || 1);
 }
 
-/* ── Body drawing ─────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   _drawArmedBody
+   Distinct visual for military units: Bantay, Bayani, Marine,
+   Air Force.  Each armedType gets its own weapon, armour tint,
+   and helmet style.
+
+   armedType values:
+     'bantay'   — dark blue-grey armour, spear
+     'bayani'   — deep red armour, sword + cape
+     'marine'   — navy blue armour, rifle, anchor badge
+     'airforce' — charcoal armour, rifle, wing badge
+══════════════════════════════════════════════════════════════ */
+function _drawArmedBody(ctx, vt, sc, walkAmt, moving, anim) {
+  var at  = vt.armedType || 'bantay';
+  var wa  = walkAmt || 0;
+
+  /* ── Read attack animation overrides ──────────────────────
+     anim.aimAngle    — world-space direction arm points (radians)
+     anim.swingOffset — extra reach along aimAngle (pixels before sc)
+     anim.bodyLean    — torso shear
+     anim.kickAngle   — extra weapon rotation on top of aimAngle
+     anim.recoilBack  — body pushed opposite to aimAngle
+  ── */
+  var isAttacking   = anim && anim.progress > 0 && anim.progress < 1;
+  var animAimAngle  = isAttacking ? (anim.aimAngle  || 0) : null;
+  var animSwing     = isAttacking ? (anim.swingOffset || 0) : 0;
+  var animBodyLean  = isAttacking ? (anim.bodyLean   || 0) : 0;
+  var animKick      = isAttacking ? (anim.kickAngle  || 0) : 0;
+  var animRecoilBack= isAttacking ? (anim.recoilBack || 0) : 0;
+
+  /* Apply whole-body recoil: push OPPOSITE to the aim direction */
+  if (animRecoilBack > 0 && animAimAngle !== null) {
+    ctx.translate(
+      -Math.cos(animAimAngle) * animRecoilBack * sc * 0.25,
+      -Math.sin(animAimAngle) * animRecoilBack * sc * 0.25
+    );
+  }
+
+  /* ── Colour palette per branch ───────────────────────── */
+  var palette = {
+    bantay: {
+      armour:'#2C3E50', armourDark:'#1A252F', armourLight:'#3D5166',
+      pants:'#1A252F', skin:vt.skinColor,
+      helmetMain:'#566573', helmetVisor:'#1C2833',
+      strapCol:'#AAB7B8', rankCol:'#F0B27A',
+      weapon:'spear',
+    },
+    bayani: {
+      armour:'#922B21', armourDark:'#641E16', armourLight:'#C0392B',
+      pants:'#641E16', skin:vt.skinColor,
+      helmetMain:'#7B241C', helmetVisor:'#1C2833',
+      strapCol:'#F5CBA7', rankCol:'#F9E79F',
+      weapon:'sword',
+      hasCape: true,
+    },
+    marine: {
+      armour:'#1B4F72', armourDark:'#154360', armourLight:'#2E86C1',
+      pants:'#154360', skin:vt.skinColor,
+      helmetMain:'#1A5276', helmetVisor:'#0D1B2A',
+      strapCol:'#AED6F1', rankCol:'#7FB3D3',
+      weapon:'rifle',
+      badge:'anchor',
+    },
+    airforce: {
+      armour:'#1C2833', armourDark:'#17202A', armourLight:'#2C3E50',
+      pants:'#17202A', skin:vt.skinColor,
+      helmetMain:'#212F3D', helmetVisor:'#0A0F14',
+      strapCol:'#85929E', rankCol:'#D5D8DC',
+      weapon:'rocket',
+      badge:'wings',
+    },
+  };
+
+  var p = palette[at] || palette.bantay;
+
+  /* ── Cape (Bayani only) — drawn behind body ──────────── */
+  if (p.hasCape) {
+    ctx.fillStyle = '#7B241C';
+    ctx.save();
+    ctx.transform(1, 0, wa * 0.06, 1, 0, 0);
+    ctx.beginPath();
+    ctx.moveTo(-4 * sc, -13 * sc);
+    ctx.quadraticCurveTo(-14 * sc + wa * 2 * sc, -5 * sc, -10 * sc + wa * sc, 6 * sc);
+    ctx.lineTo(-4 * sc, 5 * sc);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* ── Legs ─────────────────────────────────────────────── */
+  ctx.fillStyle = p.pants;
+  /* Left leg */
+  ctx.save();
+  ctx.translate(-2.5 * sc, 0);
+  ctx.transform(1, 0, wa * 0.04, 1, 0, 0);
+  ctx.fillRect(-2 * sc, 0, 4 * sc, 9 * sc);
+  /* Boot */
+  ctx.fillStyle = _darken(p.pants, 0.3);
+  ctx.fillRect(-2.5 * sc, 7 * sc, 5 * sc, 3 * sc);
+  ctx.restore();
+  /* Right leg */
+  ctx.fillStyle = p.pants;
+  ctx.save();
+  ctx.translate(2.5 * sc, 0);
+  ctx.transform(1, 0, -wa * 0.04, 1, 0, 0);
+  ctx.fillRect(-2 * sc, 0, 4 * sc, 9 * sc);
+  ctx.fillStyle = _darken(p.pants, 0.3);
+  ctx.fillRect(-2.5 * sc, 7 * sc, 5 * sc, 3 * sc);
+  ctx.restore();
+
+  /* ── Torso / breastplate ─────────────────────────────── */
+  ctx.save();
+  var totalLean = wa * 0.04 + animBodyLean;
+  ctx.transform(1, 0, totalLean, 1, 0, 0);
+  /* Base cloth */
+  ctx.fillStyle = p.armour;
+  ctx.fillRect(-5 * sc, -14 * sc, 10 * sc, 15 * sc);
+  /* Breastplate highlight */
+  ctx.fillStyle = p.armourLight;
+  ctx.beginPath();
+  ctx.moveTo(-3.5 * sc, -13 * sc);
+  ctx.lineTo(0, -11 * sc);
+  ctx.lineTo(3.5 * sc, -13 * sc);
+  ctx.lineTo(3.5 * sc, -5 * sc);
+  ctx.lineTo(0, -3 * sc);
+  ctx.lineTo(-3.5 * sc, -5 * sc);
+  ctx.closePath();
+  ctx.fill();
+  /* Centre line */
+  ctx.strokeStyle = p.armourDark;
+  ctx.lineWidth   = 0.8 * sc;
+  ctx.beginPath();
+  ctx.moveTo(0, -13 * sc);
+  ctx.lineTo(0, -1 * sc);
+  ctx.stroke();
+  /* Horizontal strap */
+  ctx.fillStyle = p.strapCol;
+  ctx.fillRect(-5 * sc, -8 * sc, 10 * sc, 1.5 * sc);
+  /* Rank stripe on left arm — 2 stripes for bayani/marine/airforce, 1 for bantay */
+  ctx.fillStyle = p.rankCol;
+  var stripes = (at === 'bantay') ? 1 : (at === 'bayani') ? 2 : 3;
+  for (var ri = 0; ri < stripes; ri++) {
+    ctx.fillRect(-5 * sc, -13 * sc + ri * 2.5 * sc, 2.5 * sc, 1.5 * sc);
+  }
+  ctx.restore();
+
+  /* ── Pauldrons (shoulder pads) ───────────────────────── */
+  ctx.fillStyle = p.armourLight;
+  ctx.beginPath();
+  ctx.ellipse(-6.5 * sc, -12 * sc, 4 * sc, 2.5 * sc, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(6.5 * sc, -12 * sc, 4 * sc, 2.5 * sc, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  /* ── Arms ────────────────────────────────────────────── */
+  ctx.fillStyle = p.armour;
+  /* Left arm (swing back) */
+  ctx.save();
+  ctx.translate(-6.5 * sc, -12 * sc);
+  ctx.transform(1, 0, -wa * 0.10, 1, 0, 0);
+  ctx.fillRect(-1.5 * sc, 0, 3 * sc, 8 * sc);
+  /* Gauntlet */
+  ctx.fillStyle = p.armourDark;
+  ctx.fillRect(-2 * sc, 6 * sc, 4 * sc, 3 * sc);
+  ctx.restore();
+
+  /* Right arm holds weapon — target-facing when attacking */
+  ctx.fillStyle = p.armour;
+  ctx.save();
+  ctx.translate(6.5 * sc, -12 * sc);
+
+  if (animAimAngle !== null) {
+    /* ── ATTACK POSE: arm rotates to point toward the target ──
+       The arm is drawn DOWN from shoulder (0 = points down).
+       aimAngle is a world-space direction (0 = right, -PI/2 = up).
+       We add PI/2 so that aim=up maps to arm pointing up.        */
+    var shoulderAng = animAimAngle + Math.PI / 2;
+    ctx.rotate(shoulderAng);
+    /* Reach along aim direction */
+    ctx.translate(0, -animSwing * sc * 0.6);
+  } else {
+    /* ── IDLE / WALK: original skew swing ── */
+    ctx.transform(1, 0, wa * 0.10, 1, 0, 0);
+  }
+
+  ctx.fillRect(-1.5 * sc, 0, 3 * sc, 8 * sc);
+  ctx.fillStyle = p.armourDark;
+  ctx.fillRect(-2 * sc, 6 * sc, 4 * sc, 3 * sc);
+
+  /* Weapon — already in arm's local rotated space, so it faces target */
+  _drawWeapon(ctx, p.weapon, sc, wa, at, animKick, anim, animAimAngle);
+  ctx.restore();
+
+  /* ── Badge on chest ──────────────────────────────────── */
+  if (p.badge) {
+    _drawBadge(ctx, p.badge, sc, p.rankCol);
+  }
+
+  /* ── Head + helmet ───────────────────────────────────── */
+  var headTilt = wa * 0.05 + animBodyLean * 0.6;
+  /* Neck */
+  ctx.fillStyle = p.skin;
+  ctx.fillRect(-2 * sc, -17 * sc, 4 * sc, 4 * sc);
+  /* Head */
+  ctx.save();
+  ctx.transform(1, 0, headTilt, 1, 0, 0);
+  ctx.fillStyle = p.skin;
+  ctx.beginPath();
+  ctx.ellipse(0, -22 * sc, 5.5 * sc, 6.5 * sc, 0, 0, Math.PI * 2);
+  ctx.fill();
+  /* Eyes */
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.beginPath();
+  ctx.arc(-2 * sc, -23 * sc, 1 * sc, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.arc(2 * sc, -23 * sc, 1 * sc, 0, Math.PI * 2); ctx.fill();
+  /* Mouth — determined expression */
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth   = 0.7 * sc;
+  ctx.beginPath();
+  ctx.moveTo(-2 * sc, -20 * sc);
+  ctx.lineTo(2 * sc, -20 * sc);
+  ctx.stroke();
+  /* Helmet */
+  _drawMilitaryHelmet(ctx, at, p, sc);
+  ctx.restore();
+}
+
+/* ── Weapon drawing ───────────────────────────────────────── */
+/* Called inside the right-arm ctx.save() which is already
+   rotated so that "down" points toward the target.
+   animKick = extra weapon tilt (recoil angle)
+   animAimAngle = world aim direction (used for orientation cues)  */
+function _drawWeapon(ctx, type, sc, wa, at, animKick, anim, animAimAngle) {
+  animKick = animKick || 0;
+  var isAttacking = anim && anim.progress > 0 && anim.progress < 1;
+
+  if (type === 'spear') {
+    /* ── SPEAR ──────────────────────────────────────────────
+       In arm-local space: shaft runs from hand upward toward tip.
+       "Down" already faces target, so tip (at negative Y) points
+       toward the target naturally.                            */
+    ctx.save();
+    /* Slight weapon-angle wobble on idle walk */
+    ctx.rotate(isAttacking ? animKick : wa * 0.04);
+
+    /* Shaft — extends from hand upward through arm */
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(-0.8 * sc, -20 * sc, 1.6 * sc, 26 * sc);
+
+    /* Grip wrap strips */
+    ctx.fillStyle = '#5a3a08';
+    ctx.fillRect(-1 * sc, -4  * sc, 2 * sc, 2.5 * sc);
+    ctx.fillRect(-1 * sc,  1  * sc, 2 * sc, 2.5 * sc);
+
+    /* Blade tip at top of shaft */
+    ctx.fillStyle = '#D4D7D8';
+    ctx.beginPath();
+    ctx.moveTo(0,       -28 * sc);
+    ctx.lineTo(-2.5*sc, -20 * sc);
+    ctx.lineTo(2.5*sc,  -20 * sc);
+    ctx.closePath();
+    ctx.fill();
+
+    /* Blade edge glint */
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(0.4*sc, -27*sc);
+    ctx.lineTo(2*sc,   -20*sc);
+    ctx.lineTo(0.8*sc, -20*sc);
+    ctx.closePath();
+    ctx.fill();
+
+    /* Butt cap */
+    ctx.fillStyle = '#AAA';
+    ctx.beginPath();
+    ctx.ellipse(0, 6 * sc, 1.5 * sc, 1 * sc, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* Attack: tip energy shimmer at thrust peak */
+    if (isAttacking && anim.flashAlpha > 0.1) {
+      ctx.globalAlpha = anim.flashAlpha * 0.8;
+      ctx.fillStyle   = '#ddeebb';
+      ctx.shadowColor = '#aaccaa';
+      ctx.shadowBlur  = 6;
+      ctx.beginPath();
+      ctx.arc(0, -28 * sc, 3.5 * sc * anim.flashAlpha, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+
+  } else if (type === 'sword') {
+    /* ── SWORD ──────────────────────────────────────────────
+       Held in hand, blade extends "up" in arm-local space.
+       kickAngle adds the slash swing rotation.               */
+    ctx.save();
+    ctx.rotate(isAttacking ? animKick * 0.6 : (0.2 + wa * 0.1));
+
+    /* Blade — from grip upward */
+    ctx.fillStyle = '#D0D3D4';
+    ctx.fillRect(-1 * sc, -20 * sc, 2 * sc, 17 * sc);
+
+    /* Fuller */
+    ctx.fillStyle = '#A8ABAC';
+    ctx.fillRect(-0.3 * sc, -19 * sc, 0.6 * sc, 12 * sc);
+
+    /* Edge glint */
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillRect(0.5 * sc, -19 * sc, 0.5 * sc, 13 * sc);
+
+    /* Crossguard */
+    ctx.fillStyle = '#D4AC0D';
+    ctx.fillRect(-4.5 * sc, -3 * sc, 9 * sc, 2 * sc);
+    ctx.fillStyle = '#F0B27A';
+    ctx.fillRect(-3.5 * sc, -4 * sc, 7 * sc, 1 * sc);
+
+    /* Grip */
+    ctx.fillStyle = '#784212';
+    ctx.fillRect(-1.2 * sc, -1 * sc, 2.4 * sc, 5 * sc);
+    /* Grip wrap */
+    ctx.fillStyle = '#5D3412';
+    ctx.fillRect(-1.2 * sc, 0.5 * sc, 2.4 * sc, 1 * sc);
+    ctx.fillRect(-1.2 * sc, 2.5 * sc, 2.4 * sc, 1 * sc);
+
+    /* Pommel */
+    ctx.fillStyle = '#D4AC0D';
+    ctx.beginPath();
+    ctx.arc(0, 4.5 * sc, 2 * sc, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* Attack: blade glow during slash */
+    if (isAttacking && anim.flashAlpha > 0.1) {
+      ctx.globalAlpha = anim.flashAlpha * 0.7;
+      ctx.fillStyle   = '#ffee99';
+      ctx.shadowColor = '#ffcc44';
+      ctx.shadowBlur  = 10;
+      ctx.fillRect(-1.2 * sc, -20 * sc, 2.4 * sc, 17 * sc);
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+
+  } else if (type === 'rifle') {
+    /* ── RIFLE ──────────────────────────────────────────────
+       In arm-local space the arm already points at the target.
+       The rifle is drawn along the arm axis so the barrel aims
+       directly at the target.
+       kickAngle tilts the barrel upward on recoil.           */
+    ctx.save();
+    /* Recoil kick tilts barrel up (negative = upward in local space) */
+    ctx.rotate(-animKick * 0.8);
+
+    /* Main receiver along arm axis (up = toward target, negative Y) */
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(-1.5 * sc, -22 * sc, 3 * sc, 16 * sc);
+
+    /* Barrel extends forward (muzzle at top) */
+    ctx.fillStyle = '#252525';
+    ctx.fillRect(-0.9 * sc, -30 * sc, 1.8 * sc, 9 * sc);
+
+    /* Muzzle ring */
+    ctx.fillStyle = '#555';
+    ctx.fillRect(-1.2 * sc, -31 * sc, 2.4 * sc, 1.5 * sc);
+
+    /* Handguard */
+    ctx.fillStyle = '#4a3a28';
+    ctx.fillRect(-1.3 * sc, -14 * sc, 2.6 * sc, 3.5 * sc);
+
+    /* Magazine */
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(-1 * sc, -10 * sc, 2 * sc, 5 * sc);
+
+    /* Stock */
+    ctx.fillStyle = '#6B3A1F';
+    ctx.fillRect(-1.6 * sc,  0, 3.2 * sc, 4.5 * sc);
+    ctx.fillStyle = '#5a2e14';
+    ctx.fillRect(-1.6 * sc,  3.5 * sc, 3.2 * sc, 1 * sc);
+
+    /* Trigger */
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth   = 0.8 * sc;
+    ctx.beginPath();
+    ctx.arc(0, -3 * sc, 2.2 * sc, 0.1, Math.PI - 0.1);
+    ctx.stroke();
+
+    /* Scope (airforce only) */
+    if (at === 'airforce') {
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(-1 * sc, -20 * sc, 2 * sc, 7 * sc);
+      /* Scope body */
+      ctx.strokeStyle = '#85929E';
+      ctx.lineWidth   = 0.5 * sc;
+      ctx.strokeRect(-1 * sc, -20 * sc, 2 * sc, 7 * sc);
+      /* Lens glint */
+      ctx.fillStyle = 'rgba(80,160,255,0.55)';
+      ctx.beginPath();
+      ctx.arc(-0.3 * sc, -19.5 * sc, 0.7 * sc, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    /* Attack: muzzle glow while firing */
+    if (isAttacking && anim.flashAlpha > 0.2) {
+      ctx.globalAlpha = anim.flashAlpha * 0.9;
+      ctx.fillStyle   = '#ffffcc';
+      ctx.shadowColor = '#ffcc44';
+      ctx.shadowBlur  = 12;
+      ctx.beginPath();
+      ctx.arc(0, -31 * sc, 3 * sc * anim.flashAlpha, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+
+  } else if (type === 'rocket') {
+    /* ── ROCKET LAUNCHER ────────────────────────────────────
+       Shoulder tube launcher; points directly at target.
+       kickAngle is minimal (rocket launchers barely kick).   */
+    ctx.save();
+    ctx.rotate(-animKick * 0.4);
+
+    /* Main launch tube */
+    ctx.fillStyle = '#2a3a2a';
+    ctx.fillRect(-2.4 * sc, -28 * sc, 4.8 * sc, 24 * sc);
+
+    /* Front rim */
+    ctx.fillStyle = '#3a4a3a';
+    ctx.beginPath();
+    ctx.ellipse(0, -28 * sc, 2.8 * sc, 1.4 * sc, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* Rocket nose (visible at muzzle) */
+    ctx.fillStyle = '#cc3311';
+    ctx.beginPath();
+    ctx.moveTo(0,      -33 * sc);
+    ctx.lineTo(-2*sc,  -28 * sc);
+    ctx.lineTo( 2*sc,  -28 * sc);
+    ctx.closePath();
+    ctx.fill();
+
+    /* Rocket body fins */
+    ctx.fillStyle = '#aa2200';
+    ctx.fillRect(-0.6 * sc, -30 * sc, 1.2 * sc, 3 * sc);
+
+    /* Rear exhaust port */
+    ctx.fillStyle = '#0a0a0a';
+    ctx.beginPath();
+    ctx.ellipse(0, -5 * sc, 2.2 * sc, 1.1 * sc, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* Grip / trigger assembly */
+    ctx.fillStyle = '#4a3a20';
+    ctx.fillRect(-1.6 * sc, -14 * sc, 3.2 * sc, 5 * sc);
+
+    /* Sight rail */
+    ctx.fillStyle = '#556655';
+    ctx.fillRect(-0.4 * sc, -26 * sc, 0.8 * sc, 12 * sc);
+
+    /* Attack: muzzle + exhaust glow on fire */
+    if (isAttacking && anim.flashAlpha > 0.15) {
+      /* Front muzzle bloom */
+      ctx.globalAlpha = anim.flashAlpha * 0.85;
+      ctx.fillStyle   = '#ff9933';
+      ctx.shadowColor = '#ff5500';
+      ctx.shadowBlur  = 16;
+      ctx.beginPath();
+      ctx.arc(0, -33 * sc, 5 * sc * anim.flashAlpha, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      /* Rear exhaust glow */
+      ctx.globalAlpha = anim.flashAlpha * 0.6;
+      ctx.fillStyle   = '#ff6622';
+      ctx.beginPath();
+      ctx.arc(0, -3 * sc, 4 * sc * anim.flashAlpha, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+}
+
+/* ── Military helmet styles ───────────────────────────────── */
+function _drawMilitaryHelmet(ctx, at, p, sc) {
+  ctx.fillStyle = p.helmetMain;
+  if (at === 'bantay') {
+    /* Simple rounded helm with nasal guard */
+    ctx.beginPath();
+    ctx.arc(0, -24 * sc, 6 * sc, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-6 * sc, -24 * sc, 12 * sc, 3 * sc);
+    /* Nasal guard */
+    ctx.fillStyle = _darken(p.helmetMain, 0.2);
+    ctx.fillRect(-1 * sc, -28 * sc, 2 * sc, 7 * sc);
+    /* Visor slit hint */
+    ctx.fillStyle = p.helmetVisor;
+    ctx.fillRect(-3 * sc, -25 * sc, 6 * sc, 1.5 * sc);
+  } else if (at === 'bayani') {
+    /* Crested helm — more ornate */
+    ctx.beginPath();
+    ctx.arc(0, -24 * sc, 6.5 * sc, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-6.5 * sc, -24 * sc, 13 * sc, 3 * sc);
+    /* Crest */
+    ctx.fillStyle = '#C0392B';
+    ctx.beginPath();
+    ctx.moveTo(-1.5 * sc, -29.5 * sc);
+    ctx.quadraticCurveTo(0, -34 * sc, 1.5 * sc, -29.5 * sc);
+    ctx.lineTo(1.5 * sc, -29.5 * sc);
+    ctx.closePath();
+    ctx.fill();
+    /* Visor bar */
+    ctx.fillStyle = p.helmetVisor;
+    ctx.fillRect(-4 * sc, -25.5 * sc, 8 * sc, 2 * sc);
+    /* Cheek guards */
+    ctx.fillStyle = p.helmetMain;
+    ctx.fillRect(-7 * sc, -25 * sc, 2 * sc, 5 * sc);
+    ctx.fillRect(5 * sc, -25 * sc, 2 * sc, 5 * sc);
+  } else if (at === 'marine') {
+    /* Combat helmet — wider brim */
+    ctx.beginPath();
+    ctx.arc(0, -24 * sc, 6.5 * sc, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-6.5 * sc, -24 * sc, 13 * sc, 2.5 * sc);
+    /* Wide brim */
+    ctx.beginPath();
+    ctx.ellipse(0, -24 * sc, 8.5 * sc, 2 * sc, 0, 0, Math.PI * 2);
+    ctx.fill();
+    /* Chin strap */
+    ctx.strokeStyle = p.strapCol;
+    ctx.lineWidth   = 0.8 * sc;
+    ctx.beginPath();
+    ctx.arc(0, -20 * sc, 6 * sc, 0.1, Math.PI - 0.1);
+    ctx.stroke();
+    /* Camo dots */
+    ctx.fillStyle = 'rgba(0,50,0,0.3)';
+    for (var di = 0; di < 5; di++) {
+      ctx.beginPath();
+      ctx.arc(-3 * sc + di * 1.5 * sc, -26 * sc, 0.8 * sc, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (at === 'airforce') {
+    /* Peaked service cap */
+    /* Band */
+    ctx.fillRect(-5.5 * sc, -25 * sc, 11 * sc, 3 * sc);
+    /* Crown */
+    ctx.beginPath();
+    ctx.arc(0, -25 * sc, 5.5 * sc, Math.PI, 0);
+    ctx.fill();
+    /* Peak / visor bill */
+    ctx.fillStyle = p.helmetVisor;
+    ctx.beginPath();
+    ctx.moveTo(-6 * sc, -23 * sc);
+    ctx.lineTo(6 * sc, -23 * sc);
+    ctx.lineTo(7.5 * sc, -21.5 * sc);
+    ctx.lineTo(-7.5 * sc, -21.5 * sc);
+    ctx.closePath();
+    ctx.fill();
+    /* Top button */
+    ctx.fillStyle = p.rankCol;
+    ctx.beginPath();
+    ctx.arc(0, -30 * sc, 1.2 * sc, 0, Math.PI * 2);
+    ctx.fill();
+    /* Gold chin strap */
+    ctx.strokeStyle = p.rankCol;
+    ctx.lineWidth   = 0.7 * sc;
+    ctx.beginPath();
+    ctx.moveTo(-5.5 * sc, -23 * sc);
+    ctx.quadraticCurveTo(-6 * sc, -19 * sc, -3 * sc, -18 * sc);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(5.5 * sc, -23 * sc);
+    ctx.quadraticCurveTo(6 * sc, -19 * sc, 3 * sc, -18 * sc);
+    ctx.stroke();
+  }
+}
+
+/* ── Branch badge on chest ────────────────────────────────── */
+function _drawBadge(ctx, type, sc, col) {
+  ctx.fillStyle   = col;
+  ctx.strokeStyle = col;
+  ctx.lineWidth   = 0.6 * sc;
+  if (type === 'anchor') {
+    /* Simple anchor shape centred at chest */
+    var ax = 0, ay = -8 * sc;
+    ctx.beginPath();
+    ctx.arc(ax, ay - 2 * sc, 2 * sc, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ax, ay - 4 * sc);
+    ctx.lineTo(ax, ay + 3 * sc);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ax - 2.5 * sc, ay - 1 * sc);
+    ctx.lineTo(ax + 2.5 * sc, ay - 1 * sc);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ax - 2 * sc, ay + 3 * sc);
+    ctx.arc(ax, ay + 3 * sc, 2 * sc, Math.PI, 0);
+    ctx.stroke();
+  } else if (type === 'wings') {
+    /* Simplified wing shape */
+    var wx = 0, wy = -8 * sc;
+    ctx.beginPath();
+    ctx.moveTo(wx, wy);
+    ctx.quadraticCurveTo(wx - 4 * sc, wy - 2 * sc, wx - 5 * sc, wy + 1 * sc);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(wx, wy);
+    ctx.quadraticCurveTo(wx + 4 * sc, wy - 2 * sc, wx + 5 * sc, wy + 1 * sc);
+    ctx.stroke();
+    /* Centre star */
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(wx, wy, 1.2 * sc, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/* ── Civilian body drawing (unchanged) ───────────────────── */
 function _drawBody(ctx, vt, sc, isChild, walkAmt, moving) {
   var sizeScale = isChild ? 0.72 : 1.0;
   var ss  = sc * sizeScale;
-  var wa  = walkAmt || 0;          /* -1..1 walk cycle value */
-  var sw  = wa * 5 * ss;           /* max leg/arm swing in pixels */
+  var wa  = walkAmt || 0;
+  var sw  = wa * 5 * ss;
 
-  /* ── Legs (animated) ──────────────────────────────────── */
   ctx.fillStyle = _darken(vt.clothColor, 0.3);
-  /* Left leg swings forward when right arm swings back */
   ctx.save();
   ctx.translate(-2.5 * ss, 0);
-  ctx.transform(1, 0, sw * 0.04, 1, 0, 0);  /* shear = leg swing */
+  ctx.transform(1, 0, sw * 0.04, 1, 0, 0);
   ctx.fillRect(-1.5 * ss, 0, 3.5 * ss, 9 * ss);
   ctx.restore();
-  /* Right leg opposite phase */
   ctx.save();
   ctx.translate(2.5 * ss, 0);
   ctx.transform(1, 0, -sw * 0.04, 1, 0, 0);
   ctx.fillRect(-2 * ss, 0, 3.5 * ss, 9 * ss);
   ctx.restore();
 
-  /* ── Torso (slight lean into walk) ───────────────────── */
   ctx.fillStyle = vt.clothColor;
   ctx.save();
-  ctx.transform(1, 0, wa * 0.04, 1, 0, 0);   /* lean */
+  ctx.transform(1, 0, wa * 0.04, 1, 0, 0);
   ctx.fillRect(-5 * ss, -14 * ss, 10 * ss, 15 * ss);
-  /* Shading */
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
   ctx.fillRect(-5 * ss, -14 * ss, 2 * ss, 15 * ss);
   ctx.fillRect(3 * ss, -14 * ss, 2 * ss, 15 * ss);
   ctx.restore();
 
-  /* ── Arms (swing opposite to legs) ───────────────────── */
   ctx.fillStyle = vt.clothColor;
-  /* Left arm swings back when left leg goes forward */
   ctx.save();
   ctx.translate(-6.5 * ss, -13 * ss);
   ctx.transform(1, 0, -wa * 0.12, 1, 0, 0);
   ctx.fillRect(0, 0, 3 * ss, 9 * ss);
   ctx.restore();
-  /* Right arm swings forward */
   ctx.save();
   ctx.translate(3.5 * ss, -13 * ss);
   ctx.transform(1, 0, wa * 0.12, 1, 0, 0);
   ctx.fillRect(0, 0, 3 * ss, 9 * ss);
   ctx.restore();
 
-  /* ── Head (slight bob, tilts into walk direction) ─────── */
   var headTilt = wa * 0.06;
   ctx.fillStyle = vt.skinColor;
   ctx.save();
@@ -1014,8 +1529,6 @@ function _drawBody(ctx, vt, sc, isChild, walkAmt, moving) {
   ctx.beginPath();
   ctx.ellipse(0, -20 * ss, 6 * ss, 7 * ss, 0, 0, Math.PI * 2);
   ctx.fill();
-
-  /* ── Face ─────────────────────────────────────────────── */
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.beginPath();
   ctx.arc(-2.2 * ss, -21.5 * ss, 1.1 * ss, 0, Math.PI * 2); ctx.fill();
@@ -1026,7 +1539,6 @@ function _drawBody(ctx, vt, sc, isChild, walkAmt, moving) {
   ctx.restore();
 }
 
-/* ── Hat drawing ──────────────────────────────────────────── */
 function _drawHat(ctx, vt, sc) {
   ctx.fillStyle = vt.hatColor || '#888';
   if (vt.hat === 'straw') {
@@ -1054,7 +1566,6 @@ function _drawHat(ctx, vt, sc) {
   }
 }
 
-/* ── Colour helper ────────────────────────────────────────── */
 function _darken(hex, amount) {
   var r = parseInt(hex.slice(1,3),16);
   var g = parseInt(hex.slice(3,5),16);
@@ -1067,13 +1578,13 @@ function _darken(hex, amount) {
     ('0' + g.toString(16)).slice(-2) +
     ('0' + b.toString(16)).slice(-2);
 }
+
 export function getHungerStatus(v) {
   if (!v || v.hunger === undefined) return { level: 'Unknown', multiplier: 1.0, canWork: true };
-  
-  if (v.hunger <= 30) return { level: 'Busog', multiplier: 1.0, canWork: true };
-  if (v.hunger <= 60) return { level: 'Gutom na', multiplier: 0.8, canWork: true };
-  if (v.hunger <= 80) return { level: 'Gutom na gutom', multiplier: 0.5, canWork: true };
-  return { level: 'Halos mamatay sa gutom', multiplier: 0.2, canWork: false };
+  if (v.hunger <= 30) return { level: 'Busog',              multiplier: 1.0, canWork: true  };
+  if (v.hunger <= 60) return { level: 'Gutom na',           multiplier: 0.8, canWork: true  };
+  if (v.hunger <= 80) return { level: 'Gutom na gutom',     multiplier: 0.5, canWork: true  };
+  return                     { level: 'Halos mamatay sa gutom', multiplier: 0.2, canWork: false };
 }
-/* Re-export tickQuips so main.js can call it alongside other villager imports */
+
 export { tickQuips } from './villagerQuips.js';

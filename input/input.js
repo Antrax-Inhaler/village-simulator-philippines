@@ -14,7 +14,7 @@ import {
   CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM,
   WORLD_W, WORLD_H,
 } from '../render/camera.js';
-import { getZoneArrowAt, ZONE_DEFS, purchaseZone } from '../world/zones.js';
+import { getZoneArrowAt, getZoneAt, ZONE_DEFS, purchaseZone } from '../world/zones.js';
 
 var _deps   = null;
 var _canvas = null;
@@ -171,8 +171,13 @@ function _onMouseMove(e) {
     _canvas.style.cursor = overArrow ? 'pointer' : (overBld ? 'grab' : (_hoveredVillager ? 'pointer' : 'grab'));
   }
 
-  /* Move‑building live follow */
+  /* Move‑building live follow — snapshot origin on first move ─────────── */
   if (mode === 'move_building' && drawer.target) {
+    /* Capture original position once so _processClick can revert */
+    if (drawer.target._moveOriginX === undefined) {
+      drawer.target._moveOriginX = drawer.target.x;
+      drawer.target._moveOriginY = drawer.target.y;
+    }
     const wpM = s2w(_mouseX, _mouseY);
     drawer.target.x = clamp(wpM.x, 40, window._VW - 40);
     drawer.target.y = clamp(wpM.y, 40, window._VH - 80);
@@ -267,7 +272,8 @@ function _processClick(sx, sy) {
   if (mode === 'build_shop') {
     const bt  = _deps.getPendingBuildType();
     const wp  = s2w(sx, sy);
-    const chk = _deps.canPlaceBuilding(bt, _deps.VS.buildings, wp.x, wp.y);
+    const chk = _deps.canPlaceBuilding(bt, _deps.VS.buildings, wp.x, wp.y,
+      _deps.VS.unlockedZones || [], getZoneAt);
     if (!chk.ok) { _deps.showMsg(chk.msg); return; }
     const bdef  = _deps.BUILDING_DEFS[bt] || {};
     const btime = bdef.buildTime || 60;
@@ -308,20 +314,56 @@ function _processClick(sx, sy) {
     return;
   }
 
-  /* Drop building after move */
+  /* Drop building after move — validate zone before committing ───────────
+     Save original position first so we can revert if the new spot
+     fails canPlaceBuilding (zone ownership, hall level, cap).         */
   if (mode === 'move_building') {
     const wp0    = s2w(sx, sy);
     const drawer = _deps.getDrawer();
-    if (drawer.target) {
-      drawer.target.x = clamp(wp0.x, 40, window._VW - 40);
-      drawer.target.y = clamp(wp0.y, 40, window._VH - 80);
+    const bld    = drawer ? drawer.target : null;
+
+    if (bld) {
+      /* Snapshot original position */
+      const origX = bld._moveOriginX !== undefined ? bld._moveOriginX : bld.x;
+      const origY = bld._moveOriginY !== undefined ? bld._moveOriginY : bld.y;
+
+      /* Clamp proposed drop position */
+      const newX = clamp(wp0.x, 40, window._VW - 40);
+      const newY = clamp(wp0.y, 40, window._VH - 80);
+
+      /* Run zone + hall-level + cap validation */
+      const VS       = _deps.VS;
+      const chkMove  = _deps.canPlaceBuilding(
+        bld.type,
+        VS.buildings,
+        newX, newY,
+        VS.unlockedZones || [],
+        getZoneAt,
+      );
+
+      if (!chkMove.ok) {
+        /* Revert to original position */
+        bld.x = origX;
+        bld.y = origY;
+        _deps.showMsg('Hindi mailipat: ' + chkMove.msg);
+      } else {
+        /* Commit new position */
+        bld.x = newX;
+        bld.y = newY;
+        _deps.showMsg(bld.getDef().label + ' inilipat!');
+      }
+
+      /* Clean up saved origin */
+      delete bld._moveOriginX;
+      delete bld._moveOriginY;
     }
+
     _deps.setGameMode('view');
-    drawer.movingBuilding = false;
+    if (drawer) drawer.movingBuilding = false;
     _deps.initWaypoints();
     _deps.assignHomes(_deps.VS.villagers, _deps.VS.buildings);
+    _deps.assignWork(_deps.VS.villagers, _deps.VS.buildings);
     _deps.recalcCaps();
-    _deps.showMsg((drawer.target ? drawer.target.getDef().label : 'Gusali') + ' inilipat!');
     _deps.renderDrawer();
     return;
   }
@@ -743,6 +785,11 @@ function _onTouchMove(e) {
   const drawer = _deps.getDrawer();
 
   if (mode === 'move_building' && drawer && drawer.target) {
+    /* Capture original position once so _processClick can revert */
+    if (drawer.target._moveOriginX === undefined) {
+      drawer.target._moveOriginX = drawer.target.x;
+      drawer.target._moveOriginY = drawer.target.y;
+    }
     const wpM = s2w(pos.x, pos.y);
     drawer.target.x = clamp(wpM.x, 40, window._VW - 40);
     drawer.target.y = clamp(wpM.y, 40, window._VH - 80);
