@@ -150,33 +150,25 @@
       </div>
  
       <!-- ── PLAN PANEL (shown before Lusubin) ────────────── -->
-      <div id="atk-plan-panel" id="atk-bottom-panel">
-        <div id="atk-bottom-panel" style="
-          position: absolute;
-          bottom: 0; left: 0; right: 0;
-          background: linear-gradient(0deg, rgba(6,3,1,0.97) 0%, rgba(6,3,1,0.90) 75%, transparent 100%);
-          padding: 14px 14px 20px;
-          z-index: 10;
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        ">
-          <div class="atk-panel-header">
-            <span>🪖 Piliin ang Sundalo</span>
-            <span id="atk-power-label">💥 0 vs 🛡️ <span id="atk-def-v">0</span></span>
-          </div>
-          <!-- Troop cards with +/- selectors -->
-          <div id="atk-troop-row"></div>
-          <!-- Win chance bar -->
-          <div id="atk-win-wrap">
-            <div id="atk-win-label">Tsansa ng Tagumpay: <b id="atk-win-pct">—</b></div>
-            <div id="atk-win-bg"><div id="atk-win-fill"></div></div>
-          </div>
-          <!-- Commit troops and switch to deploy mode -->
-          <button id="atk-go-btn" onclick="window._atkLusubin()" disabled>⚔️ LUSUBIN!</button>
-        </div>
-      </div>
- 
+<!-- Fixed HTML Structure -->
+<div id="atk-bottom-panel">
+  <div class="atk-panel-header">
+    <span>🪖 Piliin ang Sundalo</span>
+    <span id="atk-power-label">💥 0 vs 🛡️ <span id="atk-def-v">0</span></span>
+  </div>
+  
+  <!-- Troop cards -->
+  <div id="atk-troop-row"></div>
+  
+  <!-- Win chance bar -->
+  <div id="atk-win-wrap">
+    <div id="atk-win-label">Tsansa ng Tagumpay: <b id="atk-win-pct">—</b></div>
+    <div id="atk-win-bg"><div id="atk-win-fill"></div></div>
+  </div>
+  
+  <!-- Button -->
+  <button id="atk-go-btn" onclick="window._atkLusubin()" disabled>⚔️ LUSUBIN!</button>
+</div>
       <!-- ── DEPLOY PANEL (shown after Lusubin — click canvas to drop troops) ── -->
       <div id="atk-deploy-panel">
         <!-- Filled dynamically by attack_controller.js _updateDeployUI() -->
@@ -203,12 +195,12 @@
   </div>
 
   <!-- Audio Widget -->
-  <div id="audioWidget" class="audio-widget">
+  <!-- <div id="audioWidget" class="audio-widget">
     <span>🎵</span>
     <button id="audioPlayPauseBtn" aria-label="Play/Pause">⏸️</button>
     <input type="range" id="audioVolumeSlider" class="vol-slider" min="0" max="1" step="0.01" value="0.5">
     <span id="audioVolIcon">🔊</span>
-  </div>
+  </div> -->
   
   <audio id="sfx-calamity-bagyo"    preload="auto" loop><source src="audio/sfx/typhoon.mp3"   type="audio/mpeg"></audio>
   <audio id="sfx-calamity-lindol"   preload="auto" loop><source src="audio/sfx/earthquake.mp3" type="audio/mpeg"></audio>
@@ -1189,7 +1181,21 @@ setInterval(function() {
       window.applyDefaultSettings = loadDefaultSettings;
     })();
   </script>
+    <!-- Existing scripts -->
   <script type="module" src="main.js"></script>
   <script type="module" src="attack/attack_controller.js"></script>
+  
+  <!-- ADD NEW MISSILE WARFARE SCRIPTS HERE ↓ -->
+  <script type="module" src="attack/missileWarfare.js"></script>
+  <script type="module" src="attack/missileTrackingCanvas.js"></script>
+  <script type="module" src="ui/missilePanel.js"></script>
+  <script type="module" src="ui/scoutPanel.js"></script>
+  
+  <script type="module">
+    setTimeout(function() {
+      if (window.initMissilePanel) window.initMissilePanel();
+      if (window.initScoutPanel) window.initScoutPanel();
+    }, 500);
+  </script>
 </body>
 </html>

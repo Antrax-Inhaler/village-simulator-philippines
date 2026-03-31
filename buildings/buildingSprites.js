@@ -60,7 +60,9 @@ import { drawSprite as drawCuartelSprite }    from './sprites/cuartel.js';
 import { drawSprite as drawPaaralanSprite }  from './sprites/paaralan.js';
 import { drawSprite as drawTemploSprite }     from './sprites/templo.js';
    import { drawSprite as drawOspitalSprite }    from './sprites/ospital.js';
-
+   import { drawSprite as drawMissileSiloSprite } from './sprites/missilesilo.js';
+import { drawSprite as drawInterceptorSprite } from './sprites/interceptor.js';
+import { drawSprite as drawRadarStationSprite } from './sprites/radarstation.js';
 /*
    Future imports — uncomment as sprite files are created:
 
@@ -92,6 +94,9 @@ farm:       drawFarmSprite,
  cuartel:    drawCuartelSprite,
  templo:     drawTemploSprite,
  ospital:    drawOspitalSprite,
+   missilesilo: drawMissileSiloSprite,
+  radarstation: drawRadarStationSprite,
+  interceptor: drawInterceptorSprite,
   /*
   
   

@@ -1,7 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════
    Mini Bayan — attack/attack_controller.js
+   (UPDATED with Missile Warfare Integration + Camera Centering Fix)
+   
    Fixed: accurate click mapping, camera centers on building.
+   Fixed: World centering on attack screen (matches main.js)
    UI separated to attackUI.js
+   NEW: Scout mode for coordinate capture, missile panel integration
 ═══════════════════════════════════════════════════════════════ */
 
 import {
@@ -16,6 +20,10 @@ import {
   DEF_WORLD_H,
   BUILDING_DEFS,
   perspScale,
+  dist,
+  calculateETA,
+  getDistanceBetweenPoints,
+  selectMissileTargets
 } from './attack.js';
 
 import {
@@ -29,13 +37,14 @@ import {
 var _cam = {
   x: DEF_WORLD_W / 2, y: DEF_WORLD_H / 2,
   tx: DEF_WORLD_W / 2, ty: DEF_WORLD_H / 2,
-  zoom: 2.5, tzoom: 2.5,
-  MIN_ZOOM: 2.5, MAX_ZOOM: 4.0, ZOOM_SPEED: 7,
+  zoom: 1.5, tzoom: 1.5,
+  MIN_ZOOM: 1.5, MAX_ZOOM: 4.0, ZOOM_SPEED: 7,
   selectedBuilding: null
 };
+
 var _VW = 0, _VH = 0;
 
-function _clamp(v, lo, hi) { return v < lo ? lo : v > hi ? v : v; }
+function _clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 function _lerp(a, b, t) { return a + (b - a) * t; }
 
 function _clampCamTarget() {
@@ -53,20 +62,42 @@ function _clampCamCurrent() {
   _cam.y = _clamp(_cam.y, halfH, DEF_WORLD_H - halfH);
 }
 
-function _s2w(sx, sy) {
+/* ════════════════════════════════════════════════════════════
+   SCREEN ↔ WORLD COORDINATE CONVERSION
+   Reused by missile scouting system
+   ════════════════════════════════════════════════════════════ */
+export function _s2w(sx, sy) {
   return {
     x: (sx - _VW / 2) / _cam.zoom + _cam.x,
     y: (sy - _VH / 2) / _cam.zoom + _cam.y,
   };
 }
 
+export function _w2s(wx, wy) {
+  return {
+    x: (wx - _cam.x) * _cam.zoom + _VW / 2,
+    y: (wy - _cam.y) * _cam.zoom + _VH / 2,
+  };
+}
+
+/* ════════════════════════════════════════════════════════════
+   FIXED CAMERA INITIALIZATION (matches main.js pattern)
+   ════════════════════════════════════════════════════════════ */
 function _initCam(vw, vh) {
-  _VW = vw; _VH = vh;
+  _VW = vw; 
+  _VH = vh;
+  
+  // ✅ Match main.js: calculate fit zoom first
   var fitZoom = Math.min(vw / DEF_WORLD_W, vh / DEF_WORLD_H);
   _cam.zoom = _clamp(fitZoom, _cam.MIN_ZOOM, _cam.MAX_ZOOM);
   _cam.tzoom = _cam.zoom;
+  
+  // ✅ Set center position BEFORE clamping
   _cam.x = _cam.tx = DEF_WORLD_W / 2;
   _cam.y = _cam.ty = DEF_WORLD_H / 2;
+  
+  // ✅ Apply clamping AFTER centering
+  _clampCamTarget();
   _clampCamCurrent();
 }
 
@@ -84,6 +115,7 @@ function _camApply(ctx) {
   ctx.scale(_cam.zoom, _cam.zoom);
   ctx.translate(-_cam.x, -_cam.y);
 }
+
 function _camReset(ctx) { ctx.restore(); }
 
 /* ── State ───────────────────────────────────────────────── */
@@ -93,6 +125,17 @@ var _canvas = null, _ctx = null;
 var _inBattle = false, _battleOver = false;
 var _deployRole = null, _deployQueue = {}, _checkTimer = 0;
 
+/* ════════════════════════════════════════════════════════════
+   MISSILE WARFARE STATE (NEW)
+   ════════════════════════════════════════════════════════════ */
+var _missileState = {
+  active: false,
+  scoutMode: false,
+  capturedCoords: null,
+  targetPreview: null,
+  launchConfirm: null,
+};
+
 /* ── Drag / Pan ──────────────────────────────────────────── */
 var _drag = {
   active: false, moved: false,
@@ -100,8 +143,8 @@ var _drag = {
   camStartX: 0, camStartY: 0,
   THRESHOLD: 6,
 };
-var _mouseScreenX = 0, _mouseScreenY = 0;
 
+var _mouseScreenX = 0, _mouseScreenY = 0;
 var _pinch = {
   active: false,
   startDist: 0, startZoom: 0,
@@ -113,7 +156,7 @@ function G(id) { return document.getElementById(id); }
 
 /* ════════════════════════════════════════════════════════════
    ACCURATE SCREEN → CANVAS COORDINATES
-════════════════════════════════════════════════════════════ */
+   ════════════════════════════════════════════════════════════ */
 function _screenPos(e) {
   var rect = _canvas.getBoundingClientRect();
   var cssW = rect.width, cssH = rect.height;
@@ -140,7 +183,7 @@ function _getScaledTouchPos(touch) {
 
 /* ════════════════════════════════════════════════════════════
    BUILDING CLICK DETECTION (ACCURATE BOUNDS)
-════════════════════════════════════════════════════════════ */
+   ════════════════════════════════════════════════════════════ */
 function _isPointInsideBuilding(wx, wy, b) {
   var sc = perspScale(b.y);
   var w = (b.w || 60) * sc * 0.5;
@@ -173,23 +216,38 @@ function _selectBuilding(bld) {
 
 /* ════════════════════════════════════════════════════════════
    BUILDING INFO PANEL
-════════════════════════════════════════════════════════════ */
+   ════════════════════════════════════════════════════════════ */
 var _infoTimeout = null;
+
 function _showBuildingInfo(bld) {
   var def = BUILDING_DEFS[bld.type];
   if (!def) return;
   var hpPct = (bld.hp / bld.maxHp * 100).toFixed(0);
   var hpColor = bld.hp/bld.maxHp > 0.5 ? '#27ae60' : bld.hp/bld.maxHp > 0.25 ? '#f39c12' : '#e74c3c';
-  var html = `
-    <div style="background:rgba(0,0,0,0.9); border-radius:12px; padding:12px; border-left:4px solid ${def.attackRange>0?'#ff4444':'#f5c842'}; min-width:220px;">
-      <div style="display:flex; gap:8px; margin-bottom:8px;">
-        <span style="font-size:28px;">${def.attackRange>0?'🏰':'🏠'}</span>
-        <div><div style="font-weight:bold; color:#f5c842;">${def.label}</div><div style="font-size:10px;">Level ${bld.level}</div></div>
+  
+  var html = `<div style="background:rgba(0,0,0,0.9); border-radius:12px; padding:12px; border-left:4px solid ${def.attackRange>0?'#ff4444':'#f5c842'}; min-width:220px;">
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <span style="font-size:28px;">${def.attackRange>0?'🏰':'🏠'}</span>
+      <div>
+        <div style="font-weight:bold; color:#f5c842;">${def.label}</div>
+        <div style="font-size:10px;">Level ${bld.level}</div>
       </div>
-      <div><div style="font-size:10px;">HP:</div><div style="background:#2c2c2c; border-radius:4px; height:10px;"><div style="width:${hpPct}%; background:${hpColor}; height:100%;"></div></div><div style="font-size:10px;">${Math.floor(bld.hp)}/${bld.maxHp}</div></div>
-      ${def.attackRange>0?`<div style="margin-top:8px;"><div>🗡️ Range: ${Math.floor(bld.attackRange)}</div><div>💥 DPS: ${bld.attackDPS.toFixed(1)}</div></div>`:''}
-      <div style="margin-top:6px; font-size:9px; text-align:center;">🔍 I-click muli para i-focus</div>
-    </div>`;
+    </div>
+    <div>
+      <div style="font-size:10px;">HP:</div>
+      <div style="background:#2c2c2c; border-radius:4px; height:10px;">
+        <div style="width:${hpPct}%; background:${hpColor}; height:100%;"></div>
+      </div>
+      <div style="font-size:10px;">${Math.floor(bld.hp)}/${bld.maxHp}</div>
+    </div>
+    ${def.attackRange>0 ? `
+      <div style="margin-top:6px; font-size:9px;">
+        🗡️ Range: ${Math.floor(bld.attackRange)}<br>
+        💥 DPS: ${bld.attackDPS.toFixed(1)}
+      </div>` : ''}
+    <div style="margin-top:6px; font-size:9px; text-align:center;">🔍 I-click muli para i-focus</div>
+  </div>`;
+  
   var panel = G('building-info-panel');
   if (!panel) {
     panel = document.createElement('div');
@@ -202,6 +260,7 @@ function _showBuildingInfo(bld) {
   if (_infoTimeout) clearTimeout(_infoTimeout);
   _infoTimeout = setTimeout(() => { if (panel) panel.style.opacity = '0'; }, 4000);
 }
+
 function _hideBuildingInfo() {
   var p = G('building-info-panel');
   if (p) p.style.opacity = '0';
@@ -209,25 +268,190 @@ function _hideBuildingInfo() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   MISSILE SCOUTING FUNCTIONS (NEW)
+   ════════════════════════════════════════════════════════════ */
+
+export function enterScoutMode() {
+  _missileState.scoutMode = true;
+  _missileState.capturedCoords = null;
+  _showScoutHint();
+  if (window.showMsg) window.showMsg('🔭 Scout Mode: I-click ang building para kumuha ng coordinates', 'info');
+}
+
+export function exitScoutMode() {
+  _missileState.scoutMode = false;
+  _missileState.targetPreview = null;
+  _hideScoutHint();
+}
+
+function _showScoutHint() {
+  var hint = G('scout-hint');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.id = 'scout-hint';
+    hint.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.85); color:#f5c842; padding:8px 16px; border-radius:8px; font-family:Oldenburg; font-size:14px; z-index:2000; pointer-events:none;';
+    document.body.appendChild(hint);
+  }
+  hint.textContent = '🔭 I-click ang building para kopyahin ang coordinates';
+  hint.style.opacity = '1';
+}
+
+function _hideScoutHint() {
+  var h = G('scout-hint');
+  if (h) h.style.opacity = '0';
+}
+
+function _captureBuildingCoords(bld) {
+  if (!_missileState.scoutMode) return null;
+  
+  var zones = ['SENTRO', 'HILAGA', 'TIMOG', 'SILANGAN', 'KANLURAN'];
+  var zone = zones[Math.floor(Math.random() * zones.length)];
+  
+  var coords = {
+    x: bld.x.toFixed(2),
+    y: bld.y.toFixed(2),
+    zone: zone,
+    name: 'Nayon ni ' + ['Juan', 'Maria', 'Pedro', 'Ana'][Math.floor(Math.random() * 4)],
+    buildingType: bld.type,
+    buildingLevel: bld.level
+  };
+  
+  _missileState.capturedCoords = coords;
+  
+  if (window.showMsg) {
+    window.showMsg(`📍 Coordinates captured: X:${coords.x}, Y:${coords.y}, ZONE:${coords.zone}`, 'success');
+  }
+  
+  if (navigator.clipboard) {
+    var coordStr = `X:${coords.x}, Y:${coords.y}, ZONE:${coords.zone}`;
+    navigator.clipboard.writeText(coordStr).catch(function() {});
+  }
+  
+  _showCapturedCoordsPanel(coords);
+  return coords;
+}
+
+function _showCapturedCoordsPanel(coords) {
+  var panel = G('captured-coords-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'captured-coords-panel';
+    panel.style.cssText = 'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(20,30,50,0.95); border:2px solid #4a8aff; border-radius:12px; padding:12px 20px; min-width:280px; z-index:2000; font-family:Oldenburg;';
+    document.body.appendChild(panel);
+  }
+  
+  panel.innerHTML = `
+    <div style="color:#4a8aff; font-size:16px; margin-bottom:8px;">📍 Captured Coordinates</div>
+    <div style="color:#fff; font-size:13px; margin:4px 0;">Target: ${coords.name}</div>
+    <div style="color:#aaa; font-size:11px; margin:4px 0;">X: ${coords.x} | Y: ${coords.y}</div>
+    <div style="color:#aaa; font-size:11px; margin:4px 0;">Zone: ${coords.zone}</div>
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button id="copy-coords-btn" style="flex:1; background:#4a8aff; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">📋 Copy</button>
+      <button id="use-coords-btn" style="flex:1; background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">🚀 Use</button>
+    </div>
+  `;
+  
+  panel.style.opacity = '1';
+  
+  setTimeout(function() {
+    var copyBtn = G('copy-coords-btn');
+    var useBtn = G('use-coords-btn');
+    if (copyBtn) copyBtn.onclick = function() {
+      var str = `X:${coords.x}, Y:${coords.y}, ZONE:${coords.zone}`;
+      if (navigator.clipboard) navigator.clipboard.writeText(str);
+      if (window.showMsg) window.showMsg('📋 Coordinates copied!', 'info');
+    };
+    if (useBtn) useBtn.onclick = function() {
+      _openMissilePanelWithCoords(coords);
+    };
+  }, 0);
+  
+  setTimeout(function() {
+    if (panel) panel.style.opacity = '0';
+  }, 10000);
+}
+
+function _openMissilePanelWithCoords(coords) {
+  exitScoutMode();
+  if (window.openMissilePanel && typeof window.openMissilePanel === 'function') {
+    window.openMissilePanel({
+      targetX: parseFloat(coords.x),
+      targetY: parseFloat(coords.y),
+      targetZone: coords.zone,
+      targetName: coords.name
+    });
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   MISSILE PANEL INTEGRATION (NEW)
+   ════════════════════════════════════════════════════════════ */
+
+export function openMissilePanel(prefillCoords) {
+  _missileState.active = true;
+  if (prefillCoords) {
+    _missileState.capturedCoords = prefillCoords;
+  }
+  if (window.showMissilePanel && typeof window.showMissilePanel === 'function') {
+    window.showMissilePanel({
+      inventory: window._VS?.missileInventory || {},
+      prefill: prefillCoords,
+      onLaunch: _handleMissileLaunch,
+      onClose: function() { _missileState.active = false; }
+    });
+  }
+}
+
+function _handleMissileLaunch(launchData) {
+  if (window._launchMissile && typeof window._launchMissile === 'function') {
+    var result = window._launchMissile(
+      launchData.missileType,
+      launchData.targetX,
+      launchData.targetY,
+      launchData.targetZone,
+      launchData.targetName,
+      launchData.count || 1
+    );
+    if (result?.ok) {
+      _missileState.active = false;
+      if (window.closeMissilePanel) window.closeMissilePanel();
+    }
+    return result;
+  }
+  return { ok: false, msg: 'Missile system not initialized.' };
+}
+
+/* ════════════════════════════════════════════════════════════
    RENDER LOOP
-════════════════════════════════════════════════════════════ */
+   ════════════════════════════════════════════════════════════ */
 function _render(ts) {
   var dt = Math.min(0.05, (ts - _lastT) / 1000);
   _lastT = ts;
   _gameTime += dt * 0.22;
   if (_gameTime >= 24) _gameTime -= 24;
+  
   _updateCamera(dt);
+  
   if (!_enemy || !_ctx) { _raf = requestAnimationFrame(_render); return; }
+  
   tickDefenderVillagers(_enemy.villagers, dt, DEF_WORLD_W, DEF_WORLD_H, _enemy.waypoints);
+  
   if (_inBattle && !_battleOver) {
     tickBattle(_troops, _enemy, dt);
     _checkTimer += dt;
     if (_checkTimer >= 0.5) { _checkTimer = 0; _checkBattleEnd(); }
   }
+  
   _ctx.setTransform(1,0,0,1,0,0);
   _ctx.clearRect(0,0,_VW,_VH);
+  
   _camApply(_ctx);
   drawBattleScene(_ctx, _enemy, _troops, _gameTime, _inBattle, ts);
+  
+  if (_missileState.scoutMode && _missileState.targetPreview) {
+    _drawScoutPreview(_ctx, _missileState.targetPreview, ts);
+  }
+  
   if (_cam.selectedBuilding && _cam.selectedBuilding.hp > 0 && _cam.selectedBuilding.attackRange > 0) {
     var sc = perspScale(_cam.selectedBuilding.y);
     var range = _cam.selectedBuilding.attackRange * sc;
@@ -244,12 +468,46 @@ function _render(ts) {
     _ctx.setLineDash([]);
     _ctx.restore();
   }
+  
   _camReset(_ctx);
+  
   _ctx.setTransform(1,0,0,1,0,0);
   drawTimeOverlay(_ctx, _VW, _VH, _gameTime);
+  
   if (_deployRole && !_battleOver && !_drag.moved) _drawDeployHint(ts);
+  
   updateDestructionBar(_enemy?.buildings);
+  
   _raf = requestAnimationFrame(_render);
+}
+
+function _drawScoutPreview(ctx, bld, now) {
+  var sc = perspScale(bld.y);
+  var w = (bld.w || 60) * sc;
+  var h = (bld.h || 40) * sc;
+  
+  ctx.save();
+  ctx.translate(bld.x, bld.y);
+  
+  var pulse = 0.3 + 0.2 * Math.sin(now / 200);
+  ctx.globalAlpha = pulse;
+  ctx.strokeStyle = '#4a8aff';
+  ctx.lineWidth = 3 * sc;
+  ctx.setLineDash([8*sc, 4*sc]);
+  ctx.beginPath();
+  ctx.rect(-w/2 - 5*sc, -h/2 - 5*sc, w + 10*sc, h + 10*sc);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  ctx.globalAlpha = 0.8;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2 * sc;
+  ctx.beginPath();
+  ctx.moveTo(-20*sc, 0); ctx.lineTo(20*sc, 0);
+  ctx.moveTo(0, -20*sc); ctx.lineTo(0, 20*sc);
+  ctx.stroke();
+  
+  ctx.restore();
 }
 
 function _drawDeployHint(now) {
@@ -271,7 +529,7 @@ function _drawDeployHint(now) {
 
 /* ════════════════════════════════════════════════════════════
    BATTLE END
-════════════════════════════════════════════════════════════ */
+   ════════════════════════════════════════════════════════════ */
 function _checkBattleEnd() {
   if (_battleOver) return;
   var aliveBuildings = _enemy.buildings.filter(b => b.hp > 0);
@@ -280,34 +538,40 @@ function _checkBattleEnd() {
   var remaining = Object.keys(_deployQueue).reduce((s,r) => s + (_deployQueue[r]||0), 0);
   if (aliveT.length === 0 && remaining === 0) _endBattle(false);
 }
+
 function _endBattle(won) {
   _battleOver = true;
   _deployRole = null;
   _cam.selectedBuilding = null;
   _hideBuildingInfo();
+  
   var total = _enemy.buildings.length;
   var destroyed = _enemy.buildings.filter(b => b.hp <= 0).length;
   var pct = total ? destroyed/total : 0;
   var stars = pct >= 1 ? 3 : pct >= 0.5 ? 2 : pct > 0 ? 1 : 0;
+  
   var lootFrac = won ? (0.7 + Math.random()*0.3) : (pct*0.5 + Math.random()*0.1);
   var lg = Math.floor(_enemy.goldLoot * lootFrac);
   var lr = Math.floor(_enemy.riceLoot * lootFrac);
+  
   var vs = window._VS;
   if (vs && (won || pct > 0)) {
     vs.res.gold = Math.min(vs.resCap.gold, (vs.res.gold||0) + lg);
     vs.res.rice = Math.min(vs.resCap.rice, (vs.res.rice||0) + lr);
   }
+  
   var casualties = _troops.filter(t => t.hp <= 0);
   _removeSoldiers(casualties);
-  setTimeout(() => { 
+  
+  setTimeout(() => {
     showResultModal(won, stars, lg, lr, casualties.length, pct);
     _updateDeployUI();
   }, 600);
 }
 
 /* ════════════════════════════════════════════════════════════
-   POINTER HANDLERS (with accurate mapping)
-════════════════════════════════════════════════════════════ */
+   POINTER HANDLERS
+   ════════════════════════════════════════════════════════════ */
 function _onMouseDown(e) {
   var p = _screenPos(e);
   _drag.active = true; _drag.moved = false;
@@ -315,9 +579,17 @@ function _onMouseDown(e) {
   _drag.camStartX = _cam.tx; _drag.camStartY = _cam.ty;
   _mouseScreenX = p.x; _mouseScreenY = p.y;
 }
+
 function _onMouseMove(e) {
   var p = _screenPos(e);
   _mouseScreenX = p.x; _mouseScreenY = p.y;
+  
+  if (_missileState.scoutMode && _enemy) {
+    var wp = _s2w(p.x, p.y);
+    var bld = _getClickedBuilding(wp.x, wp.y);
+    _missileState.targetPreview = bld;
+  }
+  
   if (!_drag.active) return;
   var dx = p.x - _drag.startX, dy = p.y - _drag.startY;
   if (!_drag.moved && Math.hypot(dx,dy) > _drag.THRESHOLD) _drag.moved = true;
@@ -327,14 +599,17 @@ function _onMouseMove(e) {
     _clampCamTarget();
   }
 }
+
 function _onMouseUp(e) {
   if (!_drag.active) return;
   _drag.active = false;
+  
   if (!_drag.moved) {
     var p = _screenPos(e);
     _deployOrClickAtScreen(p.x, p.y);
   }
 }
+
 function _onWheel(e) {
   e.preventDefault();
   var p = _screenPos(e);
@@ -346,14 +621,17 @@ function _onWheel(e) {
   _cam.ty = wpt.y + (_cam.ty - wpt.y) / ratio;
   _clampCamTarget();
 }
+
 function _touchDist(t1, t2) {
   var p1 = _getScaledTouchPos(t1), p2 = _getScaledTouchPos(t2);
   return Math.hypot(p1.x-p2.x, p1.y-p2.y);
 }
+
 function _touchMid(t1, t2) {
   var p1 = _getScaledTouchPos(t1), p2 = _getScaledTouchPos(t2);
   return { x: (p1.x+p2.x)/2, y: (p1.y+p2.y)/2 };
 }
+
 function _onTouchStart(e) {
   e.preventDefault();
   if (e.touches.length === 1) {
@@ -374,6 +652,7 @@ function _onTouchStart(e) {
     _pinch.wptX = wpt.x; _pinch.wptY = wpt.y;
   }
 }
+
 function _onTouchMove(e) {
   e.preventDefault();
   if (_pinch.active && e.touches.length === 2) {
@@ -400,6 +679,7 @@ function _onTouchMove(e) {
     }
   }
 }
+
 function _onTouchEnd(e) {
   e.preventDefault();
   if (_pinch.active && e.touches.length < 2) _pinch.active = false;
@@ -412,6 +692,21 @@ function _onTouchEnd(e) {
 /* ── Deploy or click ──────────────────────────────────────── */
 function _deployOrClickAtScreen(sx, sy) {
   var wp = _s2w(sx, sy);
+  
+  if (_missileState.scoutMode) {
+    var bld = _getClickedBuilding(wp.x, wp.y);
+    if (bld) {
+      _captureBuildingCoords(bld);
+      return;
+    }
+    exitScoutMode();
+    return;
+  }
+  
+  if (_missileState.active) {
+    return;
+  }
+  
   if (_deployRole && !_battleOver && _enemy && _deployQueue[_deployRole] > 0) {
     var troop = createTroop(_deployRole, wp.x, wp.y);
     if (troop) {
@@ -423,6 +718,7 @@ function _deployOrClickAtScreen(sx, sy) {
       return;
     }
   }
+  
   var bld = _getClickedBuilding(wp.x, wp.y);
   if (bld) _selectBuilding(bld);
   else {
@@ -432,32 +728,14 @@ function _deployOrClickAtScreen(sx, sy) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   UI WRAPPERS (call UI module functions)
-════════════════════════════════════════════════════════════ */
-function _updateHUD() {
-  updateHUD(_enemy);
-}
-
-function _renderTroopBar() {
-  renderTroopBar(_sel, _deployRole);
-}
-
-function _refreshPowerBar() {
-  updatePowerBar(_sel, _enemy?.defPower);
-}
-
-function _showDeployUI() {
-  showDeployUI();
-  _updateDeployUI();
-}
-
-function _updateDeployUI() {
-  updateDeployUI(_deployQueue, _deployRole, _troops, _enemy);
-}
-
-function _clearUIPanels() {
-  clearPanels();
-}
+   UI WRAPPERS
+   ════════════════════════════════════════════════════════════ */
+function _updateHUD() { updateHUD(_enemy); }
+function _renderTroopBar() { renderTroopBar(_sel, _deployRole); }
+function _refreshPowerBar() { updatePowerBar(_sel, _enemy?.defPower); }
+function _showDeployUI() { showDeployUI(); _updateDeployUI(); }
+function _updateDeployUI() { updateDeployUI(_deployQueue, _deployRole, _troops, _enemy); }
+function _clearUIPanels() { clearPanels(); }
 
 function _removeSoldiers(deadTroops) {
   var vs = window._VS;
@@ -466,8 +744,8 @@ function _removeSoldiers(deadTroops) {
   deadTroops.forEach(function(t) { roleCounts[t.role] = (roleCounts[t.role]||0)+1; });
   Object.keys(roleCounts).forEach(function(role) {
     var count = roleCounts[role];
-    var pool = vs.villagers.filter(function(v) { 
-      return (v._typeDef||{}).type === role && !v.isTraining; 
+    var pool = vs.villagers.filter(function(v) {
+      return (v._typeDef||{}).type === role && !v.isTraining;
     });
     for (var i = 0; i < pool.length && count > 0; i++) {
       var idx = vs.villagers.indexOf(pool[i]);
@@ -477,20 +755,33 @@ function _removeSoldiers(deadTroops) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   CANVAS & VILLAGE LOADER
-════════════════════════════════════════════════════════════ */
+   CANVAS & VILLAGE LOADER (FIXED CENTERING)
+   ════════════════════════════════════════════════════════════ */
 function _sizeCanvas() {
+  // Set canvas INTERNAL pixel dimensions to world size
   _canvas.width = DEF_WORLD_W;
   _canvas.height = DEF_WORLD_H;
+  
+  // ✅ CRITICAL: _VW/_VH must be canvas internal dimensions (matches main.js)
+  // These are used by _camApply() for the transform math
+  _VW = _canvas.width;   // = DEF_WORLD_W
+  _VH = _canvas.height;  // = DEF_WORLD_H
+  
+  // Use viewport ONLY for CSS display sizing (browser scales the canvas)
   var screen = G('attack-screen');
-  _VW = screen.clientWidth || window.innerWidth;
-  _VH = screen.clientHeight || window.innerHeight;
+  var displayW = screen.clientWidth || window.innerWidth;
+  var displayH = screen.clientHeight || window.innerHeight;
+  
   _canvas.style.position = 'absolute';
   _canvas.style.top = '0';
   _canvas.style.left = '0';
-  _canvas.style.width = _VW + 'px';
-  _canvas.style.height = _VH + 'px';
+  _canvas.style.width = displayW + 'px';
+  _canvas.style.height = displayH + 'px';
   _canvas.style.display = 'block';
+  
+  // ✅ Set window globals to internal dimensions (matches main.js pattern)
+  window._VW = _VW;
+  window._VH = _VH;
 }
 
 function _loadVillage() {
@@ -505,20 +796,23 @@ function _loadVillage() {
   _checkTimer = 0;
   _cam.selectedBuilding = null;
   _hideBuildingInfo();
+  
+  // ✅ Initialize camera with proper dimensions
   _initCam(_VW, _VH);
+  
   _updateHUD();
   _renderTroopBar();
   _clearUIPanels();
 }
-
 /* ════════════════════════════════════════════════════════════
    PUBLIC API
-════════════════════════════════════════════════════════════ */
+   ════════════════════════════════════════════════════════════ */
 window.openAttackScreen = function() {
   _canvas = G('enemy-canvas');
   _ctx = _canvas.getContext('2d');
   G('attack-screen').style.display = 'block';
   _loadVillage();
+  
   var handlers = [
     ['mousedown', _onMouseDown], ['mousemove', _onMouseMove], ['mouseup', _onMouseUp],
     ['mouseleave', _onMouseUp], ['wheel', _onWheel, { passive: false }],
@@ -527,10 +821,12 @@ window.openAttackScreen = function() {
     ['touchend', _onTouchEnd, { passive: false }],
     ['touchcancel', _onTouchEnd, { passive: false }]
   ];
+  
   handlers.forEach(function(h) {
     _canvas.removeEventListener(h[0], h[1]);
     _canvas.addEventListener(h[0], h[1], h[2] || {});
   });
+  
   if (!_raf) { _lastT = performance.now(); _raf = requestAnimationFrame(_render); }
 };
 
@@ -538,6 +834,8 @@ window._atkClose = function() {
   G('attack-screen').style.display = 'none';
   _cam.selectedBuilding = null;
   _hideBuildingInfo();
+  exitScoutMode();
+  _missileState.active = false;
   if (_raf) cancelAnimationFrame(_raf);
   _raf = null;
 };
@@ -547,7 +845,7 @@ window._atkNewVillage = _loadVillage;
 window._atkChg = function(role, delta) {
   var inv = getMilitaryInventory();
   _sel[role] = Math.max(0, Math.min(inv[role]||0, (_sel[role]||0)+delta));
-  var el = G('tsel-'+role); 
+  var el = G('tsel-'+role);
   if (el) el.textContent = _sel[role];
   _refreshPowerBar();
 };
@@ -561,24 +859,52 @@ window._atkSelectDeploy = function(role) {
 window._atkLusubin = function() {
   if (!_enemy) return;
   var atk = MILITARY.reduce(function(s,r) { return s + (_sel[r]||0)*ROLE_POWER[r]; }, 0);
-  if (atk === 0) { 
-    if (window.showMsg) window.showMsg('Pumili muna ng sundalo!','warning'); 
-    return; 
+  if (atk === 0) {
+    if (window.showMsg) window.showMsg('Pumili muna ng sundalo!','warning');
+    return;
   }
-  MILITARY.forEach(function(r) { 
-    if (_sel[r]) _deployQueue[r] = (_deployQueue[r]||0) + _sel[r]; 
+  MILITARY.forEach(function(r) {
+    if (_sel[r]) _deployQueue[r] = (_deployQueue[r]||0) + _sel[r];
   });
   _deployRole = MILITARY.find(function(r) { return _deployQueue[r] > 0; }) || null;
   _showDeployUI();
 };
 
+/* ════════════════════════════════════════════════════════════
+   MISSILE WARFARE PUBLIC API (NEW)
+   ════════════════════════════════════════════════════════════ */
+window._enterScoutMode = enterScoutMode;
+window._openMissilePanel = openMissilePanel;
+window._getCapturedCoords = function() { return _missileState.capturedCoords; };
+
+window._calculateMissileETA = function(missileType, targetX, targetY) {
+  if (!_enemy) return null;
+  var playerPos = { x: DEF_WORLD_W/2, y: DEF_WORLD_H/2 };
+  var distance = getDistanceBetweenPoints(playerPos.x, playerPos.y, targetX, targetY);
+  return calculateETA(distance, missileType);
+};
+
+window._previewMissileTargets = function(missileType, targetX, targetY) {
+  if (!_enemy) return [];
+  return selectMissileTargets(_enemy.buildings, missileType);
+};
+
+/* ════════════════════════════════════════════════════════════
+   RESIZE HANDLER (FIXED: re-centers on resize)
+   ════════════════════════════════════════════════════════════ */
 window.addEventListener('resize', function() {
   var scr = G('attack-screen');
   if (!scr || scr.style.display === 'none' || !_canvas) return;
-  _VW = scr.clientWidth || window.innerWidth;
-  _VH = scr.clientHeight || window.innerHeight;
-  _canvas.style.width = _VW + 'px';
-  _canvas.style.height = _VH + 'px';
+  
+  // ✅ Update CSS display size ONLY - don't touch _VW/_VH!
+  var displayW = scr.clientWidth || window.innerWidth;
+  var displayH = scr.clientHeight || window.innerHeight;
+  _canvas.style.width = displayW + 'px';
+  _canvas.style.height = displayH + 'px';
+  
+  // ✅ Re-center camera on world center
+  _cam.x = _cam.tx = DEF_WORLD_W / 2;
+  _cam.y = _cam.ty = DEF_WORLD_H / 2;
   _clampCamTarget();
   _clampCamCurrent();
 });

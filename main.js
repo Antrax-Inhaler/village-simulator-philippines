@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — main.js  (with Debt System & Resource Shortage Quips)
+   Mini Bayan — main.js  (with Missile Warfare System)
+   Version 7 - Added Missile Warfare, Scout System, War State
 ═══════════════════════════════════════════════════════════════ */
 
 import { ZONE_DEFS, getZoneAt, isZoneUnlocked, purchaseZone, drawZoneGrid, canBuildInZone, getZoneProductionMult } from './world/zones.js';
@@ -7,11 +8,15 @@ import { clamp, dist, randRange, randInt } from './utils/perspective.js';
 import { advanceTime, getTimeStr, getTimeOfDay, setTimeSpeed } from './utils/time.js';
 import { saveGame, loadGame, updateAutoSave } from './utils/storage.js';
 import { preloadAll as preloadSprites } from './utils/sprites.js';
+import { getAverageHappiness, getWasteTotal, getResourcePercent, canAfford, deductCost, formatResourceNumber } from './utils/economyHelpers.js';
+import { formatTime, formatTimeLong, getColorByPercent, truncateText, capitalizeFirst, getStarRating, createElementWithClass, setElementText, showElement } from './utils/uiHelpers.js';
 
 import { ResourceNode, createDefaultResourceNodes, tickFoodConsumption } from './resources/resource.js';
 import { 
   tickEconomy, onNewDay as economyOnNewDay, setTaxRate, getTaxRate,
-  initDebt, takeLoan, makeDebtPayment, getDebtSummary, getMaxLoanAmount, getInterestRate
+  initDebt, takeLoan, makeDebtPayment, getDebtSummary, getMaxLoanAmount, getInterestRate,
+  deductMissileCost, useMissileFromInventory, calculateWarLoot, applyWarLoot, applySpamPenalty,
+  getMissileInventorySummary, canAffordMissileLaunch, getMissileTypeInfo, MISSILE_COSTS
 } from './resources/economy.js';
 import { tickTrade } from './resources/trade.js';
 import { Building, createDefaultBuildings, rebuildFromSave, BUILDING_DEFS, getMainHallLevel, getMainHallRules, canPlaceBuilding, getShopCatalogue, recalcResourceCaps } from './buildings/building.js';
@@ -24,7 +29,7 @@ import { tickNeeds, clearResolvedRequests, checkAndEmit } from './villagers/citi
 import { tickPolitics, updateLeaders } from './villagers/politics.js';
 
 import { cam, initCamera, camRecentre, updateCamera, zoomTo, zoomOut, softPan, WORLD_W, WORLD_H, expandWorld } from './render/camera.js';
-import { renderFrame } from './render/renderer.js';
+import { renderFrame, addMissileLaunch, addMissileImpact, clearMissileEffects } from './render/renderer.js';
 
 import { initInput, getDragState, getMousePos } from './input/input.js';
 
@@ -42,23 +47,31 @@ import { tickEvents, setEventDayCount, getActiveCalamity } from './government/ev
 import { initPersonalFinance, serializePersonalFinance, resetPersonalFinance } from './government/personalFinance.js';
 import { openRankModal } from './ui/rankModal.js';
 
-// Import ranking system
-import { 
-  RANKS, getRankFromScore, getNextRank, 
-  calculateDailyScore, showRankUpBanner 
-} from './ranking/rankingSystem.js';
-
-// Import new daily report UI
+import { RANKS, getRankFromScore, getNextRank, calculateDailyScore, showRankUpBanner } from './ranking/rankingSystem.js';
 import { showDayCount, showDailyReport } from './ui/dailyReport.js';
 
-/* ── SOUND TOGGLE ─────────────────────────────────────────────
-   Set SOUNDS_ENABLED = false while developing to mute all sounds.
-   Flip back to true for release.
-──────────────────────────────────────────────────────────── */
-var SOUNDS_ENABLED = true; // ← change to false to mute everything
+/* ═══════════════════════════════════════════════════════════════
+   MISSILE WARFARE IMPORTS
+══════════════════════════════════════════════════════════════ */
+import {
+  cancelMissile,
+  processOfflineImpacts,
+  getMissileTrackingData,
+  canAttackTarget,
+  recordAttackMade,
+} from './attack/missileWarfare.js';
 
-/* Central safe sound player — always use this instead of calling
-   window.playSound directly, so the toggle is respected everywhere. */
+import {
+  initMissilePanel,
+} from './ui/missilePanel.js';
+
+import {
+  initScoutPanel,
+} from './ui/scoutPanel.js';
+
+/* ── SOUND TOGGLE ─────────────────────────────────────────── */
+var SOUNDS_ENABLED = true;
+
 function _playSound(id, opts) {
   if (!SOUNDS_ENABLED) return;
   if (typeof window.playSound === 'function') window.playSound(id, opts);
@@ -66,8 +79,6 @@ function _playSound(id, opts) {
 
 var canvas, ctx;
 var VW = 0, VH = 0;
-var BAR_H = 0;
-
 var gameMode = 'view';
 var dayCount = 1;
 var activeBubbles = [];
@@ -79,6 +90,9 @@ var _initialized = false;
 
 var BASE_RES_CAP = { gold: 2000, rice: 1500, langis: 800 };
 
+/* ═══════════════════════════════════════════════════════════════
+   GAME STATE with Missile Warfare additions (Version 7)
+═══════════════════════════════════════════════════════════════ */
 var VS = {
   villagers: [],
   buildings: [],
@@ -104,7 +118,33 @@ var VS = {
     history: [],
     lastRankId: 1,
     previousDayStats: null
-  }
+  },
+  // Missile Warfare System (NEW v7)
+  missiles: {
+    outgoing: [],    // Active outgoing missiles
+    incoming: [],    // Active incoming missiles (simulated attacks)
+    history: []      // Last 50 missile events
+  },
+  warState: {
+    attacksMade: [],           // Track attacks for spam detection
+    attacksReceived: [],       // Track received attacks
+    lastAttackTime: 0,         // Timestamp of last attack made
+    lastRetaliationTime: 0,    // Timestamp of last retaliation
+    trustPenalties: 0,         // Accumulated trust penalties
+    rankPenalties: 0,          // Accumulated rank penalties
+    dailyAttackCount: 0,       // Attacks made today
+    dailyAttackReset: 0,       // Day when daily count resets
+    weeklyAttacks: [],         // Attacks this week for weekly limit
+    lastLoginTime: Date.now()  // For offline protection
+  },
+  missileInventory: {          // Player's missile stock
+    basic: 0,
+    precision: 0,
+    ballistic: 0,
+    mirv: 0,
+    interceptor: 0
+  },
+  scoutHistory: []             // Scanned enemy coordinates
 };
 
 var _drawer = {
@@ -181,7 +221,6 @@ function update(dt) {
   if (Math.floor(VS.time) < prevH) { 
     dayCount++; 
     _onNewDay();
-    // Call without await - fire and forget
     _calculateDailyRankScore();
   }
 
@@ -282,36 +321,34 @@ function update(dt) {
   }
 }
 
-/* ── Daily Rank Score Calculation with New UI ───────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   Daily Rank Score Calculation
+═══════════════════════════════════════════════════════════════ */
 function _calculateDailyRankScore() {
-  // Initialize previous day stats if not exists
   if (!VS.rank.previousDayStats) {
     VS.rank.previousDayStats = {
-      avgApproval: _avgHappiness(),
+      avgApproval: getAverageHappiness(VS.villagers),
       population: VS.villagers.length,
       employed: VS.villagers.filter(v => v.workBuilding).length,
       buildings: VS.buildings.filter(b => !b.underConstruction).length,
       totalLevels: VS.buildings.reduce((sum, b) => sum + (b.level || 1), 0),
       tradeProfit: VS.trade?.todayProfit || 0,
       corruption: VS.corruption?.exposureLevel || 0,
-      waste: _getWasteTotal(),
+      waste: getWasteTotal(VS.res, VS.resCap),
       resolvedEvents: VS.events?.resolvedToday || 0,
       damagedBuildings: VS.events?.damagedBuildingsToday || 0
     };
     return;
   }
   
-  // Calculate daily score
   const result = calculateDailyScore(VS, VS.rank.previousDayStats);
   const previousScore = VS.rank.score;
   const newScore = previousScore + result.dailyScore;
   const oldRank = getRankFromScore(previousScore);
   const newRank = getRankFromScore(Math.max(0, newScore));
   
-  // Update score (cannot go below 0)
   VS.rank.score = Math.max(0, newScore);
   
-  // Store history
   VS.rank.history.unshift({
     day: dayCount,
     score: result.dailyScore,
@@ -320,12 +357,9 @@ function _calculateDailyRankScore() {
   });
   if (VS.rank.history.length > 30) VS.rank.history.pop();
   
-  // Show day count overlay first (3 seconds)
   showDayCount(dayCount).then(() => {
-    // Then show daily report with the new minimal design
     return showDailyReport(VS, dayCount, result, previousScore, VS.rank.score, oldRank, getNextRank(VS.rank.score));
   }).then(() => {
-    // Check for rank up after report is closed
     if (newRank.id > oldRank.id) {
       VS.rank.lastRankId = newRank.id;
       showRankUpBanner(oldRank, newRank);
@@ -335,27 +369,10 @@ function _calculateDailyRankScore() {
     console.error('Error showing daily report:', err);
   });
   
-  // Save current stats for next day
   VS.rank.previousDayStats = result.newStats;
 }
 
-function _avgHappiness() {
-  if (!VS.villagers.length) return 50;
-  let s = 0;
-  VS.villagers.forEach(v => { s += v.happiness || 50; });
-  return s / VS.villagers.length;
-}
-
-function _getWasteTotal() {
-  let waste = 0;
-  if (VS.res.gold > VS.resCap.gold) waste += VS.res.gold - VS.resCap.gold;
-  if (VS.res.rice > VS.resCap.rice) waste += VS.res.rice - VS.resCap.rice;
-  if (VS.res.langis > VS.resCap.langis) waste += VS.res.langis - VS.resCap.langis;
-  return waste;
-}
-
 function _onRankUp(newRank, oldRank) {
-  // Apply rank bonuses
   if (newRank.bonus > 0) {
     VS.villagers.forEach(v => {
       v.happiness = Math.min(100, (v.happiness || 50) + newRank.bonus);
@@ -363,28 +380,20 @@ function _onRankUp(newRank, oldRank) {
     showMsg(`🎉 Rank up! +${newRank.bonus}% approval bonus!`);
   }
   
-  // Unlock new building types based on rank
-  if (newRank.id >= 3) {
+  if (newRank.id >= 3 && !window._unlockedBuildingTypes?.includes('palengke')) {
     if (!window._unlockedBuildingTypes) window._unlockedBuildingTypes = [];
-    if (!window._unlockedBuildingTypes.includes('palengke')) {
-      window._unlockedBuildingTypes.push('palengke');
-      showMsg('🏪 Bagong gusali: Palengke!');
-    }
+    window._unlockedBuildingTypes.push('palengke');
+    showMsg('🏪 Bagong gusali: Palengke!');
   }
-  if (newRank.id >= 4) {
-    if (!window._unlockedBuildingTypes.includes('school')) {
-      window._unlockedBuildingTypes.push('school');
-      showMsg('📚 Bagong gusali: Paaralan!');
-    }
+  if (newRank.id >= 4 && !window._unlockedBuildingTypes?.includes('school')) {
+    window._unlockedBuildingTypes.push('school');
+    showMsg('📚 Bagong gusali: Paaralan!');
   }
-  if (newRank.id >= 5) {
-    if (!window._unlockedBuildingTypes.includes('hospital')) {
-      window._unlockedBuildingTypes.push('hospital');
-      showMsg('🏥 Bagong gusali: Ospital!');
-    }
+  if (newRank.id >= 5 && !window._unlockedBuildingTypes?.includes('hospital')) {
+    window._unlockedBuildingTypes.push('hospital');
+    showMsg('🏥 Bagong gusali: Ospital!');
   }
   
-  // Play rank up sound
   _playSound('sfx-unlock');
 }
 
@@ -405,6 +414,22 @@ function _onNewDay() {
   updateLeaders(VS);
   economyOnNewDay(VS, showMsg);
   setEventDayCount(dayCount, VS);
+  
+  // Update war state for new day (spam protection resets)
+  if (VS.warState) {
+    if (VS.warState.dailyAttackReset !== dayCount) {
+      VS.warState.dailyAttackReset = dayCount;
+      VS.warState.dailyAttackCount = 0;
+    }
+    // Clean up old attack records (keep last 7 days)
+    var weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    VS.warState.attacksMade = (VS.warState.attacksMade || []).filter(function(a) {
+      return a.timestamp > weekAgo;
+    });
+    VS.warState.attacksReceived = (VS.warState.attacksReceived || []).filter(function(a) {
+      return a.timestamp > weekAgo;
+    });
+  }
 }
 
 export function notifyHallUpgrade(newLevel, BUILDING_DEFS, showMsgFn, showUnlockFn) {
@@ -479,16 +504,122 @@ function _updateElectionBar() {
     var pct = Math.round((est.liveApproval || 0) * 100);
     approvalEl.textContent = pct + '%';
     approvalEl.style.color = pct >= 60 ? '#44aa44' : pct >= 51 ? '#f5c842' : '#e74c3c';
-    approvalEl.title = est.liveBreakdown
-      ? 'Tiwala:' + est.liveBreakdown.trust + ' Kasiyahan:' + est.liveBreakdown.happy + ' Pagkain:' + est.liveBreakdown.food + ' Trabaho:' + est.liveBreakdown.employ + '%'
-      : '';
   }
 }
 
-// Debt system global functions
+/* ═══════════════════════════════════════════════════════════════
+   Missile Warfare Window Functions
+═══════════════════════════════════════════════════════════════ */
+
+// Launch a missile at target coordinates
+window._launchMissile = function(missileType, targetX, targetY, targetZone, targetName, count) {
+  count = count || 1;
+  
+  // Check spam protection
+  var canAttack = canAttackTarget(VS.warState, targetName, Date.now(), dayCount);
+  if (!canAttack.ok) {
+    return { ok: false, msg: canAttack.reason };
+  }
+  
+  // Check resources and inventory
+  if (!canAffordMissileLaunch(missileType, count, VS)) {
+    return { ok: false, msg: 'Kulang ang resources para sa missile na ito.' };
+  }
+  
+  // Check missile stock
+  var inv = VS.missileInventory || {};
+  if ((inv[missileType] || 0) < count) {
+    return { ok: false, msg: 'Kulang ang missile sa inventory!' };
+  }
+  
+  // Deduct cost and use from inventory
+  if (!deductMissileCost(missileType, count, VS, showMsg)) {
+    return { ok: false, msg: 'Failed to deduct missile cost.' };
+  }
+  for (var i = 0; i < count; i++) {
+    useMissileFromInventory(missileType, VS, showMsg);
+  }
+  
+  // Find launch position (Missile Silo)
+  var silo = VS.buildings.find(function(b) { return b.type === 'missilesilo' && b.hp > 0; });
+  var startX = silo ? silo.x : (WORLD_W / 2);
+  var startY = silo ? silo.y : (WORLD_H / 2);
+  
+  // Calculate travel time based on distance
+  var distance = dist(startX, startY, targetX, targetY);
+  var missileDef = MISSILE_COSTS[missileType];
+  var travelTime = randRange(missileDef.travelMin, missileDef.travelMax);
+  var launchTime = Date.now();
+  var impactTime = launchTime + travelTime * 1000;
+  
+  // Create missile record
+  var missile = {
+    id: 'm_' + Date.now() + '_' + randInt(1000, 9999),
+    type: missileType,
+    targetX: targetX,
+    targetY: targetY,
+    targetZone: targetZone,
+    targetName: targetName,
+    launchTime: launchTime,
+    impactTime: impactTime,
+    eta: travelTime,
+    status: 'traveling',
+    damage: 0,
+    buildingHit: null,
+    lootGained: 0,
+    cancelled: false,
+    startX: startX,
+    startY: startY,
+    progress: 0
+  };
+  
+  VS.missiles.outgoing.push(missile);
+  
+  // Record attack for spam protection
+  recordAttackMade(VS.warState, targetName, launchTime, dayCount);
+  
+  // Show launch effect on map
+  if (silo) {
+    addMissileLaunch(silo.x, silo.y, missileType);
+  }
+  
+  // Play launch sound
+  _playSound('sfx-missile-launch');
+  
+  // Show confirmation
+  showMsg(`🚀 Inilunsad ang ${missileType.toUpperCase()} missile papunta sa ${targetName}! ETA: ${travelTime}s`, 'info');
+  
+  return { ok: true, missile: missile };
+};
+
+// Cancel outgoing missile (within first 10 seconds)
+window._cancelMissile = function(missileId) {
+  var result = cancelMissile(missileId, VS, Date.now(), showMsg);
+  if (result.ok) {
+    // Remove from visual tracking
+    clearMissileEffects();
+  }
+  return result;
+};
+
+// Get missile tracking data for UI
+window._getMissileTracking = function() {
+  return getMissileTrackingData(VS, Date.now());
+};
+
+// Process offline missile impacts (called on game load)
+window._processMissileImpacts = function() {
+  var result = processOfflineImpacts(VS, Date.now(), showMsg);
+  if (result.processed > 0) {
+    showMsg(`💥 ${result.processed} missile(s) impacted while you were away!`, 'info');
+  }
+  return result;
+};
+
+// Debt system functions (existing)
 window._makeDebtPayment = function(amount) {
   if (makeDebtPayment) {
-    makeDebtPayment(amount, VS, showMsg);
+    return makeDebtPayment(amount, VS, showMsg);
   } else {
     if (VS.res.gold < amount) {
       showMsg('Kulang ang ginto!', 'danger');
@@ -508,7 +639,7 @@ window._makeDebtPayment = function(amount) {
 
 window._takeLoan = function(amount) {
   if (takeLoan) {
-    takeLoan(amount, VS, showMsg);
+    return takeLoan(amount, VS, showMsg);
   } else {
     if (VS.debt && VS.debt.defaulted) {
       showMsg('Hindi ka na pwedeng umutang dahil sa nakaraang hindi pagbabayad.', 'danger');
@@ -527,28 +658,15 @@ window._takeLoan = function(amount) {
   }
 };
 
-window._getMaxLoanAmount = function(vs) {
-  if (getMaxLoanAmount) return getMaxLoanAmount(vs || VS);
-  return 1000;
-};
-
-window._getInterestRate = function(vs) {
-  if (getInterestRate) return getInterestRate(vs || VS);
-  return 0.05;
-};
-
-window._getDebtSummary = function(vs) {
-  if (getDebtSummary) return getDebtSummary(vs || VS);
-  return { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] };
-};
+window._getMaxLoanAmount = function(vs) { return getMaxLoanAmount ? getMaxLoanAmount(vs || VS) : 1000; };
+window._getInterestRate = function(vs) { return getInterestRate ? getInterestRate(vs || VS) : 0.05; };
+window._getDebtSummary = function(vs) { return getDebtSummary ? getDebtSummary(vs || VS) : { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] }; };
 
 // Expose other window functions
 window.spawnVillager = function() { _spawnVillager(undefined, false); };
 window.showMsg = showMsg;
 window._VS = VS;
-
 window.setMode = function(m) { gameMode = m; canvas.className = 'mode-' + m; };
-
 window.setSpeed = function(s) {
   setTimeSpeed(s);
   document.querySelectorAll('.speed-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -556,7 +674,6 @@ window.setSpeed = function(s) {
   if (el) el.classList.add('active');
   showMsg('Bilis: ' + s + 'x');
 };
-
 window.openShop = function() { openDrawer(null, '_shop'); };
 window.softPan = function(wx, wy, dur) { softPan(wx, wy, dur); };
 window.triggerProtest = function() { triggerProtestGathering(VS); };
@@ -568,7 +685,6 @@ window.purchaseZone = function(key) {
 window._getRepairCost = getRepairCost;
 window.ZONE_DEFS = ZONE_DEFS;
 window.isZoneUnlocked = function(key) { return isZoneUnlocked(key, VS); };
-
 window.getPolicyState = function() { return getPolicyState(VS); };
 window.activatePolicy = function(key) {
   var r = activatePolicy(key, VS, showMsg);
@@ -580,15 +696,12 @@ window.deactivatePolicy = function(key) {
   showMsg(r.msg);
   if (window.openSidePanel) window.openSidePanel('policy');
 };
-
 window.setTaxRate = function(rate) { setTaxRate(rate, VS, showMsg); };
 window.getTaxRate = function() { return getTaxRate(VS); };
-
 window.triggerSave = function() {
   var _pf = serializePersonalFinance();
   showMsg(saveGame(VS, dayCount, null, _pf) ? 'Naligtas! Araw ' + dayCount : 'Save error.');
 };
-
 window.triggerLoad = function() {
   var savedState = loadGame();
   if (!savedState) { showMsg('Walang na-save.'); return; }
@@ -607,6 +720,11 @@ window.triggerLoad = function() {
   if (savedState.trade) VS.trade = savedState.trade;
   if (savedState.needs) VS.needs = savedState.needs;
   if (savedState.rank) VS.rank = savedState.rank;
+  // Load missile warfare state (NEW v7)
+  if (savedState.missiles) VS.missiles = savedState.missiles;
+  if (savedState.warState) VS.warState = savedState.warState;
+  if (savedState.missileInventory) VS.missileInventory = savedState.missileInventory;
+  if (savedState.scoutHistory) VS.scoutHistory = savedState.scoutHistory;
   if (savedState.villagers && savedState.villagers.length) VS.villagers = rebuildVillagersFromSave(savedState.villagers);
   if (savedState.buildings && savedState.buildings.length) VS.buildings = rebuildFromSave(savedState.buildings);
   if (savedState.resourceNodes && savedState.resourceNodes.length) {
@@ -630,11 +748,13 @@ window.triggerLoad = function() {
       savedCorruptionHistory: savedState.corruptionHistory || [],
     });
   }
+  // Process any missile impacts that occurred while offline
+  _processMissileImpacts();
   showMsg('Na-load! Araw ' + dayCount);
 };
 window.openRankModal = openRankModal;
 
-// Debug function to test the report
+// Debug helpers
 window.debugShowReport = function() {
   const oldRank = getRankFromScore(VS.rank.score);
   const nextRank = getNextRank(VS.rank.score);
@@ -662,8 +782,15 @@ window.debugShowDayCount = function() {
   return showDayCount(dayCount);
 };
 
-console.log('Debug commands: debugShowReport(), debugShowDayCount()');
-console.log('To trigger day change: _VS.time = 23.9');
+// Debug: Add missiles to inventory
+window.debugAddMissiles = function(type, count) {
+  VS.missileInventory = VS.missileInventory || { basic: 0, precision: 0, ballistic: 0, mirv: 0, interceptor: 0 };
+  VS.missileInventory[type] = (VS.missileInventory[type] || 0) + (count || 1);
+  showMsg(`Added ${count || 1} ${type} missile(s) to inventory`, 'info');
+};
+
+console.log('✅ Mini Bayan loaded. Debug: debugShowReport(), debugShowDayCount(), debugAddMissiles(type, count)');
+console.log('Tip: Set _VS.time = 23.9 to trigger day change');
 
 function updateCanvasSizeForDevice() {
   if (!canvas) return;
@@ -717,8 +844,6 @@ function init() {
 
   initCamera(VW, VH);
   camRecentre();
-
-  // Initialize debt system
   initDebt(VS);
 
   const container = document.getElementById('canvas-container');
@@ -731,14 +856,8 @@ function init() {
     adjustContainerLayout();
   }
   
-  window.addEventListener('resize', () => {
-    adjustContainerLayout();
-  });
-  
-  window.addEventListener('orientationchange', () => {
-    setTimeout(() => adjustContainerLayout(), 100);
-  });
-  
+  window.addEventListener('resize', () => adjustContainerLayout());
+  window.addEventListener('orientationchange', () => setTimeout(adjustContainerLayout, 100));
   setTimeout(adjustContainerLayout, 100);
   setTimeout(adjustContainerLayout, 300);
   setTimeout(adjustContainerLayout, 1000);
@@ -870,6 +989,10 @@ function init() {
   lastTime = performance.now();
   _initialized = true;
   requestAnimationFrame(gameLoop);
+
+  // Initialize missile and scout panels
+  initMissilePanel();
+  initScoutPanel();
 
   showMsg('Maligayang pagdating! I-click ang Tindahan para bumili ng gusali.');
 }

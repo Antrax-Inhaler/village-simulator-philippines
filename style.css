@@ -3610,7 +3610,6 @@ canvas.mode-view  { cursor: default; }
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 54px;
-  background: linear-gradient(180deg, rgba(8,4,2,0.94) 0%, transparent 100%);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3645,21 +3644,30 @@ canvas.mode-view  { cursor: default; }
 /* Info strip */
 #atk-info-strip {
   position: absolute;
-  top: 54px; left: 50%;
-  transform: translateX(-50%);
-  display: flex; gap: 5px;
-  z-index: 10; padding: 4px 0;
-  flex-wrap: wrap; justify-content: center;
-  max-width: 96vw;
+  top: 54px;
+  right: 12px;           /* Changed from left/center to right */
+  left: auto;            /* Override left positioning */
+  transform: none;       /* Remove center transform */
+  display: flex;
+  flex-direction: column; /* Stack vertically */
+  gap: 6px;
+  z-index: 10;
+  padding: 8px;
+  max-width: 140px;
+  align-items: flex-end; /* Align to right */
 }
+
 .atk-pill {
-  background: rgba(8,4,2,0.84);
-  border: 1px solid #c49a4e;
   border-radius: 14px;
-  padding: 3px 9px;
+  padding: 4px 10px;
   font-family: 'Oldenburg', serif;
-  font-size: 11px; color: #f5c842;
+  font-size: 11px;
+  color: #f5c842;
   white-space: nowrap;
+  width: 100%;           /* Full width of container */
+  text-align: right;     /* Right-align text */
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+
 }
 .def-pill  { border-color: #e74c3c; color: #ff9999; }
 .loot-pill { border-color: #27ae60; color: #8ddc8d; }
@@ -3668,7 +3676,6 @@ canvas.mode-view  { cursor: default; }
 #atk-bottom-panel {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  background: linear-gradient(0deg, rgba(6,3,1,0.97) 0%, rgba(6,3,1,0.90) 75%, transparent 100%);
   padding: 14px 14px 20px;
   z-index: 10;
   display: flex;
@@ -3695,7 +3702,7 @@ canvas.mode-view  { cursor: default; }
 #atk-troop-row::-webkit-scrollbar-thumb { background: rgba(196,154,78,0.4); border-radius: 2px; }
 
 .troop-slot {
-  background: rgba(18,10,3,0.92);
+  background: rgb(18 10 3 / 77%);
   border: 1.5px solid #c49a4e;
   border-radius: 12px;
   padding: 8px 10px;
@@ -3732,7 +3739,6 @@ canvas.mode-view  { cursor: default; }
 
 /* Lusubin button */
 #atk-go-btn {
-  background: linear-gradient(135deg, #7a1a1a, #4a0a0a);
   border: 2px solid #e74c3c;
   color: #ffaaaa;
   font-family: 'Slackey', sans-serif;
@@ -3742,6 +3748,7 @@ canvas.mode-view  { cursor: default; }
   cursor: pointer;
   transition: all 0.2s;
   width: 100%;
+  background-color: #e74c3c;
 }
 #atk-go-btn:hover:not(:disabled) {
   background: linear-gradient(135deg, #9a2a2a, #6a1a1a);
@@ -3818,7 +3825,6 @@ canvas.mode-view  { cursor: default; }
 #atk-deploy-panel {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  background: linear-gradient(0deg, rgba(4,2,1,0.97) 0%, rgba(4,2,1,0.85) 80%, transparent 100%);
   padding: 14px 14px 22px;
   z-index: 10;
   display: none;          /* shown once Lusubin is pressed */
@@ -3849,7 +3855,6 @@ canvas.mode-view  { cursor: default; }
 }
 .deploy-active {
   border-color: #f5c842 !important;
-  box-shadow: 0 0 0 2px rgba(245,200,66,0.45), 0 0 18px rgba(245,200,66,0.3);
   transform: scale(1.04);
 }
 .deploy-count {
@@ -3911,7 +3916,6 @@ canvas.mode-view  { cursor: default; }
 #atk-dest-fill {
   height: 100%;
   border-radius: 5px;
-  background: linear-gradient(90deg, #e74c3c, #f39c12, #27ae60);
   transition: width 0.4s;
   width: 0%;
 }
@@ -3946,4 +3950,256 @@ canvas.mode-view  { cursor: default; }
   .deploy-slot { font-size: 11px; padding: 6px 9px; }
   #atk-dest-bg { width: 150px; }
 }
- 
+ /* ════════════════════════════════════════════════════
+   MOBILE RESPONSIVE - Attack UI Panels
+   ════════════════════════════════════════════════════ */
+
+/* ── Tablet & Mobile (768px and below) ── */
+@media (max-width: 768px) {
+  
+  /* TOP HUD - Shrink height and spacing */
+  #atk-hud-top {
+    height: 44px !important;
+    padding: 0 8px !important;
+    gap: 6px !important;
+  }
+  
+  .atk-btn-pill {
+    font-size: 10px !important;
+    padding: 4px 10px !important;
+    border-radius: 14px !important;
+  }
+  
+  #atk-village-name {
+    font-size: 12px !important;
+  }
+
+  /* Info Strip - Adjust position */
+ #atk-info-strip {
+    top: 44px;
+    right: 8px;
+    max-width: 110px;
+    gap: 4px;
+    padding: 6px;
+  }
+  
+  .atk-pill {
+    font-size: 9px;
+    padding: 3px 8px;
+  }
+
+  /* BOTTOM PANEL - Compact layout */
+  #atk-bottom-panel {
+    padding: 8px 8px 15px !important;
+    gap: 6px !important;
+  }
+  
+  .atk-panel-header {
+    font-size: 10px !important;
+  }
+
+  /* Troop Slots - Narrower */
+  #atk-troop-row {
+    gap: 4px !important;
+  }
+  
+  .troop-slot {
+    min-width: 58px !important;
+    padding: 5px 4px !important;
+    border-radius: 8px !important;
+    gap: 2px !important;
+  }
+  
+  .ts-icon {
+    font-size: 18px !important;
+  }
+  
+  .ts-name {
+    font-size: 8px !important;
+  }
+  
+  .ts-avail {
+    font-size: 7px !important;
+  }
+  
+  .ts-ctrl button {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 12px !important;
+  }
+  
+  .ts-ctrl span {
+    font-size: 11px !important;
+    min-width: 16px !important;
+  }
+
+  /* Win Bar - Thinner */
+  #atk-win-wrap {
+    gap: 2px !important;
+  }
+  
+  #atk-win-label {
+    font-size: 9px !important;
+  }
+  
+  #atk-win-bg {
+    height: 6px !important;
+  }
+
+  /* Attack Button - Smaller */
+  #atk-go-btn {
+    padding: 9px 12px !important;
+    font-size: 14px !important;
+    border-radius: 22px !important;
+  }
+}
+
+/* ── Small Mobile (600px and below) ── */
+@media (max-width: 600px) {
+  
+  /* TOP HUD - Even more compact */
+  #atk-hud-top {
+    height: 40px !important;
+    padding: 0 6px !important;
+  }
+  
+  .atk-btn-pill {
+    font-size: 9px !important;
+    padding: 3px 8px !important;
+  }
+  
+  #atk-village-name {
+    font-size: 11px !important;
+  }
+
+  /* Info Strip */
+ #atk-info-strip {
+    top: 40px;
+    right: 6px;
+    max-width: 90px;
+    padding: 4px;
+    gap: 3px;
+  }
+  
+  .atk-pill {
+    font-size: 8px;
+    padding: 2px 6px;
+  }
+  /* BOTTOM PANEL - Maximum compact */
+  #atk-bottom-panel {
+    padding: 6px 6px 12px !important;
+    gap: 5px !important;
+  }
+  
+  .atk-panel-header {
+    font-size: 9px !important;
+  }
+
+  /* Troop Slots - Minimum viable size */
+  .troop-slot {
+    min-width: 52px !important;
+    padding: 4px 2px !important;
+  }
+  
+  .ts-icon {
+    font-size: 16px !important;
+  }
+  
+  .ts-name {
+    font-size: 7px !important;
+  }
+  
+  .ts-avail {
+    display: none !important; /* Hide on very small screens */
+  }
+  
+  .ts-ctrl button {
+    width: 16px !important;
+    height: 16px !important;
+    font-size: 11px !important;
+  }
+  
+  .ts-ctrl span {
+    font-size: 10px !important;
+    min-width: 14px !important;
+  }
+
+  /* Win Bar */
+  #atk-win-label {
+    font-size: 8px !important;
+  }
+  
+  #atk-win-bg {
+    height: 5px !important;
+  }
+
+  /* Attack Button */
+  #atk-go-btn {
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* ── Very Small Screens (380px and below) ── */
+@media (max-width: 380px) {
+  
+  #atk-village-name {
+    display: none !important; /* Hide to save space */
+  }
+  
+  .atk-btn-pill {
+    font-size: 8px !important;
+    padding: 3px 6px !important;
+  }
+  
+  .troop-slot {
+    min-width: 48px !important;
+  }
+  
+  .ts-icon {
+    font-size: 14px !important;
+  }
+  
+  .ts-name {
+    font-size: 6px !important;
+  }
+  
+  #atk-go-btn {
+    font-size: 12px !important;
+    padding: 7px 8px !important;
+  }
+}
+
+/* ── Landscape Mobile Optimization ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  
+  #atk-hud-top {
+    height: 36px !important;
+  }
+  
+  #atk-info-strip {
+    top: 36px !important;
+  }
+  
+  #atk-bottom-panel {
+    padding: 4px 8px 10px !important;
+  }
+  
+  .troop-slot {
+    min-width: 50px !important;
+    padding: 3px 2px !important;
+  }
+  
+  .ts-icon {
+    font-size: 15px !important;
+  }
+  
+  #atk-win-wrap {
+    display: none !important; /* Hide win bar in landscape to save space */
+  }
+  
+  #atk-go-btn {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+}

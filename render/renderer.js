@@ -1,18 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — render/renderer.js
-
-   CANVAS RENDERER
-   ─────────────────────────────────────────────────────────────
-   All canvas drawing code lifted from main.js render section.
-   main.js calls render(state) once per frame — this module
-   owns every ctx call so main.js stays logic-only.
-
-   EXPORTS
-   ─────────────────────────────────────────────────────────────
-   renderFrame(canvas, ctx, state)   — full frame, call from main.js
-   updateWasteDisplay(VS)            — push waste totals to DOM panel
-   rrect(ctx, x, y, w, h, r)        — reusable rounded-rect path
-═══════════════════════════════════════════════════════════════ */
+   Mini Bayan — render/renderer.js  (with Missile Warfare Support)
+══════════════════════════════════════════════════════════════ */
 
 import { perspScale, clamp, lerp }  from '../utils/perspective.js';
 import { getTimeStr, getTimeOfDay, getOverlayColor, getSunMoonState } from '../utils/time.js';
@@ -23,6 +11,16 @@ import { cam, camApply, camReset, w2s, WORLD_W, WORLD_H } from './camera.js';
 import { getActiveCalamity } from '../government/events.js';
 import { getWasteStats }     from '../resources/economy.js';
 import { drawZoneArrows }    from '../world/zones.js';
+
+/* ══════════════════════════════════════════════════════════════
+   Missile Sprite System Imports
+══════════════════════════════════════════════════════════════ */
+import {
+  drawMissileOnMap,
+  MissileImpactEffect,
+  drawMissileLaunch,
+  getMissileColor
+} from './missileSprites.js';
 
 /* ══════════════════════════════════════════════════════════════
    Wind particles — persist across frames
@@ -42,6 +40,13 @@ var _windParticles = (function() {
 })();
 
 /* ══════════════════════════════════════════════════════════════
+   Missile Effects Storage (for current session)
+══════════════════════════════════════════════════════════════ */
+var _missileTrails = {};      // missileId → trail particles array
+var _missileImpacts = [];     // Active impact effects
+var _missileLaunches = [];    // Active launch effects
+
+/* ══════════════════════════════════════════════════════════════
    renderFrame
    Single entry point called by main.js each animation frame.
 ══════════════════════════════════════════════════════════════ */
@@ -54,6 +59,9 @@ export function renderFrame(canvas, ctx, state) {
   ctx.shadowBlur = 0;
   ctx.shadowColor = 'transparent';
 
+  /* ── Update missile effects ───────────────────────────────── */
+  _updateMissileEffects(state.VS, 1/60);
+
   /* ── World-space draws ─────────────────────────────────── */
   camApply(ctx);
     if (state.shakeX || state.shakeY) {
@@ -64,6 +72,7 @@ export function renderFrame(canvas, ctx, state) {
     drawZoneArrows(ctx, VW, VH, state.VS);
     drawEntitiesSorted(ctx, state);
     drawBuildPreview(ctx, state);
+    drawMissileEffects(ctx, state);  // NEW: Draw missiles & effects
   camReset(ctx);
 
   /* ── Calamity overlay ──────────────────────────────────── */
@@ -76,7 +85,8 @@ export function renderFrame(canvas, ctx, state) {
   drawTimeOverlay(ctx, VW, VH, state.VS.time);
   drawHUD(ctx, state.VS, VW);
   drawZoomBadge(ctx, VW, VH);
-  drawRankBadge(ctx, VW, VH, state.VS);  // ADDED: Call rank badge drawing
+  drawRankBadge(ctx, VW, VH, state.VS);
+  drawMissileStatusBadge(ctx, VW, VH, state.VS);  // NEW: Missile inventory badge
   updateBarUI(state.VS, state.dayCount);
   updateBubblePositions(canvas, state.activeBubbles, state.VW, state.VH);
 
@@ -85,16 +95,150 @@ export function renderFrame(canvas, ctx, state) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   Update Missile Effects (launch, travel, impact)
+══════════════════════════════════════════════════════════════ */
+function _updateMissileEffects(VS, dt) {
+  var frameCount = Math.floor(performance.now() / 16);
+  
+  // Update active impact effects
+  _missileImpacts = _missileImpacts.filter(function(effect) {
+    return effect.update(dt);
+  });
+  
+  // Update active launch effects
+  _missileLaunches = _missileLaunches.filter(function(effect) {
+    return effect.update(dt);
+  });
+  
+  // Process outgoing missiles for visual tracking
+  if (VS.missiles && VS.missiles.outgoing) {
+    VS.missiles.outgoing.forEach(function(missile) {
+      if (missile.status === 'traveling' && !missile.cancelled) {
+        // Initialize trail if not exists
+        if (!_missileTrails[missile.id]) {
+          _missileTrails[missile.id] = [];
+        }
+        
+        // Update progress for rendering
+        var elapsed = Date.now() - missile.launchTime;
+        var total = missile.impactTime - missile.launchTime;
+        missile.progress = clamp(elapsed / total, 0, 1);
+        
+        // Store start position if not set
+        if (!missile.startX || !missile.startY) {
+          var silo = _findMissileSilo(VS);
+          missile.startX = silo ? silo.x : (WORLD_W / 2);
+          missile.startY = silo ? silo.y : (WORLD_H / 2);
+        }
+      }
+    });
+    
+    // Clean up finished missile trails
+    Object.keys(_missileTrails).forEach(function(id) {
+      var missile = VS.missiles.outgoing.find(function(m) { return m.id === id; });
+      if (!missile || missile.status !== 'traveling') {
+        delete _missileTrails[id];
+      }
+    });
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Find Missile Silo building (for launch position)
+══════════════════════════════════════════════════════════════ */
+function _findMissileSilo(VS) {
+  if (!VS || !VS.buildings) return null;
+  for (var i = 0; i < VS.buildings.length; i++) {
+    var b = VS.buildings[i];
+    if (b.type === 'missilesilo' && b.hp > 0) {
+      return b;
+    }
+  }
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Draw Missile Effects (traveling missiles, impacts, launches)
+══════════════════════════════════════════════════════════════ */
+function drawMissileEffects(ctx, state) {
+  var VS = state.VS;
+  var sc = cam.zoom;
+  var frameCount = Math.floor(performance.now() / 16);
+  
+  // Draw active launch effects
+  _missileLaunches.forEach(function(effect) {
+    effect.draw(ctx);
+  });
+  
+  // Draw traveling missiles
+  if (VS.missiles && VS.missiles.outgoing) {
+    VS.missiles.outgoing.forEach(function(missile) {
+      if (missile.status === 'traveling' && !missile.cancelled && missile.progress !== undefined) {
+        var trailParticles = _missileTrails[missile.id] || [];
+        drawMissileOnMap(ctx, missile, sc, frameCount, trailParticles);
+      }
+    });
+  }
+  
+  // Draw active impact effects
+  _missileImpacts.forEach(function(effect) {
+    effect.draw(ctx);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Add Missile Launch Effect (called when missile launches)
+══════════════════════════════════════════════════════════════ */
+export function addMissileLaunch(siloX, siloY, missileType) {
+  var sc = cam.zoom;
+  var effect = {
+    x: siloX,
+    y: siloY,
+    missileType: missileType,
+    sc: sc,
+    progress: 0,
+    maxProgress: 1,
+    active: true,
+    update: function(dt) {
+      this.progress += dt * 2; // 0.5 second launch animation
+      if (this.progress >= this.maxProgress) {
+        this.active = false;
+      }
+      return this.active;
+    },
+    draw: function(ctx) {
+      drawMissileLaunch(ctx, this.x, this.y, this.missileType, this.sc, this.progress);
+    }
+  };
+  _missileLaunches.push(effect);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Add Missile Impact Effect (called when missile hits)
+══════════════════════════════════════════════════════════════ */
+export function addMissileImpact(targetX, targetY, missileType) {
+  var sc = cam.zoom;
+  var effect = new MissileImpactEffect(targetX, targetY, missileType, sc);
+  _missileImpacts.push(effect);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Clear All Missile Effects (for cleanup)
+══════════════════════════════════════════════════════════════ */
+export function clearMissileEffects() {
+  _missileTrails = {};
+  _missileImpacts = [];
+  _missileLaunches = [];
+}
+
+/* ══════════════════════════════════════════════════════════════
    updateWasteDisplay
    Reads wasteStats from VS and calls window.updateWasteDisplay
-   (defined in index.html) to push integer amounts to the DOM
-   waste panel. Runs every frame — the HTML handler is cheap
-   and only touches the DOM when the panel is open.
 ══════════════════════════════════════════════════════════════ */
 export function updateWasteDisplay(VS) {
   if (typeof window.updateWasteDisplay !== 'function') return;
   if (!VS) return;
-  var w = getWasteStats(VS);   /* { gold, rice, langis, total } — all integers */
+  var w = getWasteStats(VS);
   window.updateWasteDisplay(w);
 }
 
@@ -117,7 +261,7 @@ export function drawGround(ctx, canvasW, canvasH) {
   ctx.rect(0, 0, WORLD_W, WORLD_H);
   ctx.clip();
 
-  // existing dirt path (still using WORLD_W/H)
+  // existing dirt path
   ctx.fillStyle = 'rgba(150,110,55,0.22)';
   ctx.beginPath();
   ctx.moveTo(WORLD_W*0.46, 0);
@@ -157,7 +301,7 @@ export function drawGround(ctx, canvasW, canvasH) {
 
   ctx.restore();
 
-  // 3. Optional world border (helps players see the playable area)
+  // 3. Optional world border
   ctx.strokeStyle = 'rgba(197, 154, 78, 0.5)';
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
@@ -348,16 +492,11 @@ export function drawTimeOverlay(ctx, VW, VH, time) {
    drawHUD
 ══════════════════════════════════════════════════════════════ */
 export function drawHUD(ctx, VS, VW) {
-  /* No-op — replaced by the DOM left sidebar (dashboard.js).
-     The canvas no longer draws resource bars; the sidebar handles
-     Nayon (resources), Pamahalaan (gov stats), and Gobernador
-     (personal finance) as retractable DOM panels. */
+  /* No-op — replaced by the DOM left sidebar (dashboard.js). */
 }
 
 /* ══════════════════════════════════════════════════════════════
    drawZoomBadge
-   Fixed positioning to avoid overlapping with UI elements.
-   Now positioned at bottom-left corner with proper spacing.
 ══════════════════════════════════════════════════════════════ */
 export function drawZoomBadge(ctx, VW, VH) {
   if (cam.zoom < 1.15) return;
@@ -365,10 +504,8 @@ export function drawZoomBadge(ctx, VW, VH) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.shadowBlur = 0;
   
-  // Position at bottom-left corner with safe margin
-  // Check if on mobile (narrow screen) to adjust position
   var isMobile = VW < 768;
-  var bottomMargin = isMobile ? 70 : 80;  // Higher on mobile to avoid FAB buttons
+  var bottomMargin = isMobile ? 70 : 80;
   var leftMargin = 12;
   
   var badgeWidth = 110;
@@ -393,12 +530,10 @@ export function drawZoomBadge(ctx, VW, VH) {
 
 /* ══════════════════════════════════════════════════════════════
    drawRankBadge
-   Draws the player's current rank and score at the bottom center.
 ══════════════════════════════════════════════════════════════ */
 function drawRankBadge(ctx, VW, VH, VS) {
   if (!VS || !VS.rank) return;
   
-  // Import ranking functions dynamically
   import('../ranking/rankingSystem.js').then(module => {
     const rank = module.getRankFromScore(VS.rank.score);
     
@@ -435,6 +570,67 @@ function drawRankBadge(ctx, VW, VH, VS) {
   }).catch(err => {
     console.warn('[renderer] Failed to load ranking module:', err);
   });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   drawMissileStatusBadge
+   Shows missile inventory counts in a small HUD badge
+══════════════════════════════════════════════════════════════ */
+function drawMissileStatusBadge(ctx, VW, VH, VS) {
+  if (!VS || !VS.missileInventory) return;
+  
+  var inv = VS.missileInventory;
+  var hasMissiles = inv.basic > 0 || inv.precision > 0 || inv.ballistic > 0 || inv.mirv > 0;
+  if (!hasMissiles) return;
+  
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.shadowBlur = 0;
+  
+  var isMobile = VW < 768;
+  var x = isMobile ? VW - 140 : VW - 160;
+  var y = isMobile ? VH - 110 : VH - 100;
+  var badgeW = 130;
+  var badgeH = 80;
+  
+  // Background
+  ctx.fillStyle = 'rgba(20, 25, 40, 0.9)';
+  ctx.strokeStyle = '#4a6aff';
+  ctx.lineWidth = 1;
+  rrect(ctx, x, y, badgeW, badgeH, 8);
+  ctx.fill();
+  ctx.stroke();
+  
+  // Title
+  ctx.fillStyle = '#4a8aff';
+  ctx.font = 'bold 10px "Oldenburg",serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('🚀 Missile Stock', x + badgeW/2, y + 6);
+  
+  // Inventory list
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'left';
+  var items = [
+    { label: 'Basic', count: inv.basic, color: '#88ccff' },
+    { label: 'Precision', count: inv.precision, color: '#ffcc44' },
+    { label: 'Ballistic', count: inv.ballistic, color: '#ff6644' },
+    { label: 'MIRV', count: inv.mirv, color: '#ff44ff' }
+  ];
+  
+  var itemY = y + 24;
+  items.forEach(function(item, i) {
+    if (item.count > 0) {
+      ctx.fillStyle = item.color;
+      ctx.fillText(item.label + ':', x + 8, itemY + i * 13);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'right';
+      ctx.fillText('×' + item.count, x + badgeW - 8, itemY + i * 13);
+      ctx.textAlign = 'left';
+    }
+  });
+  
+  ctx.restore();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -559,8 +755,6 @@ function drawCalamityOverlay(ctx, VW, VH, cal) {
 /* ══════════════════════════════════════════════════════════════
    Canvas helpers
 ══════════════════════════════════════════════════════════════ */
-
-/* Rounded-rect path — does NOT stroke/fill, caller decides */
 export function rrect(ctx, x, y, w, h, r) {
   r = Math.min(r, w/2, h/2);
   ctx.beginPath();

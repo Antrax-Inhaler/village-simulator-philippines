@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — attack/attack.js (UPDATED with Villager Combat)
+   Mini Bayan — attack/attack.js  (UPDATED with Missile Warfare Support)
    
    Now includes:
    - Villager projectile attacks (spears, bullets, rockets)
@@ -7,6 +7,7 @@
    - Muzzle flash effects
    - Area of effect damage for rockets
    - Proper range calculations
+   - MISSILE WARFARE: ETA calculation, missile damage, distance helpers
 ═══════════════════════════════════════════════════════════════ */
 
 import { BUILDING_DEFS }  from '../buildings/building.js';
@@ -17,92 +18,264 @@ import { perspScale, dist, randRange, randInt, clamp } from '../utils/perspectiv
 import { WORLD_W, WORLD_H } from '../render/camera.js';
 
 /* Import attack-specific modules */
-import { 
-    DefenderBuilding, 
-    Projectile, 
-    Particle, 
-    createExplosion, 
-    createHitSpark, 
-    createBloodPuff 
+import {
+  DefenderBuilding,
+  Projectile,
+  Particle,
+  createExplosion,
+  createHitSpark,
+  createBloodPuff
 } from './attackBuildings.js';
 
-import { 
-    getRandomName, 
-    getRandomVillageName, 
-    getRandomLeaderName,
-    generateWaypoints, 
-    getBuildingRosterForLevel, 
-    getBuildingLevelForDifficulty,
-    isValidBuildingPosition
+import {
+  getRandomName,
+  getRandomVillageName,
+  getRandomLeaderName,
+  generateWaypoints,
+  getBuildingRosterForLevel,
+  getBuildingLevelForDifficulty,
+  isValidBuildingPosition
 } from './attackUtils.js';
 
 /* Import villager combat module */
 import {
-    VillagerProjectile,
-    MuzzleFlash,
-    AttackAnimation,
-    getWeaponConfig,
-    getAttackRange,
-    getAttackDamage,
-    createVillagerProjectile,
-    canRangedAttack,
-    createMuzzleFlash,
-    createAttackAnimation,
-    applyAreaDamage
+  VillagerProjectile,
+  MuzzleFlash,
+  AttackAnimation,
+  getWeaponConfig,
+  getAttackRange,
+  getAttackDamage,
+  createVillagerProjectile,
+  canRangedAttack,
+  createMuzzleFlash,
+  createAttackAnimation,
+  applyAreaDamage
 } from './attackVillagerCombat.js';
 
 /* Fixed world size — always identical to the player village world */
 export var DEF_WORLD_W = WORLD_W;
 export var DEF_WORLD_H = WORLD_H;
 
-/* ── Re-export helpers needed by attack_controller.js ─────── */
+/* ── Re-export helpers needed by attack_controller.js & missileWarfare.js ─────── */
 export { BUILDING_DEFS, drawBuilding, drawGround, drawTimeOverlay, drawVillager, perspScale, dist, randRange, randInt, clamp };
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
+   MISSILE WARFARE HELPER FUNCTIONS (NEW)
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Calculate missile travel time based on distance and missile type
+ * @param {number} distance - Distance in pixels between villages
+ * @param {string} missileType - 'basic' | 'precision' | 'ballistic' | 'mirv'
+ * @param {Object} missileDefs - Optional custom missile config (defaults to MISSILE_COSTS)
+ * @returns {number} Travel time in seconds (with ±20% variance)
+ */
+export function calculateETA(distance, missileType, missileDefs) {
+  var defs = missileDefs || {
+    basic:     { speed: 150, travelMin: 30,  travelMax: 60  },
+    precision: { speed: 120, travelMin: 60,  travelMax: 90  },
+    ballistic: { speed: 100, travelMin: 90,  travelMax: 120 },
+    mirv:      { speed: 80,  travelMin: 120, travelMax: 180 }
+  };
+  
+  var def = defs[missileType];
+  if (!def) def = defs.basic;
+  
+  // Base travel time from distance / speed
+  var baseTime = distance / def.speed;
+  
+  // Clamp to min/max range
+  var clampedTime = clamp(baseTime, def.travelMin, def.travelMax);
+  
+  // Add ±20% variance for realism
+  var variance = 0.8 + Math.random() * 0.4;
+  
+  return Math.floor(clampedTime * variance);
+}
+
+/**
+ * Apply missile damage to a building based on missile type
+ * @param {DefenderBuilding|Building} building - Target building
+ * @param {string} missileType - Missile type for damage calculation
+ * @param {number} damagePercent - Override damage percent (0.0-1.0), or use missile defaults
+ * @param {Object} missileDefs - Optional custom missile config
+ * @returns {Object} Result: { damageApplied, buildingDestroyed, remainingHP }
+ */
+export function applyMissileDamage(building, missileType, damagePercent, missileDefs) {
+  if (!building || !building.maxHp) return { damageApplied: 0, buildingDestroyed: false, remainingHP: building?.hp || 0 };
+  
+  var defs = missileDefs || {
+    basic:     { damage: 0.10 },
+    precision: { damage: 0.25 },
+    ballistic: { damage: 0.50 },
+    mirv:      { damage: 0.50, hits: 3 }
+  };
+  
+  var def = defs[missileType];
+  var dmgPercent = damagePercent !== undefined ? damagePercent : (def?.damage || 0.10);
+  
+  // Calculate damage based on building's max HP
+  var damage = Math.floor(building.maxHp * dmgPercent);
+  
+  // Apply damage
+  var oldHP = building.hp;
+  building.hp = Math.max(0, building.hp - damage);
+  
+  // Create explosion effect if building destroyed
+  if (building.hp <= 0 && building.hp !== oldHP) {
+    // Note: particles array should be passed from caller for effect creation
+    // createExplosion(particles, building.x, building.y);
+  }
+  
+  return {
+    damageApplied: damage,
+    buildingDestroyed: building.hp <= 0,
+    remainingHP: building.hp,
+    damagePercent: dmgPercent
+  };
+}
+
+/**
+ * Calculate distance between two world coordinates (reuses dist helper)
+ * @param {number} x1 - Source X
+ * @param {number} y1 - Source Y
+ * @param {number} x2 - Target X
+ * @param {number} y2 - Target Y
+ * @returns {number} Distance in pixels
+ */
+export function getDistanceBetweenPoints(x1, y1, x2, y2) {
+  return dist(x1, y1, x2, y2);
+}
+
+/**
+ * Get building type that would be hit by missile (random weighted by HP/visibility)
+ * @param {Array} buildings - Array of defender buildings
+ * @param {string} missileType - For MIRV multi-hit logic
+ * @returns {Array} Array of targeted buildings (1 for most, 3 for MIRV)
+ */
+export function selectMissileTargets(buildings, missileType, missileDefs) {
+  if (!buildings || buildings.length === 0) return [];
+  
+  var defs = missileDefs || {
+    mirv: { hits: 3 }
+  };
+  
+  var hits = (missileType === 'mirv' && defs.mirv) ? defs.mirv.hits : 1;
+  var targets = [];
+  var available = buildings.filter(function(b) { return b.hp > 0 && b.type !== 'mainHall'; });
+  
+  // Weight selection: prefer high-value targets (defence, production)
+  var weights = available.map(function(b) {
+    var w = 1;
+    if (b.attackRange > 0) w += 3;  // Defence buildings priority
+    if (b.prodRate > 0) w += 2;      // Production buildings
+    if (b.type === 'storage') w += 1;
+    return w;
+  });
+  
+  for (var i = 0; i < hits && available.length > 0; i++) {
+    // Weighted random selection
+    var totalWeight = weights.reduce(function(a, b) { return a + b; }, 0);
+    var rand = Math.random() * totalWeight;
+    var cumulative = 0;
+    
+    for (var j = 0; j < available.length; j++) {
+      cumulative += weights[j];
+      if (rand <= cumulative) {
+        targets.push(available[j]);
+        // Remove selected building from pool (no double-hit unless MIRV)
+        available.splice(j, 1);
+        weights.splice(j, 1);
+        break;
+      }
+    }
+  }
+  
+  return targets;
+}
+
+/**
+ * Calculate war loot based on damage dealt and defender resources
+ * @param {Object} attackerVS - Attacker's game state
+ * @param {Object} defenderVS - Defender's game state (simulated)
+ * @param {string} missileType - Determines loot multiplier
+ * @param {number} buildingsHit - Number of buildings damaged
+ * @returns {Object} Loot amounts: { gold, rice, langis, totalValue }
+ */
+export function calculateWarLoot(attackerVS, defenderVS, missileType, buildingsHit) {
+  var baseMultipliers = {
+    basic: 0.15,
+    precision: 0.25,
+    ballistic: 0.40,
+    mirv: 0.60
+  };
+  
+  var multiplier = baseMultipliers[missileType] || 0.15;
+  var buildingsBonus = Math.min(0.3, (buildingsHit || 1) * 0.1);
+  var finalMultiplier = multiplier + buildingsBonus;
+  
+  // Cap loot at 30% of defender's resources
+  var maxLootableGold = Math.floor((defenderVS?.res?.gold || 0) * 0.30);
+  var maxLootableRice = Math.floor((defenderVS?.res?.rice || 0) * 0.30);
+  var maxLootableLangis = Math.floor((defenderVS?.res?.langis || 0) * 0.30);
+  
+  return {
+    gold: Math.floor(maxLootableGold * finalMultiplier),
+    rice: Math.floor(maxLootableRice * finalMultiplier),
+    langis: Math.floor(maxLootableLangis * finalMultiplier),
+    totalValue: Math.floor(
+      maxLootableGold * finalMultiplier + 
+      maxLootableRice * finalMultiplier * 2 + 
+      maxLootableLangis * finalMultiplier * 3
+    )
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
    INTERNAL DRAW HELPERS (same as before, keep all _inlineRenderers)
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 // ... (keep all existing _drawFarm, _drawMoog, etc functions)
 // ... (keep _inlineRenderers object)
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    drawDefenderBuilding — USES THE SAME SPRITE SYSTEM!
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export function drawDefenderBuilding(ctx, bld, WORLD_H, now) {
   var def = BUILDING_DEFS[bld.type];
   if (!def) return;
-
   var sc = perspScale(bld.y);
   var w  = (def.w || bld.w || 60) * sc;
   var h  = (def.h || bld.h || 40) * sc;
-
+  
   ctx.save();
   ctx.translate(bld.x, bld.y);
-
+  
   if (bld.hp <= 0) {
     _drawRubble(ctx, sc, w, h, def);
     ctx.restore();
     return;
   }
-
+  
   var hpRatio = clamp(bld.hp / bld.maxHp, 0, 1);
   if (hpRatio < 1) {
     ctx.globalAlpha = 0.45 + hpRatio * 0.55;
   }
-
+  
   ctx.fillStyle = 'rgba(0,0,0,0.22)';
   ctx.beginPath();
   ctx.ellipse(0, h * 0.12, w * 0.62, h * 0.2, 0, 0, Math.PI * 2);
   ctx.fill();
-
+  
   drawBuilding(ctx, sc, w, h, def, bld.type, bld.level || 1, now, _inlineRenderers);
-
+  
   ctx.globalAlpha = 1;
   ctx.fillStyle = 'rgba(255,225,155,0.82)';
   ctx.font = (11 * sc) + 'px Crimson Pro,serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(def.label, 0, h * 0.28);
-
+  
+  // HP bar
   var barW = w * 1.1, barH = 7 * sc;
   var barX = -barW / 2, barY = -h * 1.55;
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
@@ -116,70 +289,73 @@ export function drawDefenderBuilding(ctx, bld, WORLD_H, now) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(Math.ceil(bld.hp) + '/' + bld.maxHp, 0, barY + barH / 2);
-
+  
   ctx.restore();
 }
 
 function _drawRubble(ctx, sc, w, h, def) {
   ctx.fillStyle = 'rgba(80,60,40,0.75)';
-  ctx.fillRect(-w*0.45, -h*0.28, w*0.9, h*0.32);
+  ctx.fillRect(-w * 0.45, -h * 0.28, w * 0.9, h * 0.32);
   ctx.fillStyle = 'rgba(100,80,55,0.65)';
   [[-w*0.3,-h*0.35,w*0.18,h*0.1],[w*0.15,-h*0.3,w*0.22,h*0.12],[-w*0.45,-h*0.1,w*0.15,h*0.1]]
-    .forEach(function(r){ctx.fillRect(r[0],r[1],r[2],r[3]);});
+    .forEach(function(r){ ctx.fillRect(r[0],r[1],r[2],r[3]); });
+  
   if (def.wallColor) {
     ctx.globalAlpha = 0.35;
     ctx.fillStyle = def.wallColor;
-    ctx.fillRect(-w*0.42, -h*0.3, w*0.84, h*0.34);
+    ctx.fillRect(-w * 0.42, -h * 0.3, w * 0.84, h * 0.34);
     ctx.globalAlpha = 1;
   }
+  
+  // Smoke/debris
   for (var s = 0; s < 3; s++) {
-    ctx.fillStyle = 'rgba(80,80,80,' + (0.25 - s*0.06) + ')';
+    ctx.fillStyle = 'rgba(80,80,80,' + (0.25 - s * 0.06) + ')';
     ctx.beginPath();
-    ctx.arc((s-1)*w*0.25, -h*0.5-s*h*0.25, (10+s*8)*sc, 0, Math.PI*2);
+    ctx.arc((s-1) * w * 0.25, -h * 0.5 - s * h * 0.25, (10 + s*8) * sc, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
 function _rrect(ctx,x,y,w,h,r){
-  r=Math.min(r,w/2,h/2);
+  r = Math.min(r, w/2, h/2);
   ctx.beginPath();
-  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
-  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
-  ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);
-  ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
   ctx.closePath();
 }
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    drawDefenderVillager — with attack animation support
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export function drawDefenderVillager(ctx, v) {
   drawVillager(ctx, v);
-  
   // Draw attack animation if active
   if (v.attackAnimation && v.attackAnimation.progress < 1) {
     v.attackAnimation.draw(ctx, perspScale(v.y));
   }
 }
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    drawAttackingTroop
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export function drawAttackingTroop(ctx, troop) {
   if (troop.hp <= 0) return;
   drawVillager(ctx, troop);
-  
   // Draw attack animation for attacking troops too
   if (troop.attackAnimation && troop.attackAnimation.progress < 1) {
     troop.attackAnimation.draw(ctx, perspScale(troop.y));
   }
   
+  // HP bar
   var sc  = perspScale(troop.y);
   var bw  = 22 * sc;
   var bh  = 4  * sc;
   var bx  = troop.x - bw / 2;
   var by  = troop.y - 32 * sc;
   var rat = clamp(troop.hp / troop.maxHp, 0, 1);
+  
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(bx, by, bw, bh);
@@ -188,34 +364,33 @@ export function drawAttackingTroop(ctx, troop) {
   ctx.restore();
 }
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    drawDefenderGround
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export function drawDefenderGround(ctx, W, H) {
   drawGround(ctx, W, H);
 }
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    GENERATE DEFENDER VILLAGE
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export function generateDefenderVillage(level) {
   level = level || Math.floor(Math.random() * 4) + 1;
   var W = DEF_WORLD_W;
   var H = DEF_WORLD_H;
-  
   var roster = getBuildingRosterForLevel(level);
   
   var coreX1 = W * 0.18, coreX2 = W * 0.82;
   var coreY1 = H * 0.20, coreY2 = H * 0.78;
   
   var placed = [];
-  
   var mainHallLevel = level;
   var mainHall = new DefenderBuilding('mainHall', W * 0.5, H * 0.48, mainHallLevel);
   placed.push(mainHall);
   
   var defTypes = ['moog', 'bantayan', 'kuta', 'pulisya', 'cuartel'];
   var econTypes = ['farm', 'mine', 'storage', 'palengke', 'minalangis'];
+  
   var rings = [
     { r: 130, types: [] },
     { r: 230, types: [] },
@@ -259,7 +434,6 @@ export function generateDefenderVillage(level) {
   });
   
   var waypoints = generateWaypoints(placed);
-  
   var villagers = [];
   var villagerCount = 4 + level * 2;
   
@@ -357,15 +531,14 @@ export function generateDefenderVillage(level) {
     waypoints: waypoints,
     projectiles: [],
     particles: [],
-    muzzleFlashes: [],  // Add muzzle flash array
+    muzzleFlashes: [],
     W: W, H: H,
   };
 }
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    TICK FUNCTIONS
-════════════════════════════════════════════════════════════ */
-
+   ═══════════════════════════════════════════════════════════════ */
 export function tickDefenderVillagers(villagers, dt, W, H, waypoints) {
   var bx1 = DEF_WORLD_W * 0.18, bx2 = DEF_WORLD_W * 0.82;
   var by1 = DEF_WORLD_H * 0.20, by2 = DEF_WORLD_H * 0.78;
@@ -412,11 +585,12 @@ export function tickDefenderVillagers(villagers, dt, W, H, waypoints) {
   });
 }
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    LIVE BATTLE TICK with Villager Projectiles & Animations
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export function tickBattle(troops, village, dt) {
   if (!village) return;
+  
   var buildings = village.buildings;
   var defVillagers = village.villagers;
   
@@ -452,6 +626,7 @@ export function tickBattle(troops, village, dt) {
   /* Attacker movement & attack */
   troops.forEach(function(t) {
     if (t.hp <= 0) return;
+    
     if (t.waitT > 0) { t.waitT -= dt; return; }
     
     // Update attack animation
@@ -501,7 +676,6 @@ export function tickBattle(troops, village, dt) {
   /* Defence buildings shoot */
   buildings.forEach(function(b) {
     if (!b.canAttack()) return;
-    
     b.defTimer = (b.defTimer || 0) - dt;
     if (b.defTimer > 0) return;
     
@@ -605,40 +779,41 @@ function _nearestAliveBuilding(tx, ty, buildings) {
   return best;
 }
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    DRAW BATTLE SCENE with Muzzle Flashes
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export function drawBattleScene(ctx, village, troops, gameTime, inBattle, now) {
   if (!village || !ctx) return;
+  
   var W = village.W, H = village.H;
-
+  
   drawDefenderGround(ctx, W, H);
-
+  
   var ents = [];
-
+  
   village.buildings.forEach(function(b) {
     (function(bld) {
-      ents.push({ y:bld.y, fn:function() { drawDefenderBuilding(ctx, bld, H, now); } });
+      ents.push({ y: bld.y, fn: function() { drawDefenderBuilding(ctx, bld, H, now); } });
     })(b);
   });
-
+  
   village.villagers.forEach(function(v) {
     if (v.hp <= 0) return;
     (function(vil) {
-      ents.push({ y:vil.y, fn:function() { drawDefenderVillager(ctx, vil); } });
+      ents.push({ y: vil.y, fn: function() { drawDefenderVillager(ctx, vil); } });
     })(v);
   });
-
+  
   troops.forEach(function(t) {
     if (t.hp <= 0) return;
     (function(trp) {
-      ents.push({ y:trp.y, fn:function() { drawAttackingTroop(ctx, trp); } });
+      ents.push({ y: trp.y, fn: function() { drawAttackingTroop(ctx, trp); } });
     })(t);
   });
-
+  
   ents.sort(function(a, b) { return a.y - b.y; });
   ents.forEach(function(e) { e.fn(); });
-
+  
   /* Draw projectiles */
   village.projectiles.forEach(function(p) {
     p.draw(ctx);
@@ -655,7 +830,7 @@ export function drawBattleScene(ctx, village, troops, gameTime, inBattle, now) {
   village.particles.forEach(function(p) {
     p.draw(ctx);
   });
-
+  
   if (inBattle) {
     var fl = 0.07 + 0.05 * Math.sin(now / 70);
     ctx.fillStyle = 'rgba(220,25,25,' + fl + ')';
@@ -663,9 +838,9 @@ export function drawBattleScene(ctx, village, troops, gameTime, inBattle, now) {
   }
 }
 
-/* ════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    TROOP FACTORY
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 var TROOP_DEFS = {
   bantay:   { clothColor:'#2C3E50', skinColor:'#F0DDB0', hat:'helm',  hatColor:'#566573', isArmed:true, armedType:'bantay',   scale:1.0,  hp:80,  dps:8,  spd:40, range:45,  role:'Bantay'   },
   bayani:   { clothColor:'#922B21', skinColor:'#F0DDB0', hat:'helm',  hatColor:'#7B241C', isArmed:true, armedType:'bayani',   scale:1.15, hp:150, dps:18, spd:38, range:50,  role:'Bayani'   },
@@ -673,10 +848,11 @@ var TROOP_DEFS = {
   airforce: { clothColor:'#1C2833', skinColor:'#F0DDB0', hat:'cap',   hatColor:'#17202A', isArmed:true, armedType:'airforce', scale:1.1,  hp:180, dps:38, spd:55, range:120, role:'Air Force' },
 };
 
-var _troopIdCounter = 0;
-/* ════════════════════════════════════════════════════════════
+var troopIdCounter = 0;
+
+/* ═══════════════════════════════════════════════════════════════
    INLINE RENDERERS for buildings without sprite files
-════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 var _inlineRenderers = {
   farm: function(ctx,sc,w,h,def,level,now) {
     var t=now?now/1000:0;
@@ -887,11 +1063,12 @@ var _inlineRenderers = {
     ctx.stroke();
   }
 };
+
 export function createTroop(role, spawnX, spawnY) {
   var td = TROOP_DEFS[role];
   if (!td) return null;
   return {
-    id:        'trp_' + (_troopIdCounter++),
+    id:        'trp_' + (troopIdCounter++),
     role:      role,
     x:         spawnX,
     y:         spawnY,

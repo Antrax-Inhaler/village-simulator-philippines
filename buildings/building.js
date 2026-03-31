@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — buildings/building.js  (modified)
+   Mini Bayan — buildings/building.js  (with Missile Warfare)
 
    KEY CHANGES
    ─────────────────────────────────────────────────────────────
@@ -11,13 +11,17 @@
       - Training/education buildings cannot train without langis
    4. NEW: minalangis (Minahan ng Langis) — ONLY langis producer
    5. Removed langis production from: paaralan, templo, hukuman
+   6. NEW: Missile Warfare Buildings (Hall Lv 6-7)
+      - missilesilo: Launch long-range attacks
+      - radarstation: Detect incoming missiles early
+      - interceptor: Auto-shoot down incoming missiles
 ═══════════════════════════════════════════════════════════════ */
 
 import { perspScale, clamp } from '../utils/perspective.js';
 import { drawBuilding }      from './buildingSprites.js';
 
 /* ══════════════════════════════════════════════════════════════
-   BUILDING CATALOGUE with LANGIS CONSUMPTION RATES
+   BUILDING CATALOGUE with LANGIS CONSUMPTION & MISSILE PROPERTIES
 ══════════════════════════════════════════════════════════════ */
 export var BUILDING_DEFS = {
 
@@ -27,7 +31,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(40,20,5,0.85)', winColor:'rgba(255,235,160,0.65)',
     w:72, h:52, shopCost:null,
     prodRes:null, prodRate:0,
-    langisConsumption: 0.5,  // Level 1 base consumption per second
+    langisConsumption: 0.5,
     storageBonus:{ gold:200, rice:100, langis:50 },
     popBonus:0, isHome:false, defenceHP:200,
     attackRange:0, attackDPS:0, minHallLevel:1,
@@ -59,7 +63,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(20,40,80,0.7)', winColor:'rgba(180,220,255,0.55)',
     w:66, h:42, shopCost:{ gold:150, rice:30, langis:0 },
     prodRes:'gold', prodRate:4.0,
-    langisConsumption: 0.2,  // Level 1 base consumption
+    langisConsumption: 0.2,
     storageBonus:{ gold:300, rice:0, langis:0 },
     popBonus:0, isHome:false, defenceHP:20,
     attackRange:0, attackDPS:0, minHallLevel:1,
@@ -75,7 +79,7 @@ export var BUILDING_DEFS = {
     doorColor:'transparent', winColor:'transparent',
     w:84, h:30, shopCost:{ gold:60, rice:0, langis:0 },
     prodRes:'rice', prodRate:6.0,
-    langisConsumption: 0.1,  // Low consumption
+    langisConsumption: 0.1,
     storageBonus:{ gold:0, rice:200, langis:0 },
     popBonus:0, isHome:false, defenceHP:10,
     attackRange:0, attackDPS:0, minHallLevel:1,
@@ -108,7 +112,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(20,20,20,0.8)', winColor:'rgba(200,200,200,0.4)',
     w:46, h:32, shopCost:{ gold:200, rice:50, langis:0 },
     prodRes:'gold', prodRate:5.0,
-    langisConsumption: 0.4,  // Gold mine consumes more
+    langisConsumption: 0.4,
     storageBonus:{ gold:400, rice:0, langis:0 },
     popBonus:0, isHome:false, defenceHP:30,
     attackRange:0, attackDPS:0, minHallLevel:2,
@@ -118,14 +122,13 @@ export var BUILDING_DEFS = {
     maxUncollectedLangis: 0,
   },
 
-  /* ── Oil mine: the ONLY langis producer ────────────── */
   minalangis: {
     label:'Minahan ng Langis', category:'production',
     wallColor:'#2a1a08', roofColor:'#1a0e04',
     doorColor:'rgba(10,8,2,0.9)', winColor:'rgba(180,140,60,0.4)',
     w:58, h:44, shopCost:{ gold:450, rice:80, langis:0 },
     prodRes:'langis', prodRate:6.0,
-    langisConsumption: 0.3,  // Produces langis, consumes a little
+    langisConsumption: 0.3,
     storageBonus:{ gold:0, rice:0, langis:400 },
     popBonus:0, isHome:false, defenceHP:40,
     attackRange:0, attackDPS:0, minHallLevel:2,
@@ -145,7 +148,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(80,60,0,0.8)', winColor:'rgba(255,250,200,0.7)',
     w:68, h:44, shopCost:{ gold:180, rice:60, langis:0 },
     prodRes:null, prodRate:0,
-    langisConsumption: 0.5,  // School needs langis for training
+    langisConsumption: 0.5,
     storageBonus:{ gold:0, rice:0, langis:0 },
     popBonus:0, isHome:false, defenceHP:20,
     attackRange:0, attackDPS:0, minHallLevel:2,
@@ -163,7 +166,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(10,30,5,0.9)', winColor:'rgba(150,200,120,0.4)',
     w:60, h:46, shopCost:{ gold:300, rice:80, langis:50 },
     prodRes:null, prodRate:0,
-    langisConsumption: 0.5,  // Military training needs langis
+    langisConsumption: 0.5,
     storageBonus:{ gold:0, rice:0, langis:200 },
     popBonus:0, isHome:false, defenceHP:100,
     attackRange:0, attackDPS:0, minHallLevel:3,
@@ -180,7 +183,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(60,40,0,0.85)', winColor:'rgba(255,240,180,0.8)',
     w:60, h:52, shopCost:{ gold:250, rice:50, langis:0 },
     prodRes:null, prodRate:0,
-    langisConsumption: 0.1,  // Low consumption
+    langisConsumption: 0.1,
     storageBonus:{ gold:0, rice:0, langis:0 },
     popBonus:0, isHome:false, defenceHP:50,
     attackRange:0, attackDPS:0, minHallLevel:3,
@@ -196,7 +199,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(30,20,5,0.9)', winColor:'rgba(200,180,120,0.5)',
     w:32, h:48, shopCost:{ gold:200, rice:30, langis:0 },
     prodRes:null, prodRate:0,
-    langisConsumption: 0.2,  // Defense building needs fuel for operations
+    langisConsumption: 0.2,
     storageBonus:{ gold:0, rice:0, langis:0 },
     popBonus:0, isHome:false, defenceHP:120,
     attackRange:180, attackDPS:8, minHallLevel:2,
@@ -262,7 +265,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(20,40,80,0.75)', winColor:'rgba(200,220,255,0.7)',
     w:64, h:46, shopCost:{ gold:400, rice:80, langis:50 },
     prodRes:null, prodRate:0,
-    langisConsumption: 0.3,  // Hospital needs langis for equipment
+    langisConsumption: 0.3,
     storageBonus:{ gold:0, rice:0, langis:0 },
     popBonus:0, isHome:false, defenceHP:30,
     attackRange:0, attackDPS:0, minHallLevel:2,
@@ -296,7 +299,7 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(20,40,50,0.8)', winColor:'rgba(160,210,230,0.5)',
     w:74, h:38, shopCost:{ gold:600, rice:100, langis:0 },
     prodRes:'gold', prodRate:3.0,
-    langisConsumption: 0.3,  // Port needs fuel for ships
+    langisConsumption: 0.3,
     storageBonus:{ gold:200, rice:200, langis:0 },
     popBonus:0, isHome:false, defenceHP:40,
     attackRange:0, attackDPS:0, minHallLevel:2,
@@ -323,6 +326,82 @@ export var BUILDING_DEFS = {
     maxUncollectedLangis: 0,
     serviceEffect:{ nearbyProdBonus:0.10, villagerSpeedBonus:0.15 },
   },
+
+  /* ════════════════════════════════════════════════════════════
+     MISSILE WARFARE BUILDINGS (Hall Level 6-7)
+     ════════════════════════════════════════════════════════════ */
+
+  missilesilo: {
+    label:'Missile Silo', category:'military',
+    wallColor:'#3a3a4a', roofColor:'#1a1a2a',
+    doorColor:'rgba(10,10,20,0.95)', winColor:'rgba(80,120,180,0.3)',
+    w:64, h:72, shopCost:{ gold:2500, rice:400, langis:200 },
+    prodRes:null, prodRate:0,
+    langisConsumption: 1.0,  // High consumption for missile operations
+    storageBonus:{ gold:0, rice:0, langis:300 },
+    popBonus:0, isHome:false, defenceHP:250,
+    attackRange:0, attackDPS:0, minHallLevel:6,
+    requiredZone:null, buildTime:300, workerSlots:6,
+    maxUncollectedGold: 0,
+    maxUncollectedFood: 0,
+    maxUncollectedLangis: 0,
+    // Missile-specific properties
+    missileCapacity: 10,      // Max missiles that can be stored
+    missileReloadTime: 120,   // Seconds between launches
+    missileTypes: ['basic', 'precision', 'ballistic', 'mirv'],  // Types this silo can hold
+    serviceEffect:{
+      note:'Nag-iimbak at naglulunsad ng mga missile para sa long-range attacks.',
+    },
+  },
+
+  radarstation: {
+    label:'Radar Station', category:'military',
+    wallColor:'#4a5a6a', roofColor:'#2a3a4a',
+    doorColor:'rgba(15,20,30,0.9)', winColor:'rgba(100,180,255,0.4)',
+    w:48, h:56, shopCost:{ gold:1800, rice:300, langis:150 },
+    prodRes:null, prodRate:0,
+    langisConsumption: 0.8,  // Radar needs constant power
+    storageBonus:{ gold:0, rice:0, langis:100 },
+    popBonus:0, isHome:false, defenceHP:150,
+    attackRange:0, attackDPS:0, minHallLevel:6,
+    requiredZone:null, buildTime:200, workerSlots:4,
+    maxUncollectedGold: 0,
+    maxUncollectedFood: 0,
+    maxUncollectedLangis: 0,
+    // Radar-specific properties
+    detectionRange: Infinity,  // Detects all incoming missiles
+    earlyWarningTime: 15,      // Seconds of advance warning before impact
+    interceptBonus: 10,        // +10% intercept chance when paired with interceptor
+    serviceEffect:{
+      note:'Nagde-detect ng incoming missiles at nagbibigay ng early warning.',
+    },
+  },
+
+  interceptor: {
+    label:'Interceptor Battery', category:'military',
+    wallColor:'#2a4a3a', roofColor:'#1a3a2a',
+    doorColor:'rgba(10,25,15,0.95)', winColor:'rgba(80,180,120,0.35)',
+    w:56, h:48, shopCost:{ gold:3000, rice:500, langis:300 },
+    prodRes:null, prodRate:0,
+    langisConsumption: 1.2,  // Highest consumption for defense systems
+    storageBonus:{ gold:0, rice:0, langis:200 },
+    popBonus:0, isHome:false, defenceHP:300,
+    attackRange:400, attackDPS:0, minHallLevel:7,  // AttackRange = intercept range
+    requiredZone:null, buildTime:400, workerSlots:8,
+    maxUncollectedGold: 0,
+    maxUncollectedFood: 0,
+    maxUncollectedLangis: 0,
+    // Interceptor-specific properties
+    interceptBaseChance: 40,   // Base 40% chance to shoot down missile
+    interceptBonusPerUnit: 10, // +10% per additional battery (max 80%)
+    interceptorMissileStock: 5, // Starting interceptor missiles
+    canInterceptBallistic: true,  // Can shoot down Ballistic/MIRV (unlike radar alone)
+    cooldown: 30,              // Seconds between intercept attempts
+    serviceEffect:{
+      note:'Awtomatikong nag-i-intercept ng incoming missiles. Mas maraming battery = mas mataas ang tsansa.',
+    },
+  },
+
 };
 
 // Training rates multiplier when no langis (20% speed)
@@ -336,7 +415,8 @@ export var MAIN_HALL_RULES = [
   { maxBuildings: 12, maxBuildingLevel: 3 },
   { maxBuildings: 18, maxBuildingLevel: 4 },
   { maxBuildings: 26, maxBuildingLevel: 5 },
-  { maxBuildings:999, maxBuildingLevel: 5 },
+  { maxBuildings: 34, maxBuildingLevel: 6 },  // NEW: Lv6 for missile buildings
+  { maxBuildings:999, maxBuildingLevel: 7 },  // NEW: Lv7 for interceptor
 ];
 
 export function getMainHallLevel(buildings) {
@@ -451,6 +531,17 @@ export function Building(type, x, y) {
   // Track if building has langis this frame
   this._hasLangis = true;
   this._langisShortageWarned = false;
+  
+  // Missile-specific state (for military buildings)
+  if (def.missileCapacity !== undefined) {
+    this.missileStock = { basic: 0, precision: 0, ballistic: 0, mirv: 0 };
+    this.reloadTimer = 0;
+    this.lastLaunchTime = 0;
+  }
+  if (def.interceptBaseChance !== undefined) {
+    this.interceptorStock = def.interceptorMissileStock || 0;
+    this.interceptCooldown = 0;
+  }
 }
 
 Building.prototype.getDef = function() {
@@ -460,11 +551,12 @@ Building.prototype.getDef = function() {
 Building.prototype.getStats = function() {
   var def  = this.getDef();
   var lv   = this.level;
-  var pathMult = { prod: 1, storage: 1, pop: 1, efficiency: 1 };
+  var pathMult = { prod: 1, storage: 1, pop: 1, efficiency: 1, defense: 1 };
   if (this.upgradePath === 'capacity')   { pathMult.storage = 1.5; pathMult.pop = 1.5; }
   if (this.upgradePath === 'efficiency') { pathMult.prod = 1.4; pathMult.efficiency = 1.2; }
-  if (this.upgradePath === 'quality')    { pathMult.prod = 1.1; }
-  return {
+  if (this.upgradePath === 'quality')    { pathMult.prod = 1.1; pathMult.defense = 1.3; }
+  
+  var stats = {
     productionRate: def.prodRate * lv * pathMult.prod,
     storageBonus: {
       gold:  (def.storageBonus.gold  || 0) * lv * pathMult.storage,
@@ -473,7 +565,7 @@ Building.prototype.getStats = function() {
     },
     populationMax:  (def.popBonus || 0) * lv * pathMult.pop,
     efficiency:     clamp(0.6 + 0.1 * lv * pathMult.efficiency, 0.6, 1.0),
-    defenceHP:      (def.defenceHP  || 0) * lv,
+    defenceHP:      (def.defenceHP  || 0) * lv * pathMult.defense,
     attackDPS:      (def.attackDPS  || 0) * lv,
     attackRange:    (def.attackRange || 0) * (1 + (lv - 1) * 0.2),
     maxUncollectedGold: (def.maxUncollectedGold || 0) * lv,
@@ -482,6 +574,22 @@ Building.prototype.getStats = function() {
     // Langis consumption scales with level (higher levels consume more)
     langisConsumption: (def.langisConsumption || 0) * (1 + (lv - 1) * 0.3),
   };
+  
+  // Add missile-specific stats if applicable
+  if (def.missileCapacity !== undefined) {
+    stats.missileCapacity = (def.missileCapacity || 0) * lv;
+    stats.missileReloadTime = Math.max(30, (def.missileReloadTime || 120) / (1 + (lv-1)*0.15));
+  }
+  if (def.interceptBaseChance !== undefined) {
+    stats.interceptBaseChance = def.interceptBaseChance + (lv - 1) * 5;  // +5% per level
+    stats.interceptorStock = (def.interceptorMissileStock || 0) + (lv - 1) * 2;
+  }
+  if (def.detectionRange !== undefined) {
+    stats.detectionRange = def.detectionRange;
+    stats.earlyWarningTime = def.earlyWarningTime + (lv - 1) * 3;
+  }
+  
+  return stats;
 };
 
 // Get effective production multiplier based on langis availability
@@ -497,7 +605,7 @@ Building.prototype.getProductionMultiplier = function(VS) {
   
   if (!hasLangis && !this._langisShortageWarned && Math.random() < 0.01) {
     this._langisShortageWarned = true;
-    if (window.showMsg) window.showMsg('⚠️ ' + def.label + ' walang langis! Bumagal ang produksyon.', 'warning');
+    if (window.showMsg) window.showMsg('⚠️ ' + def.label + ' walang langis! Bumagal ang operasyon.', 'warning');
   }
   if (hasLangis) this._langisShortageWarned = false;
   
@@ -515,9 +623,102 @@ Building.prototype.canTrain = function(VS) {
   return hasLangis;
 };
 
+// Check if missile can be launched (for Missile Silo)
+Building.prototype.canLaunchMissile = function(missileType) {
+  var def = this.getDef();
+  if (!def.missileCapacity) return false;
+  
+  // Check reload timer
+  if (this.reloadTimer > 0) return false;
+  
+  // Check if missile type is supported
+  if (def.missileTypes && def.missileTypes.indexOf(missileType) === -1) return false;
+  
+  // Check stock
+  return (this.missileStock && this.missileStock[missileType] > 0);
+};
+
+// Launch missile from this silo
+Building.prototype.launchMissile = function(missileType) {
+  if (!this.canLaunchMissile(missileType)) return false;
+  
+  // Deduct from stock
+  if (this.missileStock) {
+    this.missileStock[missileType]--;
+  }
+  
+  // Start reload timer
+  var stats = this.getStats();
+  this.reloadTimer = stats.missileReloadTime;
+  this.lastLaunchTime = Date.now();
+  
+  return true;
+};
+
+// Update missile reload timer
+Building.prototype.updateMissileTimers = function(dt) {
+  if (this.reloadTimer > 0) {
+    this.reloadTimer -= dt;
+    if (this.reloadTimer < 0) this.reloadTimer = 0;
+  }
+  if (this.interceptCooldown > 0) {
+    this.interceptCooldown -= dt;
+    if (this.interceptCooldown < 0) this.interceptCooldown = 0;
+  }
+};
+
+// Calculate intercept chance for this battery
+Building.prototype.getInterceptChance = function(missileType, hasRadar) {
+  var def = this.getDef();
+  var stats = this.getStats();
+  
+  // Ballistic/MIRV can only be intercepted if this battery supports it
+  if ((missileType === 'ballistic' || missileType === 'mirv') && !def.canInterceptBallistic) {
+    return 0;
+  }
+  
+  var chance = stats.interceptBaseChance;
+  
+  // Bonus if radar station is present
+  if (hasRadar && def.interceptBonus) {
+    chance += def.interceptBonus;
+  }
+  
+  // Bonus from interceptor missiles in stock
+  if (this.interceptorStock > 0) {
+    chance = Math.max(chance, 60);  // At least 60% if we have interceptors
+  }
+  
+  return clamp(chance, 0, 80);  // Max 80%
+};
+
+// Attempt to intercept a missile
+Building.prototype.attemptIntercept = function(missileType, hasRadar) {
+  if (this.interceptCooldown > 0) return false;
+  
+  var chance = this.getInterceptChance(missileType, hasRadar);
+  var success = Math.random() * 100 < chance;
+  
+  if (success && this.interceptorStock > 0) {
+    this.interceptorStock--;  // Consume interceptor missile
+  }
+  
+  if (success) {
+    this.interceptCooldown = this.getDef().cooldown || 30;
+  }
+  
+  return success;
+};
+
 Building.prototype.getUpgradeCost = function() {
   var lv = this.level;
-  return { gold: UPGRADE_BASE.gold * lv * lv, rice: UPGRADE_BASE.rice * lv };
+  var def = this.getDef();
+  // Military buildings cost more to upgrade
+  var militaryMult = (def.category === 'military') ? 1.5 : 1.0;
+  return { 
+    gold: Math.floor(UPGRADE_BASE.gold * lv * lv * militaryMult), 
+    rice: Math.floor(UPGRADE_BASE.rice * lv * militaryMult) 
+  };
 };
 
 Building.prototype.getCapacity   = function() { return this.getStats().populationMax; };
@@ -537,11 +738,11 @@ Building.prototype.getServiceEffect = function() {
 
 Building.prototype.upgrade = function(VS) {
   var rules = getMainHallRules(VS.buildings || []);
-  var maxLv = this.type === 'mainHall' ? 5 : rules.maxBuildingLevel;
+  var maxLv = this.type === 'mainHall' ? 7 : rules.maxBuildingLevel;
   var mhLv  = getMainHallLevel(VS.buildings || []);
   if (this.underConstruction) return { ok:false, msg:'Nag-co-construct pa ang '+this.getDef().label+'!' };
   if (this.level >= maxLv) {
-    if (this.type !== 'mainHall' && maxLv < 5) return { ok:false, msg:'I-upgrade muna ang Bahay-Bayan (Lv'+mhLv+')!' };
+    if (this.type !== 'mainHall' && maxLv < 7) return { ok:false, msg:'I-upgrade muna ang Bahay-Bayan (Lv'+mhLv+')!' };
     return { ok:false, msg:'Maximum na ang level ng '+this.getDef().label+'!' };
   }
   var cost = this.getUpgradeCost();
@@ -583,6 +784,11 @@ Building.prototype.update = function(dt, VS) {
   
   var def   = this.getDef();
   var stats = this.getStats();
+  
+  // Update missile/interceptor timers for military buildings
+  if (def.missileCapacity !== undefined || def.interceptBaseChance !== undefined) {
+    this.updateMissileTimers(dt);
+  }
   
   // Handle langis consumption for non-production buildings first
   var consumption = stats.langisConsumption;
@@ -675,6 +881,54 @@ Building.prototype.draw = function(ctx, now) {
     ctx.globalAlpha = 1;
   }
 
+  // Draw missile reload indicator for Missile Silo
+  if (def.missileCapacity !== undefined && this.reloadTimer > 0 && !this.underConstruction) {
+    var reloadPct = 1 - (this.reloadTimer / this.getStats().missileReloadTime);
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = 'rgba(30,30,50,0.9)';
+    ctx.strokeStyle = '#4a8aff';
+    ctx.lineWidth = 2 * sc;
+    var barW = w * 0.8, barH = 6 * sc;
+    var barX = -barW/2, barY = -h * 1.6;
+    _rrect(ctx, barX, barY, barW, barH, 3*sc);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#4a8aff';
+    _rrect(ctx, barX, barY, barW * reloadPct, barH, 3*sc);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold ' + (7*sc) + 'px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(Math.ceil(this.reloadTimer) + 's', 0, barY + barH/2);
+    ctx.restore();
+  }
+
+  // Draw intercept cooldown indicator for Interceptor
+  if (def.interceptBaseChance !== undefined && this.interceptCooldown > 0 && !this.underConstruction) {
+    var cdPct = 1 - (this.interceptCooldown / (def.cooldown || 30));
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = 'rgba(30,50,40,0.9)';
+    ctx.strokeStyle = '#4aff8a';
+    ctx.lineWidth = 2 * sc;
+    var barW = w * 0.8, barH = 6 * sc;
+    var barX = -barW/2, barY = -h * 1.6;
+    _rrect(ctx, barX, barY, barW, barH, 3*sc);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#4aff8a';
+    _rrect(ctx, barX, barY, barW * cdPct, barH, 3*sc);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold ' + (7*sc) + 'px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(Math.ceil(this.interceptCooldown) + 's', 0, barY + barH/2);
+    ctx.restore();
+  }
+
   if (this.underConstruction) {
     var pct = this.constructionMax > 0 ? 1 - this.constructionTime / this.constructionMax : 0;
     var renderer0 = {
@@ -683,6 +937,7 @@ Building.prototype.draw = function(ctx, now) {
       templo:_drawTemplo, hukuman:_drawHukuman, ospital:_drawOspital,
       pulisya:_drawPulisya, daungan:_drawDaungan, kalye:_drawKalye,
       minalangis:_drawMinalangis,
+      missilesilo:_drawMissileSilo, radarstation:_drawRadarStation, interceptor:_drawInterceptor,
     }[this.type];
     ctx.globalAlpha = 0.25;
     if (renderer0) renderer0(ctx, sc, w, h, def, this.level, 0);
@@ -725,6 +980,7 @@ Building.prototype.draw = function(ctx, now) {
     templo:_drawTemplo, hukuman:_drawHukuman, ospital:_drawOspital,
     pulisya:_drawPulisya, daungan:_drawDaungan, kalye:_drawKalye,
     minalangis:_drawMinalangis,
+    missilesilo:_drawMissileSilo, radarstation:_drawRadarStation, interceptor:_drawInterceptor,
   };
 
   drawBuilding(ctx, sc, w, h, def, this.type, this.level, now, _inlineRenderers);
@@ -849,7 +1105,7 @@ function _drawOccupancyBadge(ctx,sc,w,h,occ,cap,mode){var text=occ+'/'+cap;var i
 function _rrect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
 
 /* ══════════════════════════════════════════════════════════════
-   DRAW FUNCTIONS (unchanged)
+   DRAW FUNCTIONS (including new missile buildings)
 ══════════════════════════════════════════════════════════════ */
 function _drawFarm(ctx,sc,w,h,def,level,now){var t=now?now/1000:0;var rows=Math.min(2+level,5);var fw=w*1.1,fh=h*0.9,top=-fh*0.5,rowH=fh/rows;for(var r=0;r<rows;r++){var ry=top+r*rowH;ctx.fillStyle=(r%2===0)?'rgba(80,140,160,0.72)':'rgba(60,120,140,0.65)';ctx.fillRect(-fw*0.5,ry,fw,rowH-1.5*sc);var shimmer=Math.sin(t*0.9+r*1.1)*0.12+0.10;ctx.fillStyle='rgba(200,240,255,'+shimmer+')';ctx.fillRect(-fw*0.3,ry+rowH*0.35,fw*0.6,1.5*sc);ctx.fillStyle='rgba(180,220,255,0.15)';ctx.fillRect(-fw*0.5,ry+1.5*sc,fw,rowH*0.18);ctx.fillStyle='#6b4c2a';ctx.fillRect(-fw*0.52,ry+rowH-1.5*sc,fw*1.04,3.5*sc);ctx.fillStyle='#7a5830';ctx.fillRect(-fw*0.52,ry,3*sc,rowH);ctx.fillRect(fw*0.49,ry,3*sc,rowH);var stalksPerRow=Math.floor(fw/(8*sc)),stalkSpacing=fw/(stalksPerRow+1);for(var s=0;s<stalksPerRow;s++){var sx2=-fw*0.5+stalkSpacing*(s+1);var sway=Math.sin(t*1.2+s*0.7+r*2.1)*0.8*sc;var stalkH=(rowH*0.62)*(0.85+0.3*((s*7+r*3)%5)/5);var stalkBase=ry+rowH-2*sc;ctx.strokeStyle='#4a7a28';ctx.lineWidth=1.2*sc;ctx.beginPath();ctx.moveTo(sx2,stalkBase);ctx.quadraticCurveTo(sx2+sway,stalkBase-stalkH*0.5,sx2+sway*1.5,stalkBase-stalkH);ctx.stroke();ctx.strokeStyle='#8aae38';ctx.lineWidth=1.8*sc;ctx.beginPath();ctx.moveTo(sx2+sway*1.5,stalkBase-stalkH);ctx.quadraticCurveTo(sx2+sway*1.5+2*sc,stalkBase-stalkH+2*sc,sx2+sway*1.5+1*sc,stalkBase-stalkH+4.5*sc);ctx.stroke();ctx.fillStyle='rgba(200,170,40,0.85)';ctx.beginPath();ctx.ellipse(sx2+sway*1.5+1*sc,stalkBase-stalkH+5.5*sc,1.4*sc,2.2*sc,0.3,0,Math.PI*2);ctx.fill();}}ctx.strokeStyle='#5a3c18';ctx.lineWidth=2*sc;ctx.strokeRect(-fw*0.52,top,fw*1.04,fh+2*sc);var scx=fw*0.32,scy=top+fh*0.25;ctx.strokeStyle='#6b4020';ctx.lineWidth=1.8*sc;ctx.beginPath();ctx.moveTo(scx,scy+10*sc);ctx.lineTo(scx,scy-14*sc);ctx.stroke();ctx.beginPath();ctx.moveTo(scx-7*sc,scy-5*sc);ctx.lineTo(scx+7*sc,scy-5*sc);ctx.stroke();ctx.fillStyle='#c8a040';ctx.beginPath();ctx.ellipse(scx,scy-15*sc,4.5*sc,2.5*sc,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(scx,scy-17*sc,2.5*sc,2.5*sc,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(200,80,40,0.7)';ctx.fillRect(scx-3.5*sc,scy-10*sc,7*sc,6*sc);}
 
@@ -908,6 +1164,261 @@ function _drawMinalangis(ctx, sc, w, h, def, level) {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   NEW: Missile Warfare Building Draw Functions
+══════════════════════════════════════════════════════════════ */
+
+function _drawMissileSilo(ctx, sc, w, h, def, level, now) {
+  // Base structure
+  ctx.fillStyle = def.wallColor;
+  ctx.fillRect(-w*0.45, -h*0.3, w*0.9, h*0.45);
+  
+  // Reinforced walls
+  ctx.strokeStyle = '#5a5a7a';
+  ctx.lineWidth = 3 * sc;
+  ctx.strokeRect(-w*0.45, -h*0.3, w*0.9, h*0.45);
+  
+  // Missile silo door (large hangar-style)
+  ctx.fillStyle = def.doorColor;
+  ctx.fillRect(-w*0.35, -h*0.15, w*0.7, h*0.25);
+  ctx.strokeStyle = '#3a3a5a';
+  ctx.lineWidth = 2 * sc;
+  ctx.strokeRect(-w*0.35, -h*0.15, w*0.7, h*0.25);
+  
+  // Roof with radar dish
+  ctx.fillStyle = def.roofColor;
+  ctx.beginPath();
+  ctx.moveTo(-w*0.5, -h*0.3);
+  ctx.lineTo(0, -h*0.85);
+  ctx.lineTo(w*0.5, -h*0.3);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Radar dish on top
+  ctx.fillStyle = '#4a6aff';
+  ctx.beginPath();
+  ctx.ellipse(0, -h*0.92, 12*sc, 8*sc, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#2a4aff';
+  ctx.lineWidth = 2 * sc;
+  ctx.stroke();
+  
+  // Missile visible in silo (level-dependent)
+  if (level >= 2) {
+    ctx.fillStyle = '#8a4a2a';
+    ctx.fillRect(-w*0.08, -h*0.12, w*0.16, h*0.18);
+    ctx.fillStyle = '#cc2222';
+    ctx.beginPath();
+    ctx.moveTo(0, -h*0.12);
+    ctx.lineTo(-w*0.05, -h*0.05);
+    ctx.lineTo(w*0.05, -h*0.05);
+    ctx.closePath();
+    ctx.fill();
+  }
+  
+  // Control tower window
+  ctx.fillStyle = def.winColor;
+  ctx.fillRect(-w*0.15, -h*0.55, w*0.3, h*0.15);
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 1 * sc;
+  ctx.strokeRect(-w*0.15, -h*0.55, w*0.3, h*0.15);
+  
+  // Warning stripes
+  ctx.fillStyle = 'rgba(255,100,100,0.6)';
+  for (var i = 0; i < 3; i++) {
+    ctx.fillRect(-w*0.42 + i*w*0.28, -h*0.35, w*0.12, h*0.08);
+  }
+  
+  // Level indicator glow
+  if (level >= 3) {
+    ctx.globalAlpha = 0.3 + 0.2 * Math.sin((now||0)/300);
+    ctx.fillStyle = '#4aff8a';
+    ctx.beginPath();
+    ctx.arc(0, -h*0.95, 6*sc, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function _drawRadarStation(ctx, sc, w, h, def, level, now) {
+  // Base platform
+  ctx.fillStyle = '#3a4a5a';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w*0.55, h*0.15, 0, 0, Math.PI*2);
+  ctx.fill();
+  
+  // Support tower
+  ctx.fillStyle = def.wallColor;
+  ctx.fillRect(-w*0.12, -h*0.65, w*0.24, h*0.7);
+  ctx.strokeStyle = '#2a3a4a';
+  ctx.lineWidth = 2 * sc;
+  ctx.strokeRect(-w*0.12, -h*0.65, w*0.24, h*0.7);
+  
+  // Ladder detail
+  ctx.strokeStyle = '#5a6a7a';
+  ctx.lineWidth = 1.5 * sc;
+  for (var rung = 0; rung < 5; rung++) {
+    ctx.beginPath();
+    ctx.moveTo(-w*0.08, -h*0.55 + rung*h*0.12);
+    ctx.lineTo(w*0.08, -h*0.55 + rung*h*0.12);
+    ctx.stroke();
+  }
+  
+  // Radar dish assembly
+  ctx.save();
+  ctx.translate(0, -h*0.72);
+  
+  // Rotating dish (animated)
+  var rotation = (now || 0) / 800;
+  ctx.rotate(rotation);
+  
+  // Dish support arm
+  ctx.fillStyle = '#4a5a6a';
+  ctx.fillRect(-2*sc, -h*0.05, 4*sc, h*0.25);
+  
+  // Main dish
+  ctx.fillStyle = '#5a8aff';
+  ctx.beginPath();
+  ctx.ellipse(0, -h*0.15, w*0.35, w*0.12, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#3a6aff';
+  ctx.lineWidth = 2 * sc;
+  ctx.stroke();
+  
+  // Dish center hub
+  ctx.fillStyle = '#2a4a6a';
+  ctx.beginPath();
+  ctx.arc(0, -h*0.15, 5*sc, 0, Math.PI*2);
+  ctx.fill();
+  
+  ctx.restore();
+  
+  // Signal wave animation (when detecting)
+  if (level >= 2) {
+    ctx.globalAlpha = 0.2 + 0.15 * Math.sin((now||0)/200);
+    ctx.strokeStyle = '#4affff';
+    ctx.lineWidth = 2 * sc;
+    ctx.setLineDash([8*sc, 6*sc]);
+    ctx.beginPath();
+    ctx.arc(0, -h*0.72, w*0.6, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+  
+  // Control room window
+  ctx.fillStyle = def.winColor;
+  ctx.fillRect(-w*0.08, -h*0.45, w*0.16, h*0.12);
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.lineWidth = 1 * sc;
+  ctx.strokeRect(-w*0.08, -h*0.45, w*0.16, h*0.12);
+  
+  // Antenna array on top (higher levels)
+  if (level >= 3) {
+    ctx.fillStyle = '#6a8aff';
+    for (var ant = -1; ant <= 1; ant++) {
+      ctx.fillRect(ant*w*0.18 - 2*sc, -h*0.82, 4*sc, h*0.12);
+    }
+  }
+}
+
+function _drawInterceptor(ctx, sc, w, h, def, level, now) {
+  // Concrete bunker base
+  ctx.fillStyle = '#4a5a4a';
+  ctx.fillRect(-w*0.5, -h*0.25, w, h*0.35);
+  
+  // Reinforced roof
+  ctx.fillStyle = def.roofColor;
+  ctx.beginPath();
+  ctx.moveTo(-w*0.55, -h*0.25);
+  ctx.lineTo(0, -h*0.55);
+  ctx.lineTo(w*0.55, -h*0.25);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Blast doors (front)
+  ctx.fillStyle = def.doorColor;
+  ctx.fillRect(-w*0.25, -h*0.15, w*0.5, h*0.2);
+  ctx.strokeStyle = '#2a3a2a';
+  ctx.lineWidth = 3 * sc;
+  ctx.strokeRect(-w*0.25, -h*0.15, w*0.5, h*0.2);
+  
+  // Door hinge details
+  ctx.fillStyle = '#6a7a6a';
+  for (var hinge = -1; hinge <= 1; hinge += 2) {
+    ctx.fillRect(hinge*w*0.22 - 3*sc, -h*0.1, 6*sc, h*0.12);
+  }
+  
+  // Missile launcher turret (rotating)
+  ctx.save();
+  ctx.translate(0, -h*0.35);
+  var turretRot = Math.sin((now||0)/1000) * 0.3;
+  ctx.rotate(turretRot);
+  
+  // Launcher base
+  ctx.fillStyle = '#3a5a3a';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w*0.25, h*0.08, 0, 0, Math.PI*2);
+  ctx.fill();
+  
+  // Launcher arms
+  ctx.fillStyle = '#4a6a4a';
+  for (var arm = -1; arm <= 1; arm += 2) {
+    ctx.save();
+    ctx.rotate(arm * 0.4);
+    ctx.fillRect(-3*sc, -h*0.05, 6*sc, h*0.35);
+    // Missile in launcher
+    ctx.fillStyle = '#8a4a2a';
+    ctx.fillRect(-2*sc, -h*0.28, 4*sc, h*0.25);
+    ctx.fillStyle = '#cc2222';
+    ctx.beginPath();
+    ctx.moveTo(0, -h*0.28);
+    ctx.lineTo(-2*sc, -h*0.22);
+    ctx.lineTo(2*sc, -h*0.22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  
+  ctx.restore();
+  
+  // Radar sensor on bunker
+  ctx.fillStyle = '#4a8aff';
+  ctx.beginPath();
+  ctx.arc(w*0.35, -h*0.32, 5*sc, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#2a6aff';
+  ctx.lineWidth = 1.5 * sc;
+  ctx.stroke();
+  
+  // Warning lights (blinking when active)
+  if (level >= 2) {
+    ctx.globalAlpha = 0.4 + 0.4 * Math.sin((now||0)/150);
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(-w*0.35, -h*0.32, 4*sc, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  
+  // Ventilation stacks
+  ctx.fillStyle = '#5a6a5a';
+  for (var vent = -1; vent <= 1; vent += 2) {
+    ctx.fillRect(vent*w*0.4 - 4*sc, -h*0.28, 8*sc, h*0.15);
+    ctx.fillStyle = '#3a4a3a';
+    ctx.fillRect(vent*w*0.4 - 3*sc, -h*0.35, 6*sc, h*0.08);
+    ctx.fillStyle = '#5a6a5a';
+  }
+  
+  // Level upgrade indicator
+  if (level >= 3) {
+    ctx.fillStyle = 'rgba(100,255,150,0.3)';
+    ctx.beginPath();
+    ctx.arc(0, -h*0.65, w*0.4, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
 function _darken(hex,amount){var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);r=Math.max(0,Math.round(r*(1-amount)));g=Math.max(0,Math.round(g*(1-amount)));b=Math.max(0,Math.round(b*(1-amount)));return '#'+('0'+r.toString(16)).slice(-2)+('0'+g.toString(16)).slice(-2)+('0'+b.toString(16)).slice(-2);}
 
 /* ══════════════════════════════════════════════════════════════
@@ -942,6 +1453,17 @@ export function rebuildFromSave(savedBuildings) {
       b.constructionTime  = d.constructionTime || 0;
       b.constructionMax   = d.constructionMax  || 0;
       if (d.upgradeLevel) b._upgradeLevel = d.upgradeLevel;
+    }
+    // Restore missile/interceptor state for military buildings
+    var def = BUILDING_DEFS[d.type];
+    if (def && def.missileCapacity !== undefined && d.missileStock) {
+      b.missileStock = d.missileStock;
+      b.reloadTimer = d.reloadTimer || 0;
+      b.lastLaunchTime = d.lastLaunchTime || 0;
+    }
+    if (def && def.interceptBaseChance !== undefined) {
+      b.interceptorStock = d.interceptorStock !== undefined ? d.interceptorStock : (def.interceptorMissileStock || 0);
+      b.interceptCooldown = d.interceptCooldown || 0;
     }
     return b;
   });

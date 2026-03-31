@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — resources/economy.js  (with Debt System)
+   Mini Bayan — resources/economy.js  (with Debt & Missile Warfare)
 
    CHANGES FROM ORIGINAL
    ─────────────────────────────────────────────────────────────
@@ -9,6 +9,12 @@
    - Make debt payments
    - Credit score affects loan limits and interest rates
    - Missed payments lead to default
+
+   MISSILE WARFARE SYSTEM ADDED:
+   - Missile cost deduction (gold + langis)
+   - War loot calculation from successful attacks
+   - Missile inventory management
+   - Spam attack penalty resource deduction
 ═══════════════════════════════════════════════════════════════ */
 
 import { clamp } from '../utils/perspective.js';
@@ -29,6 +35,16 @@ var DEBT_INTEREST_RATE = 0.05;       // 5% per day
 var MAX_CREDIT_SCORE = 100;
 var MIN_CREDIT_SCORE = 0;
 var DEFAULT_CREDIT_SCORE = 60;
+
+/* ── Missile constants ─────────────────────────────────────── */
+export var MISSILE_COSTS = {
+  basic:     { gold: 500,  langis: 100, damage: 0.10, speed: 150, interceptable: true,  travelMin: 30,  travelMax: 60  },
+  precision: { gold: 800,  langis: 200, damage: 0.25, speed: 120, interceptable: true,  travelMin: 60,  travelMax: 90  },
+  ballistic: { gold: 1500, langis: 400, damage: 0.50, speed: 100, interceptable: false, travelMin: 90,  travelMax: 120 },
+  mirv:      { gold: 3000, langis: 800, damage: 0.50, speed: 80,  interceptable: false, travelMin: 120, travelMax: 180, hits: 3 }
+};
+
+export var INTERCEPTOR_COST = { gold: 200, langis: 50 };
 
 /* ── Internal state ────────────────────────────────────────── */
 var _taxRate = BASE_TAX_RATE;
@@ -217,6 +233,200 @@ export function getDebtSummary(VS) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   MISSILE WARFARE ECONOMY FUNCTIONS
+══════════════════════════════════════════════════════════════ */
+
+// Deduct missile cost from player resources
+export function deductMissileCost(missileType, count, VS, showMsgFn) {
+  var costDef = MISSILE_COSTS[missileType];
+  if (!costDef) {
+    if (showMsgFn) showMsgFn('Hindi kilala ang missile type.', 'danger');
+    return false;
+  }
+  
+  var totalGold = costDef.gold * count;
+  var totalLangis = costDef.langis * count;
+  
+  if (VS.res.gold < totalGold || VS.res.langis < totalLangis) {
+    if (showMsgFn) {
+      var missing = [];
+      if (VS.res.gold < totalGold) missing.push(`${totalGold - VS.res.gold} 🪙`);
+      if (VS.res.langis < totalLangis) missing.push(`${totalLangis - VS.res.langis} 🛢️`);
+      showMsgFn(`Kulang ang resources: ${missing.join(', ')}`, 'danger');
+    }
+    return false;
+  }
+  
+  VS.res.gold -= totalGold;
+  VS.res.langis -= totalLangis;
+  
+  // Update missile inventory
+  if (VS.missileInventory) {
+    VS.missileInventory[missileType] = (VS.missileInventory[missileType] || 0) + count;
+  }
+  
+  if (showMsgFn && count === 1) {
+    showMsgFn(`Binili ang ${missileType.toUpperCase()} missile: -${costDef.gold}🪙 -${costDef.langis}🛢️`, 'info');
+  }
+  
+  return true;
+}
+
+// Deduct interceptor missile cost
+export function deductInterceptorCost(count, VS, showMsgFn) {
+  var totalGold = INTERCEPTOR_COST.gold * count;
+  var totalLangis = INTERCEPTOR_COST.langis * count;
+  
+  if (VS.res.gold < totalGold || VS.res.langis < totalLangis) {
+    if (showMsgFn) showMsgFn('Kulang ang resources para sa interceptor missiles.', 'danger');
+    return false;
+  }
+  
+  VS.res.gold -= totalGold;
+  VS.res.langis -= totalLangis;
+  
+  if (VS.missileInventory) {
+    VS.missileInventory.interceptor = (VS.missileInventory.interceptor || 0) + count;
+  }
+  
+  if (showMsgFn) showMsgFn(`Binili ang ${count} interceptor missiles: -${totalGold}🪙 -${totalLangis}🛢️`, 'success');
+  return true;
+}
+
+// Use missile from inventory (when launching)
+export function useMissileFromInventory(missileType, VS, showMsgFn) {
+  if (!VS.missileInventory || !VS.missileInventory[missileType]) {
+    if (showMsgFn) showMsgFn('Wala kang missile na ganito sa inventory!', 'warning');
+    return false;
+  }
+  
+  VS.missileInventory[missileType]--;
+  return true;
+}
+
+// Use interceptor from inventory (when defending)
+export function useInterceptorFromInventory(VS) {
+  if (!VS.missileInventory || !VS.missileInventory.interceptor) return false;
+  VS.missileInventory.interceptor--;
+  return true;
+}
+
+// Calculate war loot from successful attack
+export function calculateWarLoot(attackerVS, defenderVS, missileType, buildingsHit) {
+  var baseLootMultiplier = {
+    basic: 0.15,
+    precision: 0.25,
+    ballistic: 0.40,
+    mirv: 0.60
+  };
+  
+  var multiplier = baseLootMultiplier[missileType] || 0.15;
+  
+  // More buildings hit = more loot
+  var buildingsHitBonus = Math.min(0.3, (buildingsHit || 1) * 0.1);
+  var finalMultiplier = multiplier + buildingsHitBonus;
+  
+  // Calculate loot from defender's resources (capped at 30% of their stash)
+  var maxLootableGold = Math.floor(defenderVS.res.gold * 0.30);
+  var maxLootableRice = Math.floor(defenderVS.res.rice * 0.30);
+  var maxLootableLangis = Math.floor(defenderVS.res.langis * 0.30);
+  
+  var lootGold = Math.floor(maxLootableGold * finalMultiplier);
+  var lootRice = Math.floor(maxLootableRice * finalMultiplier);
+  var lootLangis = Math.floor(maxLootableLangis * finalMultiplier);
+  
+  return {
+    gold: lootGold,
+    rice: lootRice,
+    langis: lootLangis,
+    totalValue: lootGold + lootRice * 2 + lootLangis * 3
+  };
+}
+
+// Apply war loot to attacker and deduct from defender
+export function applyWarLoot(attackerVS, defenderVS, loot, showMsgFn) {
+  // Add to attacker
+  attackerVS.res.gold = Math.min(attackerVS.resCap.gold, attackerVS.res.gold + loot.gold);
+  attackerVS.res.rice = Math.min(attackerVS.resCap.rice, attackerVS.res.rice + loot.rice);
+  attackerVS.res.langis = Math.min(attackerVS.resCap.langis, attackerVS.res.langis + loot.langis);
+  
+  // Deduct from defender
+  defenderVS.res.gold = Math.max(0, defenderVS.res.gold - loot.gold);
+  defenderVS.res.rice = Math.max(0, defenderVS.res.rice - loot.rice);
+  defenderVS.res.langis = Math.max(0, defenderVS.res.langis - loot.langis);
+  
+  if (showMsgFn) {
+    var lootMsg = [];
+    if (loot.gold > 0) lootMsg.push(`${loot.gold}🪙`);
+    if (loot.rice > 0) lootMsg.push(`${loot.rice}🌾`);
+    if (loot.langis > 0) lootMsg.push(`${loot.langis}🛢️`);
+    if (lootMsg.length > 0) {
+      showMsgFn(`🎁 Nakuha ang loot: ${lootMsg.join(', ')}`, 'success');
+    }
+  }
+  
+  return loot;
+}
+
+// Apply spam attack penalty (resource deduction)
+export function applySpamPenalty(penaltyType, VS, showMsgFn) {
+  var penalties = {
+    samePlayer: { gold: 100, rice: 50, langis: 20, trust: 10, rank: 5 },
+    differentPlayers: { gold: 50, rice: 25, langis: 10, trust: 5, rank: 2 }
+  };
+  
+  var penalty = penalties[penaltyType];
+  if (!penalty) return false;
+  
+  // Deduct resources
+  VS.res.gold = Math.max(0, VS.res.gold - penalty.gold);
+  VS.res.rice = Math.max(0, VS.res.rice - penalty.rice);
+  VS.res.langis = Math.max(0, VS.res.langis - penalty.langis);
+  
+  // Update war state penalties
+  if (VS.warState) {
+    VS.warState.trustPenalties = (VS.warState.trustPenalties || 0) + penalty.trust;
+    VS.warState.rankPenalties = (VS.warState.rankPenalties || 0) + penalty.rank;
+  }
+  
+  if (showMsgFn) {
+    showMsgFn(`⚠️ Spam penalty: -${penalty.gold}🪙 -${penalty.rice}🌾 -${penalty.langis}🛢️ | Trust: -${penalty.trust} | Rank: -${penalty.rank}`, 'warning');
+  }
+  
+  return true;
+}
+
+// Get missile inventory summary
+export function getMissileInventorySummary(VS) {
+  if (!VS.missileInventory) {
+    return {
+      basic: 0,
+      precision: 0,
+      ballistic: 0,
+      mirv: 0,
+      interceptor: 0,
+      canAfford: {}
+    };
+  }
+  
+  var canAfford = {};
+  Object.keys(MISSILE_COSTS).forEach(function(type) {
+    var cost = MISSILE_COSTS[type];
+    canAfford[type] = VS.res.gold >= cost.gold && VS.res.langis >= cost.langis;
+  });
+  canAfford.interceptor = VS.res.gold >= INTERCEPTOR_COST.gold && VS.res.langis >= INTERCEPTOR_COST.langis;
+  
+  return {
+    basic: VS.missileInventory.basic || 0,
+    precision: VS.missileInventory.precision || 0,
+    ballistic: VS.missileInventory.ballistic || 0,
+    mirv: VS.missileInventory.mirv || 0,
+    interceptor: VS.missileInventory.interceptor || 0,
+    canAfford: canAfford
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
    TAX SYSTEM FUNCTIONS
 ══════════════════════════════════════════════════════════════ */
 
@@ -368,6 +578,17 @@ export function tickEconomy(dt, VS) {
   // Initialize debt if needed
   if (!VS.debt) initDebt(VS);
   
+  // Initialize missile inventory if needed
+  if (!VS.missileInventory) {
+    VS.missileInventory = {
+      basic: 0,
+      precision: 0,
+      ballistic: 0,
+      mirv: 0,
+      interceptor: 0
+    };
+  }
+  
   var currentDay = window.dayCount || 1;
   
   // Apply interest only once per day (when day changes)
@@ -408,6 +629,28 @@ export function tickEconomy(dt, VS) {
     // Waste decays very slowly over time
     VS.waste.total = Math.max(0, VS.waste.total - 1);
   }
+  
+  // Process war state daily resets
+  if (VS.warState) {
+    // Reset daily attack count at midnight
+    if (VS.warState.dailyAttackReset !== currentDay) {
+      VS.warState.dailyAttackReset = currentDay;
+      VS.warState.dailyAttackCount = 0;
+    }
+    
+    // Clean up old attack records (keep last 7 days)
+    var weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    if (VS.warState.attacksMade) {
+      VS.warState.attacksMade = VS.warState.attacksMade.filter(function(a) {
+        return a.timestamp > weekAgo;
+      });
+    }
+    if (VS.warState.attacksReceived) {
+      VS.warState.attacksReceived = VS.warState.attacksReceived.filter(function(a) {
+        return a.timestamp > weekAgo;
+      });
+    }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -435,6 +678,12 @@ export function onNewDay(VS, showMsgFn) {
       VS.debt.creditScore = Math.min(MAX_CREDIT_SCORE, VS.debt.creditScore + 1);
     }
   }
+  
+  // Update war state for new day
+  if (VS.warState) {
+    // Update last login time for offline protection calculation
+    VS.warState.lastLoginTime = Date.now();
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -446,14 +695,44 @@ export function getEconomicSummary(VS) {
   var taxRate = getTaxRate(VS);
   var waste = getWasteStats(VS);
   var debt = getDebtSummary(VS);
+  var missiles = getMissileInventorySummary(VS);
   
   return {
     taxRate: taxRate,
     taxRatePercent: Math.round(taxRate * 100),
     waste: waste,
     debt: debt,
+    missiles: missiles,
     treasury: VS.res.gold,
     rice: VS.res.rice,
     langis: VS.res.langis
+  };
+}
+
+// Check if player can afford missile launch
+export function canAffordMissileLaunch(missileType, count, VS) {
+  var costDef = MISSILE_COSTS[missileType];
+  if (!costDef) return false;
+  
+  var totalGold = costDef.gold * count;
+  var totalLangis = costDef.langis * count;
+  
+  return VS.res.gold >= totalGold && VS.res.langis >= totalLangis;
+}
+
+// Get missile type info with current affordability
+export function getMissileTypeInfo(missileType, VS) {
+  var info = MISSILE_COSTS[missileType];
+  if (!info) return null;
+  
+  return {
+    type: missileType,
+    cost: { gold: info.gold, langis: info.langis },
+    damage: info.damage,
+    speed: info.speed,
+    interceptable: info.interceptable,
+    travelTime: { min: info.travelMin, max: info.travelMax },
+    canAfford: VS.res.gold >= info.gold && VS.res.langis >= info.langis,
+    inInventory: VS.missileInventory ? (VS.missileInventory[missileType] || 0) : 0
   };
 }

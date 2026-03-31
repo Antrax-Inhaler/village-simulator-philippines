@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — input/input.js
+   Mini Bayan — input/input.js  (with Missile Warfare Support)
    INPUT SYSTEM — fixed panning at all zoom levels, uses WORLD_W/H
    FIXED: Proper canvas coordinate scaling for mouse/touch events
    FIXED: Added langis collection from resource bubbles
+   NEW: Scout mode coordinate capture, military building interactions
 ═══════════════════════════════════════════════════════════════ */
 
 import { perspScale, clamp, dist } from '../utils/perspective.js';
@@ -34,6 +35,15 @@ var DOUBLE_TAP_MS  = 320;
 var DOUBLE_TAP_PX  = 30;
 
 var _hoveredVillager = null;
+
+/* ════════════════════════════════════════════════════════════
+   MISSILE WARFARE INPUT STATE (NEW)
+════════════════════════════════════════════════════════════ */
+var _missileInput = {
+  scoutMode: false,           // Is scout mode active for coordinate capture?
+  capturedCoords: null,       // Last captured coordinates {x, y, zone, name}
+  selectedMilitaryBld: null,  // Currently selected military building
+};
 
 /* ── Touch state ────────────────────────────────────────────── */
 var _touch = {
@@ -67,6 +77,7 @@ export function initInput(canvas, deps) {
 export function getMousePos()        { return { x: _mouseX, y: _mouseY }; }
 export function getHoveredVillager() { return _hoveredVillager; }
 export function getDragState()       { return _drag; }
+export function getMissileInputState() { return _missileInput; }  // NEW export
 
 /* ── Helper: Get properly scaled canvas coordinates ─────────── */
 function getCanvasCoords(e) {
@@ -100,6 +111,12 @@ function _onMouseDown(e) {
   const sy = pos.y;
   const mode = _deps.getGameMode();
 
+  /* Handle scout mode click first */
+  if (_missileInput.scoutMode) {
+    _handleScoutClick(sx, sy);
+    return;
+  }
+
   if (mode === 'build_shop' || mode === 'move_building') {
     _drag.active = true; _drag.moved = false; _drag.building = null;
     _drag.startSX = sx; _drag.startSY = sy;
@@ -126,6 +143,72 @@ function _onMouseDown(e) {
   _drag.moved     = false;
   _drag.startSX   = sx;        _drag.startSY   = sy;
   _drag.startCamX = cam.tx;    _drag.startCamY = cam.ty;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Handle scout mode click (capture building coordinates)
+════════════════════════════════════════════════════════════ */
+function _handleScoutClick(sx, sy) {
+  const wp = s2w(sx, sy);
+  const VS = _deps.VS;
+  
+  // Check if clicked on a building
+  for (var i = 0; i < VS.buildings.length; i++) {
+    const bld = VS.buildings[i];
+    const sc = perspScale(bld.y);
+    const w = bld.w * sc * 0.6;
+    const h = bld.h * sc * 0.55;
+    
+    if (wp.x >= bld.x - w && wp.x <= bld.x + w && 
+        wp.y >= bld.y - h && wp.y <= bld.y + h && bld.hp > 0) {
+      
+      // Capture coordinates
+      const zones = ['SENTRO', 'HILAGA', 'TIMOG', 'SILANGAN', 'KANLURAN'];
+      const zone = zones[Math.floor(Math.random() * zones.length)];
+      const name = 'Nayon ni ' + ['Juan', 'Maria', 'Pedro', 'Ana'][Math.floor(Math.random() * 4)];
+      
+      _missileInput.capturedCoords = {
+        x: bld.x.toFixed(2),
+        y: bld.y.toFixed(2),
+        zone: zone,
+        name: name,
+        buildingType: bld.type,
+        buildingLevel: bld.level
+      };
+      
+      // Show feedback
+      if (_deps.showMsg) {
+        _deps.showMsg(`📍 Coordinates: X:${_missileInput.capturedCoords.x}, Y:${_missileInput.capturedCoords.y}, ZONE:${zone}`, 'success');
+      }
+      
+      // Auto-copy to clipboard
+      if (navigator.clipboard) {
+        const coordStr = `X:${_missileInput.capturedCoords.x}, Y:${_missileInput.capturedCoords.y}, ZONE:${zone}`;
+        navigator.clipboard.writeText(coordStr).catch(function() {});
+      }
+      
+      // Exit scout mode after capture
+      _missileInput.scoutMode = false;
+      if (window.exitScoutMode) window.exitScoutMode();
+      
+      // Open missile panel with pre-filled coords
+      if (window.openMissilePanel) {
+        window.openMissilePanel({
+          targetX: parseFloat(_missileInput.capturedCoords.x),
+          targetY: parseFloat(_missileInput.capturedCoords.y),
+          targetZone: zone,
+          targetName: name
+        });
+      }
+      
+      return;
+    }
+  }
+  
+  // Clicked empty space - exit scout mode
+  _missileInput.scoutMode = false;
+  if (window.exitScoutMode) window.exitScoutMode();
+  if (_deps.showMsg) _deps.showMsg('Scout mode cancelled.', 'info');
 }
 
 /* ── Mouse move ─────────────────────────────────────────────── */
@@ -159,7 +242,7 @@ function _onMouseMove(e) {
     _hoveredVillager = found;
   }
 
-  /* Cursor style */
+  /* Cursor style - add military building hover */
   if (mode === 'build_shop' || mode === 'move_building') {
     _canvas.style.cursor = 'crosshair';
   } else if (!_drag.active) {
@@ -168,7 +251,33 @@ function _onMouseMove(e) {
       return dist(wp3.x, wp3.y, b.x, b.y) < b.w * perspScale(b.y) * 0.55;
     });
     const overArrow = !!getZoneArrowAt(wp3.x, wp3.y, VS);
-    _canvas.style.cursor = overArrow ? 'pointer' : (overBld ? 'grab' : (_hoveredVillager ? 'pointer' : 'grab'));
+    
+    // Check for military building hover
+    let overMilitary = false;
+    if (VS.buildings) {
+      for (var mi = 0; mi < VS.buildings.length; mi++) {
+        const mb = VS.buildings[mi];
+        const def = mb.getDef ? mb.getDef() : null;
+        if (def && (def.missileCapacity !== undefined || def.interceptBaseChance !== undefined || def.detectionRange !== undefined)) {
+          if (dist(wp3.x, wp3.y, mb.x, mb.y) < mb.w * perspScale(mb.y) * 0.6) {
+            overMilitary = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (overMilitary) {
+      _canvas.style.cursor = 'pointer';
+    } else if (overArrow) {
+      _canvas.style.cursor = 'pointer';
+    } else if (overBld) {
+      _canvas.style.cursor = 'grab';
+    } else if (_hoveredVillager) {
+      _canvas.style.cursor = 'pointer';
+    } else {
+      _canvas.style.cursor = 'grab';
+    }
   }
 
   /* Move‑building live follow — snapshot origin on first move ─────────── */
@@ -446,6 +555,42 @@ function _processClick(sx, sy) {
     }
   }
 
+  /* Military building click - Missile Silo / Radar / Interceptor */
+  for (var mb = 0; mb < VS.buildings.length; mb++) {
+    const bld = VS.buildings[mb];
+    const def = bld.getDef ? bld.getDef() : null;
+    const sc = perspScale(bld.y);
+    
+    if (def && dist(wp2.x, wp2.y, bld.x, bld.y) < bld.w * sc * 0.65 && bld.hp > 0) {
+      
+      // Missile Silo - open missile panel
+      if (def.missileCapacity !== undefined) {
+        if (window.openMissilePanel) {
+          window.openMissilePanel({ building: bld });
+        }
+        return;
+      }
+      
+      // Radar Station - show detection status
+      if (def.detectionRange !== undefined) {
+        if (_deps.showMsg) {
+          const stats = bld.getStats();
+          _deps.showMsg(`📡 Radar Station Lv${bld.level}: Detection Range: ∞ | Warning Time: ${stats.earlyWarningTime}s`, 'info');
+        }
+        return;
+      }
+      
+      // Interceptor Battery - show defense status
+      if (def.interceptBaseChance !== undefined) {
+        if (_deps.showMsg) {
+          const stats = bld.getStats();
+          _deps.showMsg(`🛡️ Interceptor Lv${bld.level}: Intercept Chance: ${stats.interceptBaseChance}% | Stock: ${bld.interceptorStock || 0}`, 'info');
+        }
+        return;
+      }
+    }
+  }
+
   /* Villager click */
   for (var i = 0; i < VS.villagers.length; i++) {
     const v  = VS.villagers[i];
@@ -650,6 +795,14 @@ function _onKeyDown(e) {
   var zm = document.getElementById('_zonePurchaseModal');
   if (zm) { zm.parentNode && zm.parentNode.removeChild(zm); return; }
 
+  /* Exit scout mode if active */
+  if (_missileInput.scoutMode) {
+    _missileInput.scoutMode = false;
+    if (window.exitScoutMode) window.exitScoutMode();
+    if (_deps.showMsg) _deps.showMsg('Scout mode cancelled.', 'info');
+    return;
+  }
+
   const mode   = _deps.getGameMode();
   const drawer = _deps.getDrawer();
   if (mode === 'build_shop' || mode === 'move_building') {
@@ -727,6 +880,13 @@ function _onTouchStart(e) {
     _touch.startCamY = cam.ty;
     _touch.moved     = false;
     _mouseX = pos.x; _mouseY = pos.y;
+    
+    /* Handle scout mode touch */
+    if (_missileInput.scoutMode) {
+      _handleScoutClick(pos.x, pos.y);
+      return;
+    }
+    
     const mode = _deps.getGameMode();
     if (mode === 'move_building') {
       const drawer = _deps.getDrawer();
@@ -848,4 +1008,25 @@ function _onTouchCancel(e) {
   _touch.moved  = false;
   _touch.id0 = _touch.id1 = null;
   _touch.count = 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PUBLIC API FOR MISSILE SYSTEM
+══════════════════════════════════════════════════════════════ */
+export function enterScoutMode() {
+  _missileInput.scoutMode = true;
+  _missileInput.capturedCoords = null;
+  if (_deps.showMsg) _deps.showMsg('🔭 Scout Mode: I-click ang building para kumuha ng coordinates', 'info');
+}
+
+export function exitScoutMode() {
+  _missileInput.scoutMode = false;
+}
+
+export function getCapturedCoords() {
+  return _missileInput.capturedCoords;
+}
+
+export function setCapturedCoords(coords) {
+  _missileInput.capturedCoords = coords;
 }
