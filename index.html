@@ -202,21 +202,27 @@
     <span id="audioVolIcon">🔊</span>
   </div> -->
   
+  <!-- Calamity SFX (looping) -->
   <audio id="sfx-calamity-bagyo"    preload="auto" loop><source src="audio/sfx/typhoon.mp3"   type="audio/mpeg"></audio>
   <audio id="sfx-calamity-lindol"   preload="auto" loop><source src="audio/sfx/earthquake.mp3" type="audio/mpeg"></audio>
   <audio id="sfx-calamity-tagtuyot" preload="auto" loop><source src="audio/sfx/drought.mp3"    type="audio/mpeg"></audio>
  
+  <!-- One-shot SFX -->
   <audio id="sfx-protest"          preload="auto"><source src="audio/sfx/protest.mp3"  type="audio/mpeg"></audio>
   <audio id="sfx-election"         preload="auto"><source src="audio/sfx/election.mp3" type="audio/mpeg"></audio>
   <audio id="sfx-birth"            preload="auto"><source src="audio/sfx/birth.mp3"    type="audio/mpeg"></audio>
   <audio id="sfx-unlock"           preload="auto"><source src="audio/sfx/unlock.mp3"   type="audio/mpeg"></audio>
   <audio id="sfx-villager-male"    preload="auto"><source src="audio/sfx/male.mp3"     type="audio/mpeg"></audio>
   <audio id="sfx-villager-female"  preload="auto"><source src="audio/sfx/female.mp3"   type="audio/mpeg"></audio>
+  
+  <!-- Daily Report SFX (NEW) -->
+  <audio id="sfx-day-complete" preload="auto"><source src="audio/sfx/day-complete.mp3" type="audio/mpeg"></audio>
+  <audio id="sfx-score-count" preload="auto" loop><source src="audio/sfx/score-count.mp3" type="audio/mpeg"></audio>
  
   <!-- Background Music -->
   <audio id="bgm-day"   preload="auto" loop><source src="audio/bgm/day.mp3"   type="audio/mpeg"></audio>
   <audio id="bgm-night" preload="auto" loop><source src="audio/bgm/night.mp3" type="audio/mpeg"></audio>
- 
+  <audio id="bgm-battle" preload="auto" loop><source src="audio/bgm/battle.mp3" type="audio/mpeg"></audio>
   <script>
     /* ═══════════════════════════════════════════════════════════════
        MINI BAYAN — COMPLETE AUDIO SYSTEM
@@ -525,7 +531,109 @@ function _spShell(title, body) {
          '<button class="sp-close" onclick="closeSidePanel()">✕</button></div>' +
          '<div class="sp-body">' + body + '</div>';
 }
+/* ═══════════════════════════════════════════════════════════════
+   BATTLE MUSIC SYSTEM
+   ═══════════════════════════════════════════════════════════════ */
+var _battleMusicActive = false;
+var _previousBgmTrack = null;  // Store which track was playing (day/night)
 
+/* Switch to battle music */
+window.switchToBattleMusic = function() {
+  if (_battleMusicActive) return;
+  
+  // Store current track
+  _previousBgmTrack = _currentBgm;
+  
+  // Fade out current BGM
+  var currentEl = document.getElementById('bgm-' + _previousBgmTrack);
+  if (currentEl && !currentEl.paused) {
+    (function(el) {
+      var v = el.volume;
+      var s = Math.max(0.01, v / 10);
+      var t = setInterval(function() {
+        v = Math.max(0, v - s);
+        el.volume = v;
+        if (v <= 0) {
+          clearInterval(t);
+          el.pause();
+        }
+      }, 60);
+    })(currentEl);
+  }
+  
+  // Play battle music
+  var battleEl = document.getElementById('bgm-battle');
+  if (battleEl && SOUNDS_ENABLED) {
+    battleEl.volume = 0;
+    battleEl.loop = true;
+    battleEl.currentTime = 0;
+    battleEl.play().catch(function(e) {
+      console.warn('[BGM] Could not play battle music:', e.message);
+    });
+    
+    // Fade in battle music
+    var targetVol = _masterVolume;
+    var fadeVol = 0;
+    var fadeIn = setInterval(function() {
+      fadeVol = Math.min(targetVol, fadeVol + 0.03);
+      if (battleEl) battleEl.volume = fadeVol;
+      if (fadeVol >= targetVol) clearInterval(fadeIn);
+    }, 60);
+    
+    _battleMusicActive = true;
+  }
+};
+
+/* Resume regular day/night music */
+window.resumeRegularMusic = function() {
+  if (!_battleMusicActive) return;
+  
+  // Fade out battle music
+  var battleEl = document.getElementById('bgm-battle');
+  if (battleEl && !battleEl.paused) {
+    (function(el) {
+      var v = el.volume;
+      var s = Math.max(0.01, v / 10);
+      var t = setInterval(function() {
+        v = Math.max(0, v - s);
+        el.volume = v;
+        if (v <= 0) {
+          clearInterval(t);
+          el.pause();
+          el.currentTime = 0;
+        }
+      }, 60);
+    })(battleEl);
+  }
+  
+  // Resume previous track
+  if (_previousBgmTrack) {
+    var prevEl = document.getElementById('bgm-' + _previousBgmTrack);
+    if (prevEl && SOUNDS_ENABLED) {
+      prevEl.volume = 0;
+      prevEl.play().catch(function(e) {
+        console.warn('[BGM] Could not resume ' + _previousBgmTrack + ':', e.message);
+      });
+      
+      // Fade in
+      var targetVol = _masterVolume;
+      var fadeVol = 0;
+      var fadeIn = setInterval(function() {
+        fadeVol = Math.min(targetVol, fadeVol + 0.03);
+        if (prevEl) prevEl.volume = fadeVol;
+        if (fadeVol >= targetVol) clearInterval(fadeIn);
+      }, 60);
+    }
+    _currentBgm = _previousBgmTrack;
+  }
+  
+  _battleMusicActive = false;
+};
+
+/* Check if battle music is active */
+window.isBattleMusicActive = function() {
+  return _battleMusicActive;
+};
 // Tax panel functions
 window.spTaxSlider = function(val) {
   var v = document.getElementById('sp-tax-val');

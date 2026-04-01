@@ -813,6 +813,14 @@ window.openAttackScreen = function() {
   G('attack-screen').style.display = 'block';
   _loadVillage();
   
+  // ════════════════════════════════════════════════════════
+  // SWITCH TO BATTLE MUSIC
+  // ════════════════════════════════════════════════════════
+  if (typeof window.switchToBattleMusic === 'function') {
+    window.switchToBattleMusic();
+  }
+  // ════════════════════════════════════════════════════════
+  
   var handlers = [
     ['mousedown', _onMouseDown], ['mousemove', _onMouseMove], ['mouseup', _onMouseUp],
     ['mouseleave', _onMouseUp], ['wheel', _onWheel, { passive: false }],
@@ -834,12 +842,18 @@ window._atkClose = function() {
   G('attack-screen').style.display = 'none';
   _cam.selectedBuilding = null;
   _hideBuildingInfo();
-  exitScoutMode();
-  _missileState.active = false;
+  
+  // ════════════════════════════════════════════════════════
+  // RESUME DAY/NIGHT MUSIC
+  // ════════════════════════════════════════════════════════
+  if (typeof window.resumeRegularMusic === 'function') {
+    window.resumeRegularMusic();
+  }
+  // ════════════════════════════════════════════════════════
+  
   if (_raf) cancelAnimationFrame(_raf);
   _raf = null;
 };
-
 window._atkNewVillage = _loadVillage;
 
 window._atkChg = function(role, delta) {

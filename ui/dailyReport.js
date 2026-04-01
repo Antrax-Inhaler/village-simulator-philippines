@@ -9,7 +9,51 @@ import { getRankFromScore, getNextRank } from '../ranking/rankingSystem.js';
 let reportContainer = null;
 let dayCountContainer = null;
 let currentResolve = null;
+function playDayCompleteSound() {
+  if (typeof window.playSound === 'function') {
+    window.playSound('sfx-day-complete');
+  } else {
+    // Fallback: direct audio element
+    var el = document.getElementById('sfx-day-complete');
+    if (el && SOUNDS_ENABLED !== false) {
+      el.currentTime = 0;
+      el.play().catch(function(e) {
+        console.warn('[DailyReport] Could not play day-complete sound:', e.message);
+      });
+    }
+  }
+}
 
+// Play score counting sound (looped)
+function startScoreCountSound() {
+  if (typeof window.playSound === 'function') {
+    window.playSound('sfx-score-count', { loop: true });
+  } else {
+    // Fallback: direct audio element
+    var el = document.getElementById('sfx-score-count');
+    if (el && SOUNDS_ENABLED !== false) {
+      el.loop = true;
+      el.currentTime = 0;
+      el.play().catch(function(e) {
+        console.warn('[DailyReport] Could not play score-count sound:', e.message);
+      });
+    }
+  }
+}
+
+// Stop score counting sound
+function stopScoreCountSound() {
+  if (typeof window.stopSound === 'function') {
+    window.stopSound('sfx-score-count');
+  } else {
+    // Fallback: direct audio element
+    var el = document.getElementById('sfx-score-count');
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+  }
+}
 // Create and inject styles
 function injectStyles() {
   if (document.getElementById('daily-report-styles')) return;
@@ -564,6 +608,9 @@ function countAnimation(element, start, end, duration = 1000) {
     const isPositive = end >= 0;
     const prefix = isPositive ? '+' : '';
     
+    // 🎵 START score counting sound when animation begins
+    startScoreCountSound();
+    
     function animate(currentTime) {
       if (!startTime) startTime = currentTime;
       const elapsed = currentTime - startTime;
@@ -574,7 +621,12 @@ function countAnimation(element, start, end, duration = 1000) {
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
+        // Ensure final value is exact
         element.textContent = `${prefix}${end}`;
+        
+        // 🎵 STOP score counting sound when animation completes
+        stopScoreCountSound();
+        
         resolve();
       }
     }
@@ -599,6 +651,9 @@ export function showDayCount(dayNumber) {
   return new Promise((resolve) => {
     injectStyles();
     
+    // 🎵 PLAY day complete sound when overlay appears
+    playDayCompleteSound();
+    
     const overlay = document.createElement('div');
     overlay.className = 'day-count-overlay';
     overlay.innerHTML = `
@@ -618,6 +673,7 @@ export function showDayCount(dayNumber) {
     }, 2500);
   });
 }
+
 
 // Show daily report
 export function showDailyReport(VS, dayCount, result, previousScore, newScore, oldRank, nextRank) {
@@ -711,7 +767,7 @@ export function showDailyReport(VS, dayCount, result, previousScore, newScore, o
       drawRankBadge(nextCanvas, nextRank.id);
     }
     
-    // Animate score
+    // 🎵 Animate score (sound starts/stops automatically in countAnimation)
     const scoreEl = document.getElementById('bigScoreMinimal');
     countAnimation(scoreEl, 0, result.dailyScore, 1500);
     
@@ -725,6 +781,9 @@ export function showDailyReport(VS, dayCount, result, previousScore, newScore, o
     const continueBtn = document.getElementById('continueBtnMinimal');
     if (continueBtn) {
       continueBtn.onclick = () => {
+        // 🎵 Ensure score sound is stopped if user skips animation
+        stopScoreCountSound();
+        
         const reportElement = document.getElementById('daily-report-minimal');
         if (reportElement) {
           reportElement.style.animation = 'slideOutDown 0.3s ease forwards';
