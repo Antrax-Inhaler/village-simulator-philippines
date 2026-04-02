@@ -4203,3 +4203,8 @@ canvas.mode-view  { cursor: default; }
     font-size: 12px !important;
   }
 }
+.slot-highlight {
+  stroke: #f5c842;
+  stroke-width: 2;
+  fill: rgba(245, 200, 66, 0.1);
+}

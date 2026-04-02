@@ -1016,5 +1016,5 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   if (window.loadDefaultGameSettings) {
     window.loadDefaultGameSettings();
-  }
+}
 });

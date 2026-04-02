@@ -4,6 +4,9 @@
    FIXED: Proper canvas coordinate scaling for mouse/touch events
    FIXED: Added langis collection from resource bubbles
    NEW: Scout mode coordinate capture, military building interactions
+   NEW: Building overlap prevention with max upgrade footprint check
+   NEW: Show OTHER buildings' max footprint when moving (green/red)
+   NEW: Zone boundary enforcement for zone-locked buildings
 ═══════════════════════════════════════════════════════════════ */
 
 import { perspScale, clamp, dist } from '../utils/perspective.js';
@@ -15,7 +18,14 @@ import {
   CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM,
   WORLD_W, WORLD_H,
 } from '../render/camera.js';
-import { getZoneArrowAt, getZoneAt, ZONE_DEFS, purchaseZone } from '../world/zones.js';
+import { getZoneArrowAt, getZoneAt, ZONE_DEFS, purchaseZone, isZoneUnlocked } from '../world/zones.js';
+
+/* ══════════════════════════════════════════════════════════════
+   USER ADJUSTABLE: Max Upgrade Footprint Multiplier
+   Must match the value in renderer.js for consistency!
+   2.0 = 2x the base building size (green guide shows max upgrade space)
+══════════════════════════════════════════════════════════════ */
+var MAX_UPGRADE_FOOTPRINT_MULTIPLIER = 2.0;
 
 var _deps   = null;
 var _canvas = null;
@@ -40,9 +50,9 @@ var _hoveredVillager = null;
    MISSILE WARFARE INPUT STATE (NEW)
 ════════════════════════════════════════════════════════════ */
 var _missileInput = {
-  scoutMode: false,           // Is scout mode active for coordinate capture?
-  capturedCoords: null,       // Last captured coordinates {x, y, zone, name}
-  selectedMilitaryBld: null,  // Currently selected military building
+  scoutMode: false,
+  capturedCoords: null,
+  selectedMilitaryBld: null,
 };
 
 /* ── Touch state ────────────────────────────────────────────── */
@@ -57,6 +67,88 @@ var _touch = {
   pinchStartDist: 0,
   pinchStartZoom: 1,
 };
+
+/* ══════════════════════════════════════════════════════════════
+   OVERLAP DETECTION SYSTEM — Checks ALL buildings' max footprints
+══════════════════════════════════════════════════════════════ */
+function _checkBuildingOverlap(type, x, y, buildings, excludeBuilding) {
+  var def = _deps.BUILDING_DEFS[type] || _deps.BUILDING_DEFS.house;
+  if (!def) return { overlap: false, msg: '', overlapBuilding: null };
+  
+  var sc = perspScale(y);
+  var baseW = def.w * sc;
+  var baseH = def.h * sc;
+  
+  // Use max upgrade footprint for collision check
+  var checkW = baseW * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+  var checkH = baseH * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+  
+  // Building bounds (centered on x, y)
+  var left1 = x - checkW / 2;
+  var right1 = x + checkW / 2;
+  var top1 = y - checkH;
+  var bottom1 = y;
+  
+  for (var i = 0; i < buildings.length; i++) {
+    var b = buildings[i];
+    if (!b || b.hp <= 0) continue;
+    if (excludeBuilding && b === excludeBuilding) continue;
+    
+    var bsc = perspScale(b.y);
+    var bW = b.w * bsc * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+    var bH = b.h * bsc * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+    
+    var left2 = b.x - bW / 2;
+    var right2 = b.x + bW / 2;
+    var top2 = b.y - bH;
+    var bottom2 = b.y;
+    
+    // AABB collision detection with small padding
+    var padding = 5 * sc;
+    if (left1 < right2 - padding && right1 > left2 + padding &&
+        top1 < bottom2 - padding && bottom1 > top2 + padding) {
+      return {
+        overlap: true,
+        msg: 'May nakakapit na gusali! (' + b.getDef().label + ')',
+        overlapBuilding: b
+      };
+    }
+  }
+  
+  return { overlap: false, msg: '', overlapBuilding: null };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ZONE BOUNDARY CHECK — For zone-locked buildings
+══════════════════════════════════════════════════════════════ */
+function _checkZoneBoundary(type, x, y, VS) {
+  var def = _deps.BUILDING_DEFS[type] || _deps.BUILDING_DEFS.house;
+  if (!def) return { ok: true, msg: '' };
+  
+  // Only check if building has a required zone
+  if (!def.requiredZone) {
+    return { ok: true, msg: '' };
+  }
+  
+  // Check if zone is unlocked
+  var zones = VS.unlockedZones || [];
+  if (zones.indexOf(def.requiredZone) === -1) {
+    return { ok: false, msg: def.label + ' ay nangangailangan ng ' + def.requiredZone + ' zone.' };
+  }
+  
+  // Check if position is inside the required zone
+  if (typeof getZoneAt === 'function') {
+    var zoneAtPos = getZoneAt(x, y);
+    if (zoneAtPos !== def.requiredZone) {
+      return { 
+        ok: false, 
+        msg: def.label + ' ay dapat manatili sa loob ng ' + ZONE_DEFS[def.requiredZone].label + ' zone.' 
+      };
+    }
+  }
+  
+  return { ok: true, msg: '' };
+}
 
 export function initInput(canvas, deps) {
   _canvas = canvas;
@@ -77,7 +169,7 @@ export function initInput(canvas, deps) {
 export function getMousePos()        { return { x: _mouseX, y: _mouseY }; }
 export function getHoveredVillager() { return _hoveredVillager; }
 export function getDragState()       { return _drag; }
-export function getMissileInputState() { return _missileInput; }  // NEW export
+export function getMissileInputState() { return _missileInput; }
 
 /* ── Helper: Get properly scaled canvas coordinates ─────────── */
 function getCanvasCoords(e) {
@@ -93,7 +185,6 @@ function getCanvasCoords(e) {
     clientY = e.clientY;
   }
   
-  /* CRITICAL: Scale coordinates to match canvas pixel dimensions */
   const scaleX = _canvas.width / rect.width;
   const scaleY = _canvas.height / rect.height;
   
@@ -111,7 +202,6 @@ function _onMouseDown(e) {
   const sy = pos.y;
   const mode = _deps.getGameMode();
 
-  /* Handle scout mode click first */
   if (_missileInput.scoutMode) {
     _handleScoutClick(sx, sy);
     return;
@@ -146,13 +236,12 @@ function _onMouseDown(e) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   Handle scout mode click (capture building coordinates)
+   Handle scout mode click
 ════════════════════════════════════════════════════════════ */
 function _handleScoutClick(sx, sy) {
   const wp = s2w(sx, sy);
   const VS = _deps.VS;
   
-  // Check if clicked on a building
   for (var i = 0; i < VS.buildings.length; i++) {
     const bld = VS.buildings[i];
     const sc = perspScale(bld.y);
@@ -162,7 +251,6 @@ function _handleScoutClick(sx, sy) {
     if (wp.x >= bld.x - w && wp.x <= bld.x + w && 
         wp.y >= bld.y - h && wp.y <= bld.y + h && bld.hp > 0) {
       
-      // Capture coordinates
       const zones = ['SENTRO', 'HILAGA', 'TIMOG', 'SILANGAN', 'KANLURAN'];
       const zone = zones[Math.floor(Math.random() * zones.length)];
       const name = 'Nayon ni ' + ['Juan', 'Maria', 'Pedro', 'Ana'][Math.floor(Math.random() * 4)];
@@ -176,22 +264,18 @@ function _handleScoutClick(sx, sy) {
         buildingLevel: bld.level
       };
       
-      // Show feedback
       if (_deps.showMsg) {
         _deps.showMsg(`📍 Coordinates: X:${_missileInput.capturedCoords.x}, Y:${_missileInput.capturedCoords.y}, ZONE:${zone}`, 'success');
       }
       
-      // Auto-copy to clipboard
       if (navigator.clipboard) {
         const coordStr = `X:${_missileInput.capturedCoords.x}, Y:${_missileInput.capturedCoords.y}, ZONE:${zone}`;
         navigator.clipboard.writeText(coordStr).catch(function() {});
       }
       
-      // Exit scout mode after capture
       _missileInput.scoutMode = false;
       if (window.exitScoutMode) window.exitScoutMode();
       
-      // Open missile panel with pre-filled coords
       if (window.openMissilePanel) {
         window.openMissilePanel({
           targetX: parseFloat(_missileInput.capturedCoords.x),
@@ -205,7 +289,6 @@ function _handleScoutClick(sx, sy) {
     }
   }
   
-  // Clicked empty space - exit scout mode
   _missileInput.scoutMode = false;
   if (window.exitScoutMode) window.exitScoutMode();
   if (_deps.showMsg) _deps.showMsg('Scout mode cancelled.', 'info');
@@ -221,7 +304,6 @@ function _onMouseMove(e) {
   const drawer = _deps.getDrawer();
   const VS     = _deps.VS;
 
-  /* Hover‑to‑stop villager */
   if (!_drag.active) {
     const wp   = s2w(_mouseX, _mouseY);
     const VT   = _deps.VILLAGER_TYPES;
@@ -242,7 +324,6 @@ function _onMouseMove(e) {
     _hoveredVillager = found;
   }
 
-  /* Cursor style - add military building hover */
   if (mode === 'build_shop' || mode === 'move_building') {
     _canvas.style.cursor = 'crosshair';
   } else if (!_drag.active) {
@@ -252,7 +333,6 @@ function _onMouseMove(e) {
     });
     const overArrow = !!getZoneArrowAt(wp3.x, wp3.y, VS);
     
-    // Check for military building hover
     let overMilitary = false;
     if (VS.buildings) {
       for (var mi = 0; mi < VS.buildings.length; mi++) {
@@ -280,17 +360,43 @@ function _onMouseMove(e) {
     }
   }
 
-  /* Move‑building live follow — snapshot origin on first move ─────────── */
+  /* Move-building live follow with overlap AND zone check */
   if (mode === 'move_building' && drawer.target) {
-    /* Capture original position once so _processClick can revert */
     if (drawer.target._moveOriginX === undefined) {
       drawer.target._moveOriginX = drawer.target.x;
       drawer.target._moveOriginY = drawer.target.y;
     }
     const wpM = s2w(_mouseX, _mouseY);
+    
+    // CHECK 1: Overlap with other buildings' max footprints
+    var overlapCheck = _checkBuildingOverlap(
+      drawer.target.type,
+      wpM.x,
+      wpM.y,
+      VS.buildings,
+      drawer.target
+    );
+    
+    // CHECK 2: Zone boundary for zone-locked buildings
+    var zoneCheck = _checkZoneBoundary(drawer.target.type, wpM.x, wpM.y, VS);
+    
+    // Store state for renderer to show green/red footprint
+    drawer.target._hasOverlap = overlapCheck.overlap;
+    drawer.target._overlapMsg = overlapCheck.msg;
+    drawer.target._overlapBuilding = overlapCheck.overlapBuilding;
+    drawer.target._zoneViolation = !zoneCheck.ok;
+    drawer.target._zoneMsg = zoneCheck.msg;
+    
+    // Change cursor based on validity
+    if (overlapCheck.overlap || !zoneCheck.ok) {
+      _canvas.style.cursor = 'not-allowed';
+    } else {
+      _canvas.style.cursor = 'crosshair';
+    }
+    
+    // Still update position for visual feedback (will be rejected on drop)
     drawer.target.x = clamp(wpM.x, 40, window._VW - 40);
     drawer.target.y = clamp(wpM.y, 40, window._VH - 80);
-    _canvas.style.cursor = 'crosshair';
     return;
   }
 
@@ -301,14 +407,12 @@ function _onMouseMove(e) {
   if (!_drag.moved && Math.sqrt(dx*dx + dy*dy) > 8) _drag.moved = true;
   if (!_drag.moved) return;
 
-  /* Drag a building */
   if (_drag.building && (mode === 'move_building' || (mode === 'view' && !drawer.visible))) {
     const wp2 = s2w(_mouseX, _mouseY);
     _drag.building.x = clamp(wp2.x - _drag.bldOffX, 40, window._VW - 40);
     _drag.building.y = clamp(wp2.y - _drag.bldOffY, 40, window._VH - 80);
     _canvas.style.cursor = 'move';
 
-  /* ── Camera pan — ALWAYS allowed at ANY zoom level ────────── */
   } else if (!_drag.building) {
     const panScale = 1 / Math.max(cam.zoom, 0.1);
     cam.followTarget = null;
@@ -377,13 +481,23 @@ function _processClick(sx, sy) {
   _lastClickX    = sx;
   _lastClickY    = sy;
 
-  /* Place building — show procurement modal */
+  /* Place building — CHECK OVERLAP FIRST */
   if (mode === 'build_shop') {
     const bt  = _deps.getPendingBuildType();
     const wp  = s2w(sx, sy);
+    
+    // CHECK 1: Overlap with max upgrade footprint
+    var overlapCheck = _checkBuildingOverlap(bt, wp.x, wp.y, _deps.VS.buildings, null);
+    if (overlapCheck.overlap) {
+      _deps.showMsg('⚠️ ' + overlapCheck.msg);
+      return;  // BLOCK PLACEMENT
+    }
+    
+    // CHECK 2: Zone/hall requirements
     const chk = _deps.canPlaceBuilding(bt, _deps.VS.buildings, wp.x, wp.y,
       _deps.VS.unlockedZones || [], getZoneAt);
     if (!chk.ok) { _deps.showMsg(chk.msg); return; }
+    
     const bdef  = _deps.BUILDING_DEFS[bt] || {};
     const btime = bdef.buildTime || 60;
     const VS    = _deps.VS;
@@ -423,48 +537,82 @@ function _processClick(sx, sy) {
     return;
   }
 
-  /* Drop building after move — validate zone before committing ───────────
-     Save original position first so we can revert if the new spot
-     fails canPlaceBuilding (zone ownership, hall level, cap).         */
+  /* Drop building after move — CHECK OVERLAP AND ZONE */
   if (mode === 'move_building') {
     const wp0    = s2w(sx, sy);
     const drawer = _deps.getDrawer();
     const bld    = drawer ? drawer.target : null;
 
     if (bld) {
-      /* Snapshot original position */
       const origX = bld._moveOriginX !== undefined ? bld._moveOriginX : bld.x;
       const origY = bld._moveOriginY !== undefined ? bld._moveOriginY : bld.y;
 
-      /* Clamp proposed drop position */
       const newX = clamp(wp0.x, 40, window._VW - 40);
       const newY = clamp(wp0.y, 40, window._VH - 80);
 
-      /* Run zone + hall-level + cap validation */
-      const VS       = _deps.VS;
-      const chkMove  = _deps.canPlaceBuilding(
+      // CHECK 1: Overlap with other buildings' max footprints
+      var overlapCheck = _checkBuildingOverlap(
         bld.type,
-        VS.buildings,
         newX, newY,
-        VS.unlockedZones || [],
-        getZoneAt,
+        _deps.VS.buildings,
+        bld
       );
-
-      if (!chkMove.ok) {
-        /* Revert to original position */
+      
+      if (overlapCheck.overlap) {
+        // REVERT - BLOCK THE MOVE
         bld.x = origX;
         bld.y = origY;
-        _deps.showMsg('Hindi mailipat: ' + chkMove.msg);
+        _deps.showMsg('⚠️ Hindi mailipat: ' + overlapCheck.msg);
       } else {
-        /* Commit new position */
-        bld.x = newX;
-        bld.y = newY;
-        _deps.showMsg(bld.getDef().label + ' inilipat!');
+        // CHECK 2: Zone boundary for zone-locked buildings
+        var zoneCheck = _checkZoneBoundary(bld.type, newX, newY, _deps.VS);
+        
+        if (!zoneCheck.ok) {
+          // REVERT - BLOCK THE MOVE
+          bld.x = origX;
+          bld.y = origY;
+          _deps.showMsg('⚠️ Hindi mailipat: ' + zoneCheck.msg);
+        } else {
+          // CHECK 3: General zone requirements (via canPlaceBuilding without hall check)
+          const VS = _deps.VS;
+          var canMove = true;
+          var moveMsg = '';
+          
+          // Check zone requirement for zone-locked buildings
+          var def = bld.getDef();
+          if (def.requiredZone) {
+            var zones = VS.unlockedZones || [];
+            if (zones.indexOf(def.requiredZone) === -1) {
+              canMove = false;
+              moveMsg = def.label + ' ay nangangailangan ng ' + def.requiredZone + ' zone.';
+            } else if (typeof getZoneAt === 'function') {
+              var zoneAtPos = getZoneAt(newX, newY);
+              if (zoneAtPos !== def.requiredZone) {
+                canMove = false;
+                moveMsg = def.label + ' ay dapat ilagay sa loob ng ' + def.requiredZone + ' zone.';
+              }
+            }
+          }
+          
+          if (!canMove) {
+            bld.x = origX;
+            bld.y = origY;
+            _deps.showMsg('Hindi mailipat: ' + moveMsg);
+          } else {
+            bld.x = newX;
+            bld.y = newY;
+            _deps.showMsg(bld.getDef().label + ' inilipat!');
+          }
+        }
       }
 
-      /* Clean up saved origin */
       delete bld._moveOriginX;
       delete bld._moveOriginY;
+      delete bld._hasOverlap;
+      delete bld._overlapMsg;
+      delete bld._overlapBuilding;
+      delete bld._zoneViolation;
+      delete bld._zoneMsg;
     }
 
     _deps.setGameMode('view');
@@ -517,7 +665,7 @@ function _processClick(sx, sy) {
     }
   }
 
-  /* Resource bubbles - LANGIS (FIXED) */
+  /* Resource bubbles - LANGIS */
   for (var bc = 0; bc < VS.buildings.length; bc++) {
     const bld2 = VS.buildings[bc];
     const sc2  = perspScale(bld2.y);
@@ -527,7 +675,6 @@ function _processClick(sx, sy) {
       const bw2 = bld2.w * sc2;
       let xOff = 0;
       
-      // Determine offset based on other indicators (matches building.js draw logic)
       const hasGold = (bld2.uncollectedGold || 0) >= 5;
       const hasFood = (bld2.uncollectedFood || 0) >= 5;
       
@@ -539,7 +686,6 @@ function _processClick(sx, sy) {
         xOff = -bw2 * 0.35;
       }
       
-      // Langis indicator position with bob animation (matches building.js)
       const bobL = Math.sin(Date.now() / 800 + bld2.x + 2) * 3 * sc2;
       const indicatorX = bld2.x + xOff;
       const indicatorY = bld2.y - bh2 * 1.55 + bobL;
@@ -555,23 +701,19 @@ function _processClick(sx, sy) {
     }
   }
 
-  /* Military building click - Missile Silo / Radar / Interceptor */
+  /* Military building click */
   for (var mb = 0; mb < VS.buildings.length; mb++) {
     const bld = VS.buildings[mb];
     const def = bld.getDef ? bld.getDef() : null;
     const sc = perspScale(bld.y);
     
     if (def && dist(wp2.x, wp2.y, bld.x, bld.y) < bld.w * sc * 0.65 && bld.hp > 0) {
-      
-      // Missile Silo - open missile panel
       if (def.missileCapacity !== undefined) {
         if (window.openMissilePanel) {
           window.openMissilePanel({ building: bld });
         }
         return;
       }
-      
-      // Radar Station - show detection status
       if (def.detectionRange !== undefined) {
         if (_deps.showMsg) {
           const stats = bld.getStats();
@@ -579,8 +721,6 @@ function _processClick(sx, sy) {
         }
         return;
       }
-      
-      // Interceptor Battery - show defense status
       if (def.interceptBaseChance !== undefined) {
         if (_deps.showMsg) {
           const stats = bld.getStats();
@@ -603,7 +743,7 @@ function _processClick(sx, sy) {
     }
   }
 
-  /* ── Zone arrow click — show purchase confirmation ────────── */
+  /* Zone arrow click */
   const zoneKey = getZoneArrowAt(wp2.x, wp2.y, VS);
   if (zoneKey) {
     _showZonePurchaseModal(zoneKey);
@@ -636,13 +776,12 @@ function _onRightClick(e) {
   if (cam.focused) _deps.closeDrawer();
 }
 
-/* ── Zone purchase confirmation modal ────────────────────────── */
+/* ── Zone purchase modal ────────────────────────────────────── */
 function _showZonePurchaseModal(key) {
   var VS  = _deps.VS;
   var def = ZONE_DEFS[key];
   if (!def) return;
 
-  /* Check hall requirement */
   var mhLv = 1;
   (VS.buildings || []).forEach(function(b) {
     if (b.type === 'mainHall') mhLv = Math.max(mhLv, b.level || 1);
@@ -654,11 +793,9 @@ function _showZonePurchaseModal(key) {
     (VS.res.rice  || 0) >= def.cost.rice &&
     (VS.res.langis|| 0) >= def.cost.langis;
 
-  /* Remove any existing zone-purchase modal */
   var existing = document.getElementById('_zonePurchaseModal');
   if (existing) existing.remove();
 
-  /* Build modal DOM */
   var overlay = document.createElement('div');
   overlay.id = '_zonePurchaseModal';
   overlay.style.cssText = [
@@ -668,7 +805,6 @@ function _showZonePurchaseModal(key) {
     'animation:_zpFadeIn 0.18s ease;',
   ].join('');
 
-  /* Inject keyframe once */
   if (!document.getElementById('_zpStyles')) {
     var st = document.createElement('style');
     st.id  = '_zpStyles';
@@ -704,44 +840,27 @@ function _showZonePurchaseModal(key) {
   ].join('');
 
   card.innerHTML = [
-    /* Arrow icon bouncing at top */
     '<div style="text-align:center;margin-bottom:4px;">',
     '  <span style="font-size:2.2rem;display:inline-block;',
     canAfford ? 'animation:_zpBounce 1.1s ease-in-out infinite;' : '',
     '">', def.icon, '</span>',
     '</div>',
-
-    /* Zone name */
     '<h2 style="text-align:center;margin:0 0 4px;font-size:1.2rem;',
     'color:#f5c842;text-shadow:0 1px 6px rgba(245,200,66,0.4);">',
     def.label, '</h2>',
-
-    /* Specialty tag */
     '<div style="text-align:center;margin-bottom:14px;">',
     '<span style="background:#2a1e08;border:1px solid #6a4a18;',
     'border-radius:20px;padding:2px 12px;font-size:0.72rem;color:#c8a050;letter-spacing:.05em;">',
     (def.sign || def.specialty.toUpperCase()), '</span></div>',
-
-    /* Description */
     '<p style="font-size:0.82rem;color:#c8b880;margin:0 0 14px;',
     'text-align:center;line-height:1.5;">', def.desc, '</p>',
-
-    /* Divider */
     '<div style="border-top:1px solid rgba(138,96,48,0.4);margin-bottom:14px;"></div>',
-
-    /* Hall requirement */
     '<div style="font-size:0.78rem;margin-bottom:8px;text-align:center;">', hallMsg, '</div>',
-
-    /* Cost */
     '<div style="text-align:center;margin-bottom:18px;">',
     '<span style="font-size:0.78rem;color:#a08848;">Gastos: </span>',
     '<span style="font-size:0.9rem;font-weight:bold;color:#f5c842;">', costLine, '</span>',
     '</div>',
-
-    /* Not-affordable note */
     (!canAfford && hallOk) ? '<div style="text-align:center;font-size:0.75rem;color:#ff9a7a;margin-bottom:14px;">Hindi sapat ang mga yaman.</div>' : '',
-
-    /* Buttons */
     '<div style="display:flex;gap:10px;justify-content:center;">',
     '<button id="_zpCancel" style="',
     'flex:1;padding:10px 0;border-radius:8px;border:1px solid #6a4a18;',
@@ -758,7 +877,6 @@ function _showZonePurchaseModal(key) {
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 
-  /* Close helpers */
   function _close() {
     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
   }
@@ -781,7 +899,6 @@ function _showZonePurchaseModal(key) {
       }
     });
 
-    /* Hover glow for confirm button */
     confirmBtn.addEventListener('mouseenter', function() { this.style.opacity = '0.85'; });
     confirmBtn.addEventListener('mouseleave', function() { this.style.opacity = '1'; });
   }
@@ -791,11 +908,9 @@ function _showZonePurchaseModal(key) {
 function _onKeyDown(e) {
   if (e.key !== 'Escape') return;
 
-  /* Close zone purchase modal if open */
   var zm = document.getElementById('_zonePurchaseModal');
   if (zm) { zm.parentNode && zm.parentNode.removeChild(zm); return; }
 
-  /* Exit scout mode if active */
   if (_missileInput.scoutMode) {
     _missileInput.scoutMode = false;
     if (window.exitScoutMode) window.exitScoutMode();
@@ -841,7 +956,7 @@ function _onWheel(e) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   TOUCH HANDLERS — using scaled coordinates
+   TOUCH HANDLERS
 ══════════════════════════════════════════════════════════════ */
 function _getTouch(list, id) {
   for (var i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i];
@@ -881,7 +996,6 @@ function _onTouchStart(e) {
     _touch.moved     = false;
     _mouseX = pos.x; _mouseY = pos.y;
     
-    /* Handle scout mode touch */
     if (_missileInput.scoutMode) {
       _handleScoutClick(pos.x, pos.y);
       return;
@@ -945,12 +1059,30 @@ function _onTouchMove(e) {
   const drawer = _deps.getDrawer();
 
   if (mode === 'move_building' && drawer && drawer.target) {
-    /* Capture original position once so _processClick can revert */
     if (drawer.target._moveOriginX === undefined) {
       drawer.target._moveOriginX = drawer.target.x;
       drawer.target._moveOriginY = drawer.target.y;
     }
     const wpM = s2w(pos.x, pos.y);
+    
+    // Check overlap (touch version)
+    var overlapCheck = _checkBuildingOverlap(
+      drawer.target.type,
+      wpM.x,
+      wpM.y,
+      _deps.VS.buildings,
+      drawer.target
+    );
+    
+    // Check zone boundary (touch version)
+    var zoneCheck = _checkZoneBoundary(drawer.target.type, wpM.x, wpM.y, _deps.VS);
+    
+    drawer.target._hasOverlap = overlapCheck.overlap;
+    drawer.target._overlapMsg = overlapCheck.msg;
+    drawer.target._overlapBuilding = overlapCheck.overlapBuilding;
+    drawer.target._zoneViolation = !zoneCheck.ok;
+    drawer.target._zoneMsg = zoneCheck.msg;
+    
     drawer.target.x = clamp(wpM.x, 40, window._VW - 40);
     drawer.target.y = clamp(wpM.y, 40, window._VH - 80);
     return;

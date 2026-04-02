@@ -2,35 +2,20 @@
    Mini Bayan — buildings/sprites/palengke.js
 
    Palengke (Market) — Level 1–5 sprites
-   Faithful recreation of the designs from palengke-levels.html
-   with proper perspective scaling (sc) and positioning relative
-   to building origin (x=0, y=0 at ground level).
-
-   LEVEL 1 — Tindahan (simple store)
-   LEVEL 2 — Palengke (basic market with stalls)
-   LEVEL 3 — Palengke Sentral (covered market hall)
-   LEVEL 4 — Merkado (two-storey public market)
-   LEVEL 5 — Grand Merkado (grand market complex with clock tower)
-
-   Each level uses dimensions proportional to the building's
-   def.w / def.h scaled by `sc` parameter for consistent sizing.
+   MODIFIED: 7-Eleven Style Conversion
+   Each level now represents a 7-Eleven convenience store with
+   iconic orange/white/green/red branding.
+   Level 1: Small 7-Eleven kiosk
+   Level 2: Standard 7-Eleven store
+   Level 3: 7-Eleven with gas station canopy
+   Level 4: Two-storey 7-Eleven with signage tower
+   Level 5: Grand 7-Eleven flagship with digital signage and coffee bar
 ═══════════════════════════════════════════════════════════════ */
 
 /* ─────────────────────────────────────────────────────────────
    drawSprite — main entry point for buildingSprites.js
-   @param ctx      Canvas 2D context (already translated to building origin)
-   @param sc       perspective scale (from perspScale)
-   @param w        scaled building width  (def.w * sc)
-   @param h        scaled building height (def.h * sc)
-   @param def      BUILDING_DEFS entry
-   @param level    building.level (1–5)
-   @param now      performance.now() timestamp for animations
 ──────────────────────────────────────────────────────────────── */
 export function drawSprite(ctx, sc, w, h, def, level, now) {
-  // Use w/h as primary dimensions — they already include sc scaling
-  // The HTML designs used fixed pixel dimensions; we adapt them proportionally.
-  // We'll use the same coordinate system as building.js: origin at ground center,
-  // positive Y down, negative Y up.
   const t = now * 0.001;
 
   // Helper: draw shadow ellipse at ground level
@@ -41,11 +26,11 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
     ctx.fill();
   };
 
-  // Helper: standard window with crossbars
+  // Helper: standard window with crossbars (7-Eleven style tinted)
   const stdWin = (x, y, winW, winH) => {
-    ctx.fillStyle = 'rgba(180,220,255,0.55)';
+    ctx.fillStyle = 'rgba(70,130,200,0.65)';
     ctx.fillRect(x, y, winW, winH);
-    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
     ctx.lineWidth = 0.7 * sc;
     ctx.beginPath();
     ctx.moveTo(x + winW / 2, y);
@@ -57,752 +42,516 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
     ctx.stroke();
   };
 
-  // Helper: awning over a stall section
-  const awning = (x, y, awW, awH, color) => {
-    ctx.fillStyle = color || '#cc3322';
+  // Helper: 7-Eleven awning (striped red/green/orange)
+  const sevenAwning = (x, y, awW, awH, hasStripes = true) => {
+    // Base awning
+    ctx.fillStyle = '#e6332a';
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(x + awW, y);
-    ctx.lineTo(x + awW + 4 * sc, y + awH);
-    ctx.lineTo(x - 4 * sc, y + awH);
+    ctx.lineTo(x + awW + 3 * sc, y + awH);
+    ctx.lineTo(x - 3 * sc, y + awH);
     ctx.closePath();
     ctx.fill();
-    // stripes
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    for (let s = 0; s < 4; s++) {
-      const sx = x + s * (awW / 4);
-      ctx.beginPath();
-      ctx.moveTo(sx, y);
-      ctx.lineTo(sx + awW / 4, y);
-      ctx.lineTo(sx + awW / 4 + 4 * sc, y + awH);
-      ctx.lineTo(sx + 4 * sc, y + awH);
-      ctx.closePath();
-      if (s % 2 === 0) ctx.fill();
+    
+    if (hasStripes) {
+      // 7-Eleven stripes
+      const stripeColors = ['#e6332a', '#ff8c00', '#2c9e3d'];
+      for (let s = 0; s < 6; s++) {
+        const sx = x + s * (awW / 6);
+        ctx.fillStyle = stripeColors[s % 3];
+        ctx.beginPath();
+        ctx.moveTo(sx, y);
+        ctx.lineTo(sx + awW / 6, y);
+        ctx.lineTo(sx + awW / 6 + 3 * sc, y + awH);
+        ctx.lineTo(sx + 3 * sc, y + awH);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
   };
 
-  // Helper: hanging pennant string
-  const pennants = (x1, y1, x2, y2, colors, animTime) => {
-    const tAnim = animTime * 0.001;
-    ctx.strokeStyle = 'rgba(180,180,180,0.4)';
-    ctx.lineWidth = 0.6 * sc;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.quadraticCurveTo((x1 + x2) / 2, (y1 + y2) / 2 + 8 * sc, x2, y2);
-    ctx.stroke();
-    for (let i = 0; i < colors.length; i++) {
-      const p = (i + 0.5) / colors.length;
-      let px = x1 + (x2 - x1) * p;
-      let py = y1 + (y2 - y1) * p + Math.sin(Math.PI * p) * 8 * sc + Math.sin(tAnim * 1.2 + i) * 1.5 * sc;
-      ctx.fillStyle = colors[i];
-      ctx.beginPath();
-      ctx.moveTo(px - 3 * sc, py);
-      ctx.lineTo(px + 3 * sc, py);
-      ctx.lineTo(px, py + 6 * sc);
-      ctx.closePath();
-      ctx.fill();
-    }
-  };
-
-  // Helper: sign board
-  const sign = (x, y, signW, signH, text, bgc, tc) => {
-    ctx.fillStyle = bgc || '#1a3a6a';
+  // Helper: 7-Eleven sign
+  const sevenSign = (x, y, signW, signH, isVertical = false) => {
+    // White background
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, y, signW, signH);
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = 0.7 * sc;
+    ctx.strokeStyle = '#e6332a';
+    ctx.lineWidth = 1.2 * sc;
     ctx.strokeRect(x, y, signW, signH);
-    ctx.fillStyle = tc || '#ffffff';
-    ctx.font = `bold ${Math.max(8, signH * 0.62)}px 'Bebas Neue',sans-serif`;
+    
+    // 7-ELEVEN text
+    ctx.fillStyle = '#e6332a';
+    const fontSize = Math.max(9, signH * 0.55);
+    ctx.font = `bold ${fontSize}px 'Bebas Neue', 'Arial Black', sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + signW / 2, y + signH / 2 + 0.5 * sc);
+    ctx.fillText('7', x + signW * 0.3, y + signH / 2);
+    ctx.fillStyle = '#2c9e3d';
+    ctx.fillText('ELEVEN', x + signW * 0.65, y + signH / 2);
+    
     ctx.textBaseline = 'alphabetic';
   };
 
-  // Helper: arch over opening
-  const arch = (cx, baseY, archW, fill, stroke) => {
-    ctx.fillStyle = fill || 'rgba(20,40,80,0.7)';
+  // Helper: 7-Eleven logo (simplified)
+  const sevenLogo = (x, y, size) => {
+    ctx.fillStyle = '#e6332a';
     ctx.beginPath();
-    ctx.rect(cx - archW / 2, baseY, archW, archW * 0.6);
-    ctx.arc(cx, baseY, archW / 2, Math.PI, 0, true);
+    ctx.arc(x, y, size, 0, Math.PI * 2);
     ctx.fill();
-    if (stroke) {
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = 1 * sc;
-      ctx.beginPath();
-      ctx.rect(cx - archW / 2, baseY, archW, archW * 0.6);
-      ctx.arc(cx, baseY, archW / 2, Math.PI, 0, true);
-      ctx.stroke();
-    }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${size * 1.2}px 'Bebas Neue', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('7', x, y + 1);
+    ctx.textBaseline = 'alphabetic';
   };
 
-  // Helper: draw ground shadow and base platform
+  // Helper: gas pump (for level 3+)
+  const gasPump = (x, y) => {
+    ctx.fillStyle = '#2c6e9e';
+    ctx.fillRect(x, y - 10 * sc, 6 * sc, 14 * sc);
+    ctx.fillStyle = '#cccccc';
+    ctx.fillRect(x + 1 * sc, y - 8 * sc, 4 * sc, 5 * sc);
+    ctx.fillStyle = '#e6332a';
+    ctx.beginPath();
+    ctx.arc(x + 3 * sc, y - 2 * sc, 2 * sc, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  // Helper: coffee cup (for level 5)
+  const coffeeCup = (x, y) => {
+    ctx.fillStyle = '#f5f5dc';
+    ctx.fillRect(x, y - 6 * sc, 5 * sc, 8 * sc);
+    ctx.fillStyle = '#8b4513';
+    ctx.fillRect(x + 1 * sc, y - 8 * sc, 3 * sc, 3 * sc);
+    ctx.fillStyle = '#2c9e3d';
+    ctx.beginPath();
+    ctx.arc(x + 2.5 * sc, y - 3 * sc, 1.5 * sc, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  // Helper: draw base and ground shadow
   const drawBase = () => {
     drawShadow(w * 0.62, h * 0.12);
-    // subtle ground shadow under building
     ctx.fillStyle = 'rgba(0,0,0,0.04)';
     ctx.fillRect(-w / 2 - 4, 0, w + 8, 4 * sc);
   };
 
-  // Dispatch based on level
   switch (level) {
     case 1:
-      drawLv1(ctx, sc, w, h, def, t, { drawBase, stdWin, awning, sign, arch, pennants });
+      drawSevenLv1(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo });
       break;
     case 2:
-      drawLv2(ctx, sc, w, h, def, t, { drawBase, stdWin, awning, sign, arch, pennants });
+      drawSevenLv2(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo });
       break;
     case 3:
-      drawLv3(ctx, sc, w, h, def, t, { drawBase, stdWin, awning, sign, arch, pennants });
+      drawSevenLv3(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump });
       break;
     case 4:
-      drawLv4(ctx, sc, w, h, def, t, { drawBase, stdWin, awning, sign, arch, pennants });
+      drawSevenLv4(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump });
       break;
     case 5:
-      drawLv5(ctx, sc, w, h, def, t, { drawBase, stdWin, awning, sign, arch, pennants });
+      drawSevenLv5(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump, coffeeCup });
       break;
     default:
-      // fallback to generic if level out of range
-      drawLv1(ctx, sc, w, h, def, t, { drawBase, stdWin, awning, sign, arch, pennants });
+      drawSevenLv1(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo });
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LEVEL 1 — Tindahan (simple store)
-   Dimensions: w = def.w * sc, h = def.h * sc
-   Based on HTML LV1: w=52, h=38 in original fixed pixels
+   LEVEL 1 — 7-Eleven Kiosk
+   Small corner store with signature slanted roof and branding
 ═══════════════════════════════════════════════════════════════ */
-function drawLv1(ctx, sc, w, h, def, t, helpers) {
-  const { drawBase, stdWin, awning } = helpers;
+function drawSevenLv1(ctx, sc, w, h, def, t, helpers) {
+  const { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo } = helpers;
   drawBase();
 
-  // Wall (color from def: #6090c8)
-  ctx.fillStyle = def.wallColor;
+  // Main wall (white with orange accent)
+  ctx.fillStyle = '#f8f8f8';
   ctx.fillRect(-w / 2, -h * 0.55, w, h * 0.67);
-  // Wall shading
-  const ws = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
-  ws.addColorStop(0, 'rgba(0,0,0,0)');
-  ws.addColorStop(0.7, 'rgba(0,0,0,0)');
-  ws.addColorStop(1, 'rgba(0,0,0,0.18)');
-  ctx.fillStyle = ws;
-  ctx.fillRect(-w / 2, -h * 0.55, w, h * 0.67);
-
-  // Roof (gable)
-  ctx.fillStyle = def.roofColor;
+  
+  // Orange accent stripe at bottom
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(-w / 2, 0, w, 5 * sc);
+  
+  // Slanted roof (modern style)
+  ctx.fillStyle = '#2c6e9e';
   ctx.beginPath();
   ctx.moveTo(-w * 0.58, -h * 0.55);
-  ctx.lineTo(0, -h * 1.12);
+  ctx.lineTo(0, -h * 1.08);
   ctx.lineTo(w * 0.58, -h * 0.55);
   ctx.closePath();
   ctx.fill();
-
-  // Roof ridge highlight
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.beginPath();
-  ctx.moveTo(-w * 0.1, -h * 0.55);
-  ctx.lineTo(0, -h * 1.12);
-  ctx.lineTo(w * 0.1, -h * 0.55);
-  ctx.closePath();
-  ctx.fill();
-
-  // Door
-  ctx.fillStyle = 'rgba(20,40,80,0.7)';
-  const dw = 10 * sc;
-  const dh = h * 0.34;
-  ctx.beginPath();
-  ctx.rect(-dw / 2, -dh, dw, dh);
-  ctx.arc(0, -dh, dw / 2, Math.PI, 0, true);
-  ctx.fill();
-
-  // Windows
-  stdWin(-w * 0.38, -h * 0.48, 10 * sc, 8 * sc);
-  stdWin(w * 0.23, -h * 0.48, 10 * sc, 8 * sc);
-
-  // Small awning above door
-  awning(-8 * sc, -h * 0.36, 16 * sc, 6 * sc, '#cc3322');
-
-  // Goods outside
-  ctx.fillStyle = '#c8a030';
-  ctx.fillRect(-w * 0.5 + 2 * sc, 0, 8 * sc, 4 * sc);
-  ctx.fillStyle = '#e8b840';
-  ctx.beginPath();
-  ctx.arc(-w * 0.5 + 6 * sc, -2 * sc, 4 * sc, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Label
-  ctx.fillStyle = 'rgba(200,225,255,0.85)';
-  ctx.font = `${9 * sc}px 'Crimson Pro',serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('Tindahan', 0, h * 0.26);
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LEVEL 2 — Palengke
-   Wider structure with front stall awnings and pennant flags
-═══════════════════════════════════════════════════════════════ */
-function drawLv2(ctx, sc, w, h, def, t, helpers) {
-  const { drawBase, stdWin, awning, sign, pennants } = helpers;
-  drawBase();
-
-  // Left stall counter
-  ctx.fillStyle = '#4a7ab0';
-  ctx.fillRect(-w / 2, -h * 0.4, w * 0.32, h * 0.4);
-  awning(-w / 2, -h * 0.4, w * 0.32 + 2 * sc, 9 * sc, '#cc3322');
-  ctx.fillStyle = '#5080b8';
-  ctx.fillRect(-w / 2 + 2 * sc, 0, w * 0.3, 4 * sc);
-
-  // Right stall counter
-  ctx.fillStyle = '#4a7ab0';
-  ctx.fillRect(w * 0.16, -h * 0.4, w * 0.34, h * 0.4);
-  awning(w * 0.16, -h * 0.4, w * 0.34 + 2 * sc, 9 * sc, '#2255aa');
-  ctx.fillStyle = '#5080b8';
-  ctx.fillRect(w * 0.18, 0, w * 0.3, 4 * sc);
-
-  // Main walls
-  ctx.fillStyle = def.wallColor;
-  ctx.fillRect(-w / 2, -h * 0.55, w, h * 0.67);
-  const ws = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
-  ws.addColorStop(0, 'rgba(0,0,0,0)');
-  ws.addColorStop(0.75, 'rgba(0,0,0,0)');
-  ws.addColorStop(1, 'rgba(0,0,0,0.16)');
-  ctx.fillStyle = ws;
-  ctx.fillRect(-w / 2, -h * 0.55, w, h * 0.67);
-
-  // Gable roof (steeper)
-  ctx.fillStyle = def.roofColor;
-  ctx.beginPath();
-  ctx.moveTo(-w * 0.56, -h * 0.55);
-  ctx.lineTo(0, -h * 1.18);
-  ctx.lineTo(w * 0.56, -h * 0.55);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.07)';
-  ctx.beginPath();
-  ctx.moveTo(-w * 0.08, -h * 0.55);
-  ctx.lineTo(0, -h * 1.18);
-  ctx.lineTo(w * 0.08, -h * 0.55);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#1a4080';
-  ctx.fillRect(-w * 0.58, -h * 0.555, w * 1.16, h * 0.035);
-
-  // Door
-  ctx.fillStyle = 'rgba(20,40,80,0.7)';
-  const dw = 11 * sc;
-  const dh = h * 0.36;
-  ctx.beginPath();
-  ctx.rect(-dw / 2, -dh, dw, dh);
-  ctx.arc(0, -dh, dw / 2, Math.PI, 0, true);
-  ctx.fill();
-
-  // Windows
-  stdWin(-w * 0.4, -h * 0.46, 11 * sc, 9 * sc);
-  stdWin(w * 0.24, -h * 0.46, 11 * sc, 9 * sc);
-
-  // Pennant string across front
-  pennants(-w * 0.5, -h * 0.42, w * 0.5, -h * 0.42,
-    ['#cc2222', '#f5c842', '#2255aa', '#44aa44', '#cc2222', '#f5c842'], t);
-
-  // Goods on counters
-  ['#e8b840', '#44aa44', '#e84040', '#f5a020'].forEach((c, i) => {
-    ctx.fillStyle = c;
-    ctx.beginPath();
-    ctx.arc(-w / 2 + 6 * sc + i * 7 * sc, -2 * sc, 3.5 * sc, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // Sign
-  sign(-w * 0.28, -h * 0.56, w * 0.56, 9 * sc, 'PALENGKE', '#1a3a6a', '#f5c842');
-
-  // Label
-  ctx.fillStyle = 'rgba(200,225,255,0.82)';
-  ctx.font = `${9 * sc}px 'Crimson Pro',serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('Palengke', 0, h * 0.26);
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LEVEL 3 — Palengke Sentral
-   Covered market hall: wide hipped roof, two side wings, busy stalls
-═══════════════════════════════════════════════════════════════ */
-function drawLv3(ctx, sc, w, h, def, t, helpers) {
-  const { drawBase, stdWin, awning, sign, arch, pennants } = helpers;
-  drawBase();
-
-  const wgW = 20 * sc;
-  const wgH = 36 * sc;
-
-  // Side wing function
-  const stallWing = (lx) => {
-    ctx.fillStyle = '#4060a0';
-    ctx.fillRect(lx + 2 * sc, -wgH, 4 * sc, wgH);
-    ctx.fillRect(lx + wgW - 6 * sc, -wgH, 4 * sc, wgH);
-    ctx.fillStyle = 'rgba(64,90,160,0.4)';
-    ctx.fillRect(lx + 6 * sc, -wgH, wgW - 12 * sc, wgH);
-    // Canopy roof
-    ctx.fillStyle = '#1a3878';
-    ctx.beginPath();
-    ctx.moveTo(lx, -wgH - 2 * sc);
-    ctx.lineTo(lx + wgW + 2 * sc, -wgH + 4 * sc);
-    ctx.lineTo(lx + wgW + 2 * sc, 0);
-    ctx.lineTo(lx, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(80,130,220,0.3)';
-    ctx.lineWidth = 1 * sc;
-    for (let ri = 0; ri < 4; ri++) {
-      const ry = -wgH - 2 * sc + ri * (wgH + 6 * sc) / 4;
-      ctx.beginPath();
-      ctx.moveTo(lx, ry);
-      ctx.lineTo(lx + wgW + 2 * sc, ry + (wgH + 6 * sc) / 4 * 0.25);
-      ctx.stroke();
-    }
-    // Goods
-    ['#e8b840', '#44aa44', '#e84040'].forEach((c, gi) => {
-      ctx.fillStyle = c;
-      ctx.beginPath();
-      ctx.arc(lx + 5 * sc + gi * 6 * sc, -3 * sc, 3 * sc, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.fillStyle = '#3a5898';
-    ctx.fillRect(lx + 2 * sc, -4 * sc, wgW - 4 * sc, 4 * sc);
-  };
-
-  stallWing(-w / 2 - wgW + 2 * sc);
-  stallWing(w / 2 - 2 * sc);
-
-  // Main hall walls
-  ctx.fillStyle = def.wallColor;
-  ctx.fillRect(-w / 2, -h * 0.54, w, h * 0.67);
-  const ws = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
-  ws.addColorStop(0, 'rgba(0,0,0,0)');
-  ws.addColorStop(0.78, 'rgba(0,0,0,0)');
-  ws.addColorStop(1, 'rgba(0,0,0,0.16)');
-  ctx.fillStyle = ws;
-  ctx.fillRect(-w / 2, -h * 0.54, w, h * 0.67);
-
-  // Horizontal band
-  ctx.strokeStyle = 'rgba(30,60,120,0.3)';
-  ctx.lineWidth = 0.7 * sc;
-  ctx.beginPath();
-  ctx.moveTo(-w / 2, -h * 0.28);
-  ctx.lineTo(w / 2, -h * 0.28);
-  ctx.stroke();
-
-  // Hipped roof
-  ctx.fillStyle = def.roofColor;
-  ctx.beginPath();
-  ctx.moveTo(-w * 0.54, -h * 0.54);
-  ctx.lineTo(-w * 0.12, -h * 1.18);
-  ctx.lineTo(w * 0.12, -h * 1.18);
-  ctx.lineTo(w * 0.54, -h * 0.54);
-  ctx.closePath();
-  ctx.fill();
-  // Hip end triangles
-  ctx.beginPath();
-  ctx.moveTo(-w * 0.54, -h * 0.54);
-  ctx.lineTo(-w * 0.12, -h * 1.18);
-  ctx.lineTo(-w * 0.54, -h * 1.18);
-  ctx.closePath();
-  ctx.fillStyle = '#1e4888';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(w * 0.54, -h * 0.54);
-  ctx.lineTo(w * 0.12, -h * 1.18);
-  ctx.lineTo(w * 0.54, -h * 1.18);
-  ctx.closePath();
-  ctx.fill();
-  // Ridge
-  ctx.fillStyle = '#1a3878';
-  ctx.fillRect(-w * 0.12, -h * 1.185, w * 0.24, h * 0.02);
-  // Eave
-  ctx.fillStyle = '#1a3878';
-  ctx.fillRect(-w * 0.56, -h * 0.552, w * 1.12, h * 0.036);
-
-  // Front awning full width
-  awning(-w / 2, -h * 0.42, w, 12 * sc, '#cc3322');
-
-  // Center door (arch)
-  arch(0, -h * 0.38, 16 * sc, 'rgba(15,30,70,0.75)', 'rgba(100,160,255,0.4)');
-
-  // Windows
-  stdWin(-w * 0.44, -h * 0.47, 12 * sc, 10 * sc);
-  stdWin(-w * 0.24, -h * 0.47, 12 * sc, 10 * sc);
-  stdWin(w * 0.09, -h * 0.47, 12 * sc, 10 * sc);
-  stdWin(w * 0.29, -h * 0.47, 12 * sc, 10 * sc);
-
-  // Pennants
-  pennants(-w * 0.52, -h * 0.44, w * 0.52, -h * 0.44,
-    ['#cc2222', '#f5c842', '#2255aa', '#44aa44', '#cc2222', '#f5c842', '#aa22cc'], t);
-
-  // Sign
-  sign(-w * 0.3, -h * 0.56, w * 0.6, 10 * sc, 'PALENGKE SENTRAL', '#1a3a6a', '#f5c842');
-
-  ctx.fillStyle = 'rgba(200,225,255,0.82)';
-  ctx.font = `${9 * sc}px 'Crimson Pro',serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('Palengke Sentral', 0, h * 0.26);
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LEVEL 4 — Merkado
-   Two-storey main block, colonnade arcade, big sign, side wings
-═══════════════════════════════════════════════════════════════ */
-function drawLv4(ctx, sc, w, h, def, t, helpers) {
-  const { drawBase, stdWin, awning, sign, arch, pennants } = helpers;
-  drawBase();
-
-  const wgW = 24 * sc;
-  const wgH = 46 * sc;
-
-  // Side market wings
-  const mw4 = (lx) => {
-    ctx.fillStyle = '#5080b8';
-    ctx.fillRect(lx, -wgH, wgW, wgH);
-    const wsg = ctx.createLinearGradient(lx, 0, lx + wgW, 0);
-    wsg.addColorStop(0, lx < 0 ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0)');
-    wsg.addColorStop(1, lx < 0 ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,0.12)');
-    ctx.fillStyle = wsg;
-    ctx.fillRect(lx, -wgH, wgW, wgH);
-    // Flat roof
-    ctx.fillStyle = '#1a3878';
-    ctx.fillRect(lx - 2 * sc, -wgH - 3 * sc, wgW + 4 * sc, 4 * sc);
-    ctx.fillStyle = '#243a88';
-    ctx.fillRect(lx - 3 * sc, -wgH - 7 * sc, wgW + 6 * sc, 5 * sc);
-    ctx.fillStyle = '#162e68';
-    ctx.fillRect(lx - 4 * sc, -wgH - 9 * sc, wgW + 8 * sc, 2.5 * sc);
-    // Arched opening GF
-    arch(lx + wgW / 2, -wgH * 0.46, 16 * sc, 'rgba(15,30,70,0.7)', 'rgba(100,160,255,0.35)');
-    stdWin(lx + 4 * sc, -wgH * 0.82, wgW - 8 * sc, 10 * sc, 'rgba(180,220,255,0.55)');
-    awning(lx + 1 * sc, -wgH * 0.47, wgW - 2 * sc, 8 * sc, '#cc3322');
-    // Goods
-    ['#f5c842', '#e84040', '#44bb44'].forEach((c, gi) => {
-      ctx.fillStyle = c;
-      ctx.beginPath();
-      ctx.arc(lx + 5 * sc + gi * 6 * sc, -3 * sc, 3 * sc, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.fillStyle = '#3a5898';
-    ctx.fillRect(lx + 1 * sc, -4 * sc, wgW - 2 * sc, 4 * sc);
-  };
-  mw4(-w / 2 - wgW + 2 * sc);
-  mw4(w / 2 - 2 * sc);
-
-  // Main block GF
-  ctx.fillStyle = def.wallColor;
-  ctx.fillRect(-w / 2, -h * 0.52, w, h * 0.65);
-  const ms = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
-  ms.addColorStop(0, 'rgba(0,0,0,0)');
-  ms.addColorStop(0.8, 'rgba(0,0,0,0)');
-  ms.addColorStop(1, 'rgba(0,0,0,0.16)');
-  ctx.fillStyle = ms;
-  ctx.fillRect(-w / 2, -h * 0.52, w, h * 0.65);
-
-  // Floor slab
-  ctx.fillStyle = '#1a3878';
-  ctx.fillRect(-w / 2 - 2 * sc, -h * 0.52 - 3 * sc, w + 4 * sc, 4 * sc);
-  ctx.fillStyle = '#2a4888';
-  ctx.fillRect(-w / 2 - 3 * sc, -h * 0.52 - 6 * sc, w + 6 * sc, 3.5 * sc);
-
-  // 2F
-  const f2H = h * 0.44;
-  ctx.fillStyle = '#7098d0';
-  ctx.fillRect(-w / 2, -h * 0.52 - f2H, w, f2H);
-  const ms2 = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
-  ms2.addColorStop(0, 'rgba(255,255,255,0.04)');
-  ms2.addColorStop(0.8, 'rgba(0,0,0,0)');
-  ms2.addColorStop(1, 'rgba(0,0,0,0.14)');
-  ctx.fillStyle = ms2;
-  ctx.fillRect(-w / 2, -h * 0.52 - f2H, w, f2H);
-
-  // 2F cornice
-  ctx.fillStyle = '#1a3878';
-  ctx.fillRect(-w / 2 - 3 * sc, -h * 0.52 - f2H - 3 * sc, w + 6 * sc, 4 * sc);
-  ctx.fillStyle = '#243a88';
-  ctx.fillRect(-w / 2 - 4 * sc, -h * 0.52 - f2H - 7 * sc, w + 8 * sc, 5 * sc);
-
-  // GF colonnade arcade
-  const numArch = 5;
-  const aW = w / numArch;
-  for (let ai = 0; ai < numArch; ai++) {
-    const ax = -w / 2 + ai * aW + aW / 2;
-    if (Math.abs(ax) < aW * 0.4) continue;
-    arch(ax, -h * 0.38, aW * 0.62, 'rgba(15,30,70,0.5)', 'rgba(80,130,220,0.3)');
-    if (ai > 0) {
-      const cx2 = -w / 2 + ai * aW;
-      ctx.fillStyle = '#5888c0';
-      ctx.fillRect(cx2 - 2 * sc, -h * 0.52, 4 * sc, h * 0.52);
-    }
-  }
-
-  // Center grand door
-  arch(0, -h * 0.44, 20 * sc, 'rgba(10,20,60,0.85)', 'rgba(120,180,255,0.5)');
-
-  // GF windows (above arcade)
-  stdWin(-w * 0.44, -h * 0.47, 12 * sc, 9 * sc);
-  stdWin(-w * 0.26, -h * 0.47, 12 * sc, 9 * sc);
-  stdWin(w * 0.11, -h * 0.47, 12 * sc, 9 * sc);
-  stdWin(w * 0.29, -h * 0.47, 12 * sc, 9 * sc);
-
-  // 2F windows
-  const f2y = -h * 0.52 - f2H * 0.72;
-  for (let wi = 0; wi < 5; wi++) {
-    const wx = -w / 2 + 8 * sc + wi * (w - 16 * sc) / 4;
-    stdWin(wx, f2y, 13 * sc, 10 * sc);
-  }
-
-  // Big sign
-  sign(-w * 0.32, -h * 0.52 - f2H * 0.25, w * 0.64, 13 * sc, 'MERKADO', '#0a2050', '#f5c842');
-
-  // Wide front awning
-  awning(-w / 2, -h * 0.42, w, 11 * sc, '#cc2211');
-
-  // Pennants
-  pennants(-w * 0.54, -h * 0.44, w * 0.54, -h * 0.44,
-    ['#cc2222', '#f5c842', '#2255aa', '#44aa44', '#cc2222', '#f5c842', '#aa22cc', '#cc2222'], t);
-
-  // Steps
-  ctx.fillStyle = '#405888';
-  ctx.fillRect(-w / 2 - 4 * sc, 0, w + 8 * sc, 4 * sc);
-  ctx.fillStyle = '#4a6898';
-  ctx.fillRect(-w / 2 - 8 * sc, -4 * sc, w + 16 * sc, 4 * sc);
-
-  ctx.fillStyle = 'rgba(200,225,255,0.82)';
-  ctx.font = `${9 * sc}px 'Crimson Pro',serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('Merkado', 0, h * 0.24);
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LEVEL 5 — Grand Merkado
-   Majestic market complex: 3-storey central hall with clock tower,
-   colonnaded wings, flags, bustling front plaza
-═══════════════════════════════════════════════════════════════ */
-function drawLv5(ctx, sc, w, h, def, t, helpers) {
-  const { drawBase, stdWin, awning, sign, arch, pennants } = helpers;
-  drawBase();
-
-  const owW = 22 * sc;
-  const owH = 42 * sc;
-
-  // Outer wings 1F
-  const ow5 = (lx) => {
-    ctx.fillStyle = '#4878b0';
-    ctx.fillRect(lx, -owH, owW, owH);
-    ctx.fillStyle = lx < 0 ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.06)';
-    ctx.fillRect(lx, -owH, owW, owH);
-    ctx.fillStyle = '#1a3878';
-    ctx.fillRect(lx - 2 * sc, -owH - 3 * sc, owW + 4 * sc, 4 * sc);
-    ctx.fillStyle = '#243a88';
-    ctx.fillRect(lx - 3 * sc, -owH - 7 * sc, owW + 6 * sc, 4 * sc);
-    ctx.fillStyle = '#162e68';
-    ctx.fillRect(lx - 4 * sc, -owH - 9 * sc, owW + 8 * sc, 2 * sc);
-    arch(lx + owW / 2, -owH * 0.44, 16 * sc, 'rgba(15,30,70,0.7)', 'rgba(80,140,255,0.35)');
-    awning(lx, -owH * 0.45, owW, 8 * sc, '#cc3322');
-    ['#f5c842', '#e84040', '#44bb44'].forEach((c, gi) => {
-      ctx.fillStyle = c;
-      ctx.beginPath();
-      ctx.arc(lx + 4 * sc + gi * 6 * sc, -3 * sc, 3 * sc, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.fillStyle = '#3a5898';
-    ctx.fillRect(lx + 1 * sc, -4 * sc, owW - 2 * sc, 4 * sc);
-  };
-  ow5(-w / 2 - owW);
-  ow5(w / 2);
-
-  // Inner wings 2F
-  const iwW = 30 * sc;
-  const iwH = 56 * sc;
-  const iw5 = (lx) => {
-    ctx.fillStyle = '#5888c0';
-    ctx.fillRect(lx, -iwH, iwW, iwH);
-    ctx.fillStyle = lx < 0 ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.05)';
-    ctx.fillRect(lx, -iwH, iwW, iwH);
-    ctx.fillStyle = '#1a3060';
-    ctx.fillRect(lx - 1 * sc, -iwH * 0.5 - 1.5 * sc, iwW + 2 * sc, 3 * sc);
-    ctx.fillStyle = '#1a3878';
-    ctx.fillRect(lx - 2 * sc, -iwH - 3 * sc, iwW + 4 * sc, 4 * sc);
-    ctx.fillStyle = '#243a88';
-    ctx.fillRect(lx - 3 * sc, -iwH - 7 * sc, iwW + 6 * sc, 4 * sc);
-    arch(lx + iwW / 2, -iwH * 0.44, 18 * sc, 'rgba(12,25,65,0.75)', 'rgba(100,160,255,0.4)');
-    stdWin(lx + 4 * sc, -iwH * 0.82, iwW - 8 * sc, 11 * sc, 'rgba(180,220,255,0.58)');
-    awning(lx + 1 * sc, -iwH * 0.45, iwW - 2 * sc, 9 * sc, '#2255aa');
-    ctx.fillStyle = '#6898c8';
-    ctx.fillRect(lx + 2 * sc, -iwH, 3 * sc, iwH);
-    ctx.fillRect(lx + iwW - 5 * sc, -iwH, 3 * sc, iwH);
-  };
-  iw5(-w / 2 + owW * 0.0);
-  iw5(w / 2 - iwW);
-
-  // Main central hall dimensions
-  const mbW = 66 * sc;
-  const mbH = h * 0.5;
-  const mb2H = h * 0.44;
-  const mb3H = h * 0.3;
-
-  // GF
-  ctx.fillStyle = def.wallColor;
-  ctx.fillRect(-mbW / 2, -mbH, mbW, mbH);
-  const ms1 = ctx.createLinearGradient(-mbW / 2, 0, mbW / 2, 0);
-  ms1.addColorStop(0, 'rgba(0,0,0,0)');
-  ms1.addColorStop(0.8, 'rgba(0,0,0,0)');
-  ms1.addColorStop(1, 'rgba(0,0,0,0.14)');
-  ctx.fillStyle = ms1;
-  ctx.fillRect(-mbW / 2, -mbH, mbW, mbH);
-  ctx.fillStyle = '#1a3878';
-  ctx.fillRect(-mbW / 2 - 2 * sc, -mbH - 2 * sc, mbW + 4 * sc, 4 * sc);
-  ctx.fillStyle = '#2a4888';
-  ctx.fillRect(-mbW / 2 - 3 * sc, -mbH - 5.5 * sc, mbW + 6 * sc, 3.5 * sc);
-
-  // 2F
-  ctx.fillStyle = '#7098d0';
-  ctx.fillRect(-mbW / 2, -mbH - mb2H, mbW, mb2H);
-  const ms2 = ctx.createLinearGradient(-mbW / 2, 0, mbW / 2, 0);
-  ms2.addColorStop(0, 'rgba(255,255,255,0.04)');
-  ms2.addColorStop(0.8, 'rgba(0,0,0,0)');
-  ms2.addColorStop(1, 'rgba(0,0,0,0.12)');
-  ctx.fillStyle = ms2;
-  ctx.fillRect(-mbW / 2, -mbH - mb2H, mbW, mb2H);
-  ctx.fillStyle = '#1a3060';
-  ctx.fillRect(-mbW / 2 - 2 * sc, -mbH - mb2H - 2 * sc, mbW + 4 * sc, 4 * sc);
-  ctx.fillStyle = '#243070';
-  ctx.fillRect(-mbW / 2 - 3 * sc, -mbH - mb2H - 6 * sc, mbW + 6 * sc, 4 * sc);
-
-  // 3F
-  ctx.fillStyle = '#78a0d8';
-  ctx.fillRect(-mbW / 2, -mbH - mb2H - mb3H, mbW, mb3H);
-  ctx.fillStyle = '#162e68';
-  ctx.fillRect(-mbW / 2 - 3 * sc, -mbH - mb2H - mb3H - 3 * sc, mbW + 6 * sc, 4 * sc);
-  ctx.fillStyle = '#1e3878';
-  ctx.fillRect(-mbW / 2 - 4 * sc, -mbH - mb2H - mb3H - 7 * sc, mbW + 8 * sc, 5 * sc);
-
-  // Clock tower
-  const twH = mb3H * 1.7;
-  const twW = 18 * sc;
-  const twBase = -mbH - mb2H - mb3H;
-  ctx.fillStyle = '#80a8d8';
-  ctx.fillRect(-twW / 2, twBase - twH, twW, twH);
-  ctx.fillStyle = 'rgba(0,0,0,0.12)';
-  ctx.fillRect(twW / 2 - 4 * sc, twBase - twH, 4 * sc, twH);
-  ctx.fillStyle = '#162e68';
-  ctx.beginPath();
-  ctx.moveTo(-twW / 2 - 2 * sc, twBase - twH);
-  ctx.lineTo(0, twBase - twH - 24 * sc);
-  ctx.lineTo(twW / 2 + 2 * sc, twBase - twH);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.07)';
-  ctx.beginPath();
-  ctx.moveTo(-3 * sc, twBase - twH);
-  ctx.lineTo(0, twBase - twH - 24 * sc);
-  ctx.lineTo(3 * sc, twBase - twH);
-  ctx.closePath();
-  ctx.fill();
-
-  const clkY = twBase - twH * 0.45;
-  ctx.fillStyle = '#e8f4ff';
-  ctx.beginPath();
-  ctx.arc(0, clkY, 7 * sc, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#1a3878';
-  ctx.lineWidth = 0.8 * sc;
-  ctx.beginPath();
-  ctx.arc(0, clkY, 7 * sc, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = '#1a3878';
-  ctx.lineWidth = 1 * sc;
-  ctx.beginPath();
-  ctx.moveTo(0, clkY);
-  ctx.lineTo(0, clkY - 5 * sc);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(0, clkY);
-  ctx.lineTo(4 * sc, clkY + 2 * sc);
-  ctx.stroke();
-  stdWin(-4 * sc, twBase - twH * 0.82, 8 * sc, 6 * sc, 'rgba(180,220,255,0.7)');
-  ctx.fillStyle = '#1a3060';
-  ctx.fillRect(-twW / 2 - 1 * sc, twBase - twH * 0.6, twW + 2 * sc, 2.5 * sc);
-  ctx.fillRect(-twW / 2 - 1 * sc, twBase, twW + 2 * sc, 2.5 * sc);
-
-  // GF colonnade
-  const nA = 5;
-  const aW2 = mbW / nA;
-  for (let ai = 0; ai < nA; ai++) {
-    const ax = -mbW / 2 + ai * aW2 + aW2 / 2;
-    if (Math.abs(ax) < aW2 * 0.45) continue;
-    arch(ax, -mbH * 0.46, aW2 * 0.65, 'rgba(12,24,60,0.55)', 'rgba(80,140,255,0.28)');
-    if (ai > 0) {
-      ctx.fillStyle = '#5888c0';
-      ctx.fillRect(-mbW / 2 + ai * aW2 - 2 * sc, -mbH, 4 * sc, mbH);
-    }
-  }
-  arch(0, -mbH * 0.5, 22 * sc, 'rgba(8,16,50,0.88)', 'rgba(120,190,255,0.55)');
-
-  // GF windows
-  stdWin(-mbW * 0.44, -mbH * 0.46, 12 * sc, 9 * sc);
-  stdWin(-mbW * 0.26, -mbH * 0.46, 12 * sc, 9 * sc);
-  stdWin(mbW * 0.11, -mbH * 0.46, 12 * sc, 9 * sc);
-  stdWin(mbW * 0.29, -mbH * 0.46, 12 * sc, 9 * sc);
-
-  // 2F windows
-  const f2y = -mbH - mb2H * 0.74;
-  for (let wi = 0; wi < 5; wi++) {
-    const wx = -mbW / 2 + 6 * sc + wi * (mbW - 12 * sc) / 4;
-    stdWin(wx, f2y, 13 * sc, 10 * sc);
-  }
-
-  // 3F windows
-  const f3y = -mbH - mb2H - mb3H * 0.72;
-  stdWin(-mbW * 0.36, f3y, 11 * sc, 8 * sc);
-  stdWin(-mbW * 0.18, f3y, 11 * sc, 8 * sc);
-  stdWin(mbW * 0.04, f3y, 11 * sc, 8 * sc);
-  stdWin(mbW * 0.22, f3y, 11 * sc, 8 * sc);
-
-  // Big illuminated sign
-  sign(-mbW * 0.36, -mbH - mb2H * 0.28, mbW * 0.72, 15 * sc, 'GRAND MERKADO', '#0a1840', '#f5c842');
-
-  // Wide awning across center
-  awning(-mbW / 2, -mbH * 0.42, mbW, 13 * sc, '#cc2211');
-
-  // Dense pennants
-  const pColors = ['#cc2222', '#f5c842', '#2255aa', '#44aa44', '#cc2222', '#f5c842', '#aa22cc', '#cc2222', '#f5c842', '#44aa44'];
-  pennants(-w * 0.56, -h * 0.44, w * 0.56, -h * 0.44, pColors, t);
-
-  // Grand steps
-  ctx.fillStyle = '#304868';
-  ctx.fillRect(-mbW / 2 - 2 * sc, 0, mbW + 4 * sc, 4 * sc);
-  ctx.fillStyle = '#3a5878';
-  ctx.fillRect(-mbW / 2 - 6 * sc, -4 * sc, mbW + 12 * sc, 4 * sc);
-  ctx.fillStyle = '#304868';
-  ctx.fillRect(-mbW / 2 - 10 * sc, -8 * sc, mbW + 20 * sc, 4 * sc);
-
-  // Flags on tower
-  const flagBase = twBase - twH - 24 * sc;
-  ctx.strokeStyle = '#3a6090';
+  
+  // Roof trim
+  ctx.fillStyle = '#ff8c00';
+  ctx.fillRect(-w * 0.6, -h * 0.555, w * 1.2, 4 * sc);
+  
+  // Door with glass
+  ctx.fillStyle = 'rgba(100,180,255,0.5)';
+  const dw = 12 * sc;
+  const dh = h * 0.38;
+  ctx.fillRect(-dw / 2, -dh, dw, dh);
+  ctx.strokeStyle = '#e6332a';
   ctx.lineWidth = 1.2 * sc;
+  ctx.strokeRect(-dw / 2, -dh, dw, dh);
+  
+  // Windows
+  stdWin(-w * 0.42, -h * 0.48, 10 * sc, 9 * sc);
+  stdWin(w * 0.22, -h * 0.48, 10 * sc, 9 * sc);
+  
+  // 7-Eleven awning above door
+  sevenAwning(-12 * sc, -h * 0.38, 24 * sc, 7 * sc, true);
+  
+  // Signage
+  sevenSign(-w * 0.35, -h * 0.58, w * 0.7, 9 * sc);
+  
+  // Logo on roof
+  sevenLogo(0, -h * 0.85, 8 * sc);
+  
+  // Slurpee cup outside
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(-w * 0.48, -4 * sc, 5 * sc, 6 * sc);
+  ctx.fillStyle = '#ff8c00';
   ctx.beginPath();
-  ctx.moveTo(0, flagBase);
-  ctx.lineTo(0, flagBase - 16 * sc);
+  ctx.arc(-w * 0.455, -5 * sc, 3 * sc, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#2c9e3d';
+  ctx.font = `bold ${7 * sc}px 'Bebas Neue',sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('SLURPEE', -w * 0.455, -2 * sc);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LEVEL 2 — Standard 7-Eleven Store
+   Full convenience store with gas pumps and wide awning
+═══════════════════════════════════════════════════════════════ */
+function drawSevenLv2(ctx, sc, w, h, def, t, helpers) {
+  const { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump } = helpers;
+  drawBase();
+
+  // White main building
+  ctx.fillStyle = '#f0f0f0';
+  ctx.fillRect(-w / 2, -h * 0.55, w, h * 0.72);
+  
+  // Orange lower band
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(-w / 2, -h * 0.2, w, 6 * sc);
+  
+  // Green upper band
+  ctx.fillStyle = '#2c9e3d';
+  ctx.fillRect(-w / 2, -h * 0.55, w, 5 * sc);
+  
+  // Flat roof with parapet
+  ctx.fillStyle = '#2c6e9e';
+  ctx.fillRect(-w * 0.55, -h * 0.58, w * 1.1, 8 * sc);
+  
+  // Large front awning
+  sevenAwning(-w / 2, -h * 0.42, w, 11 * sc, true);
+  
+  // Glass storefront with multiple doors
+  const doorCount = 3;
+  const doorW = (w * 0.7) / doorCount;
+  for (let i = 0; i < doorCount; i++) {
+    const doorX = -w * 0.35 + i * doorW;
+    ctx.fillStyle = 'rgba(100,180,255,0.55)';
+    ctx.fillRect(doorX, -h * 0.38, doorW - 2 * sc, h * 0.38);
+    ctx.strokeStyle = '#e6332a';
+    ctx.strokeRect(doorX, -h * 0.38, doorW - 2 * sc, h * 0.38);
+  }
+  
+  // Windows on sides
+  stdWin(-w * 0.48, -h * 0.5, 12 * sc, 10 * sc);
+  stdWin(w * 0.26, -h * 0.5, 12 * sc, 10 * sc);
+  
+  // Main sign
+  sevenSign(-w * 0.38, -h * 0.6, w * 0.76, 12 * sc);
+  
+  // Gas pumps
+  gasPump(-w * 0.3, 2 * sc);
+  gasPump(w * 0.1, 2 * sc);
+  
+  // Canopy over pumps
+  ctx.fillStyle = 'rgba(44,110,158,0.7)';
+  ctx.fillRect(-w * 0.45, -2 * sc, w * 0.9, 6 * sc);
+  
+  // Logo on roof
+  sevenLogo(w * 0.35, -h * 0.52, 7 * sc);
+  sevenLogo(-w * 0.35, -h * 0.52, 7 * sc);
+  
+  // Hotdog cart
+  ctx.fillStyle = '#8b4513';
+  ctx.fillRect(w * 0.4, -3 * sc, 8 * sc, 5 * sc);
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(w * 0.42, -5 * sc, 6 * sc, 3 * sc);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LEVEL 3 — 7-Eleven with Gas Station Canopy
+   Large store with extended fuel canopy and convenience store
+═══════════════════════════════════════════════════════════════ */
+function drawSevenLv3(ctx, sc, w, h, def, t, helpers) {
+  const { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump } = helpers;
+  drawBase();
+
+  // Main building (taller)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(-w / 2, -h * 0.6, w, h * 0.75);
+  
+  // Brand stripes
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(-w / 2, -h * 0.22, w, 7 * sc);
+  ctx.fillStyle = '#2c9e3d';
+  ctx.fillRect(-w / 2, -h * 0.29, w, 7 * sc);
+  ctx.fillStyle = '#ff8c00';
+  ctx.fillRect(-w / 2, -h * 0.36, w, 7 * sc);
+  
+  // Parapet roof with sign tower
+  ctx.fillStyle = '#2c6e9e';
+  ctx.fillRect(-w * 0.55, -h * 0.63, w * 1.1, 9 * sc);
+  
+  // Tall sign tower
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(-10 * sc, -h * 0.9, 20 * sc, 30 * sc);
+  sevenSign(-13 * sc, -h * 0.88, 26 * sc, 11 * sc);
+  sevenLogo(0, -h * 0.68, 9 * sc);
+  
+  // Large gas canopy over pumps
+  ctx.fillStyle = 'rgba(44,110,158,0.85)';
+  ctx.fillRect(-w * 0.7, -8 * sc, w * 1.4, 12 * sc);
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(-w * 0.6 + i * (w * 1.2 / 5), -6 * sc, 6 * sc, 8 * sc);
+  }
+  
+  // Four gas pumps
+  gasPump(-w * 0.45, 3 * sc);
+  gasPump(-w * 0.15, 3 * sc);
+  gasPump(w * 0.05, 3 * sc);
+  gasPump(w * 0.35, 3 * sc);
+  
+  // Glass storefront
+  ctx.fillStyle = 'rgba(100,180,255,0.6)';
+  ctx.fillRect(-w * 0.45, -h * 0.4, w * 0.9, h * 0.4);
+  
+  // Awning
+  sevenAwning(-w / 2, -h * 0.42, w, 10 * sc, true);
+  
+  // Windows upstairs
+  stdWin(-w * 0.38, -h * 0.75, 14 * sc, 12 * sc);
+  stdWin(w * 0.14, -h * 0.75, 14 * sc, 12 * sc);
+  
+  // Price sign
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(w * 0.45, -h * 0.3, 12 * sc, 18 * sc);
+  ctx.fillStyle = '#ff8c00';
+  ctx.font = `bold ${8 * sc}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText('GAS', w * 0.51, -h * 0.22);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('₱58.90', w * 0.51, -h * 0.12);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LEVEL 4 — Two-Storey 7-Eleven with Drive-Thru
+   Flagship store with second floor seating and drive-thru window
+═══════════════════════════════════════════════════════════════ */
+function drawSevenLv4(ctx, sc, w, h, def, t, helpers) {
+  const { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump } = helpers;
+  drawBase();
+
+  const secondFloorY = -h * 0.6;
+  const secondFloorH = h * 0.4;
+  
+  // Ground floor (white with glass)
+  ctx.fillStyle = '#f8f8f8';
+  ctx.fillRect(-w / 2, -h * 0.55, w, h * 0.65);
+  
+  // Second floor (green accent)
+  ctx.fillStyle = '#2c9e3d';
+  ctx.fillRect(-w / 2, secondFloorY, w, secondFloorH);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(-w * 0.48, secondFloorY + 5 * sc, w * 0.96, secondFloorH - 10 * sc);
+  
+  // Brand band between floors
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(-w / 2, -h * 0.53, w, 8 * sc);
+  
+  // Large rooftop sign
+  ctx.fillStyle = '#2c6e9e';
+  ctx.fillRect(-w * 0.45, -h * 0.95, w * 0.9, 18 * sc);
+  sevenSign(-w * 0.38, -h * 0.93, w * 0.76, 12 * sc);
+  sevenLogo(0, -h * 0.78, 10 * sc);
+  
+  // Drive-thru window (right side)
+  ctx.fillStyle = 'rgba(100,180,255,0.7)';
+  ctx.fillRect(w * 0.35, -h * 0.35, 12 * sc, 12 * sc);
+  ctx.fillStyle = '#e6332a';
+  ctx.font = `${7 * sc}px sans-serif`;
+  ctx.fillText('DRIVE THRU', w * 0.41, -h * 0.28);
+  
+  // Drive-thru lane
+  ctx.fillStyle = '#555555';
+  ctx.fillRect(w * 0.25, -3 * sc, 30 * sc, 6 * sc);
+  for (let i = 0; i < 6; i++) {
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(w * 0.27 + i * 5 * sc, -1 * sc, 3 * sc, 2 * sc);
+  }
+  
+  // Second floor windows
+  stdWin(-w * 0.42, secondFloorY + 15 * sc, 14 * sc, 12 * sc);
+  stdWin(-w * 0.18, secondFloorY + 15 * sc, 14 * sc, 12 * sc);
+  stdWin(w * 0.04, secondFloorY + 15 * sc, 14 * sc, 12 * sc);
+  stdWin(w * 0.28, secondFloorY + 15 * sc, 14 * sc, 12 * sc);
+  
+  // Outdoor seating area
+  ctx.fillStyle = '#ccccaa';
+  ctx.fillRect(-w * 0.35, -2 * sc, w * 0.7, 5 * sc);
+  for (let i = 0; i < 4; i++) {
+    const tableX = -w * 0.25 + i * 18 * sc;
+    ctx.fillStyle = '#8b5a2b';
+    ctx.fillRect(tableX, -4 * sc, 8 * sc, 4 * sc);
+    ctx.fillStyle = '#cd853f';
+    ctx.beginPath();
+    ctx.arc(tableX + 4 * sc, -6 * sc, 3 * sc, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // Main awning
+  sevenAwning(-w / 2, -h * 0.42, w, 10 * sc, true);
+  
+  // Gas pumps
+  gasPump(-w * 0.3, 2 * sc);
+  gasPump(w * 0.1, 2 * sc);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LEVEL 5 — Grand 7-Eleven Flagship
+   Ultimate 7-Eleven with digital signage, coffee bar, and modern design
+═══════════════════════════════════════════════════════════════ */
+function drawSevenLv5(ctx, sc, w, h, def, t, helpers) {
+  const { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump, coffeeCup } = helpers;
+  drawBase();
+
+  const thirdFloorY = -h * 0.82;
+  const thirdFloorH = h * 0.28;
+  
+  // Modern glass facade building
+  ctx.fillStyle = '#eef4ff';
+  ctx.fillRect(-w / 2, -h * 0.7, w, h * 0.85);
+  
+  // Green base
+  ctx.fillStyle = '#2c9e3d';
+  ctx.fillRect(-w / 2, 0, w, 8 * sc);
+  
+  // Vertical accent stripes
+  ctx.fillStyle = '#e6332a';
+  for (let i = 0; i < 5; i++) {
+    ctx.fillRect(-w * 0.45 + i * (w * 0.9 / 4), -h * 0.65, 4 * sc, h * 0.8);
+  }
+  
+  // Glass curtain wall (simulated)
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 6; col++) {
+      const glassX = -w * 0.45 + col * (w * 0.9 / 6);
+      const glassY = -h * 0.55 + row * (h * 0.45 / 3);
+      ctx.fillStyle = 'rgba(70,150,220,0.5)';
+      ctx.fillRect(glassX + 1 * sc, glassY + 1 * sc, (w * 0.9 / 6) - 2 * sc, (h * 0.45 / 3) - 2 * sc);
+      ctx.strokeStyle = '#ffffff';
+      ctx.strokeRect(glassX + 1 * sc, glassY + 1 * sc, (w * 0.9 / 6) - 2 * sc, (h * 0.45 / 3) - 2 * sc);
+    }
+  }
+  
+  // Grand entrance with double doors
+  ctx.fillStyle = 'rgba(100,180,255,0.8)';
+  ctx.fillRect(-15 * sc, -h * 0.42, 30 * sc, h * 0.42);
+  ctx.strokeStyle = '#e6332a';
+  ctx.lineWidth = 2 * sc;
+  ctx.strokeRect(-15 * sc, -h * 0.42, 30 * sc, h * 0.42);
+  ctx.beginPath();
+  ctx.moveTo(0, -h * 0.42);
+  ctx.lineTo(0, 0);
   ctx.stroke();
-  ctx.fillStyle = '#cc2222';
-  ctx.beginPath();
-  ctx.moveTo(0, flagBase - 16 * sc);
-  ctx.lineTo(16 * sc, flagBase - 10 * sc);
-  ctx.lineTo(0, flagBase - 4 * sc);
-  ctx.closePath();
-  ctx.fill();
-
-  // Blinking light atop tower
-  const bl = Math.sin(t * 2.8) > 0;
-  ctx.fillStyle = bl ? 'rgba(255,50,50,1)' : 'rgba(255,50,50,0.08)';
-  ctx.beginPath();
-  ctx.arc(0, flagBase - 16 * sc, 2 * sc, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Final label
-  ctx.fillStyle = 'rgba(200,225,255,0.88)';
+  
+  // Digital sign board (LED)
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(-w * 0.48, -h * 0.72, w * 0.96, 10 * sc);
+  const blink = Math.sin(t * 3) > 0;
+  ctx.fillStyle = blink ? '#ff3300' : '#ff8844';
+  ctx.font = `bold ${8 * sc}px monospace`;
+  ctx.fillText('NOW OPEN 24/7  •  COFFEE PROMO ₱49', 0, -h * 0.68);
+  
+  // Main illuminated sign
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(-w * 0.42, -h * 0.92, w * 0.84, 16 * sc);
+  sevenSign(-w * 0.38, -h * 0.9, w * 0.76, 13 * sc);
+  
+  // Rooftop 3D sign
+  ctx.fillStyle = '#2c6e9e';
+  ctx.fillRect(-20 * sc, -h * 1.08, 40 * sc, 10 * sc);
+  ctx.fillStyle = '#ff8c00';
+  ctx.fillRect(-18 * sc, -h * 1.1, 36 * sc, 4 * sc);
+  sevenLogo(0, -h * 1.02, 12 * sc);
+  
+  // Coffee bar area (left side)
+  ctx.fillStyle = '#8b4513';
+  ctx.fillRect(-w * 0.48, -h * 0.32, 16 * sc, 10 * sc);
+  ctx.fillStyle = '#f5deb3';
+  ctx.fillRect(-w * 0.47, -h * 0.3, 14 * sc, 6 * sc);
+  coffeeCup(-w * 0.42, -h * 0.27);
+  coffeeCup(-w * 0.35, -h * 0.27);
+  
+  // Slurpee station (right side)
+  ctx.fillStyle = '#e6332a';
+  ctx.fillRect(w * 0.32, -h * 0.32, 16 * sc, 10 * sc);
+  ctx.fillStyle = '#ff8c00';
+  for (let i = 0; i < 3; i++) {
+    ctx.fillRect(w * 0.34 + i * 4 * sc, -h * 0.3, 3 * sc, 7 * sc);
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(w * 0.355 + i * 4 * sc, -h * 0.32, 2 * sc, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff8c00';
+  }
+  
+  // Gas pumps with canopy
+  ctx.fillStyle = 'rgba(44,110,158,0.9)';
+  ctx.fillRect(-w * 0.65, -8 * sc, w * 1.3, 14 * sc);
+  for (let i = 0; i < 6; i++) {
+    gasPump(-w * 0.5 + i * 20 * sc, 3 * sc);
+  }
+  
+  // LED strip animation
+  ctx.fillStyle = blink ? '#ff5500' : '#ffaa33';
+  ctx.fillRect(-w / 2, -h * 0.64, w, 3 * sc);
+  
+  // Large awning
+  sevenAwning(-w / 2, -h * 0.43, w, 12 * sc, true);
+  
+  // Outdoor lounge
+  for (let i = 0; i < 6; i++) {
+    const chairX = -w * 0.4 + i * 18 * sc;
+    ctx.fillStyle = '#2c9e3d';
+    ctx.fillRect(chairX, -2 * sc, 6 * sc, 4 * sc);
+    ctx.fillStyle = '#ff8c00';
+    ctx.fillRect(chairX + 1 * sc, -4 * sc, 4 * sc, 3 * sc);
+  }
+  
+  // Digital price board
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(w * 0.42, -h * 0.18, 12 * sc, 14 * sc);
+  ctx.fillStyle = '#ff8c00';
+  ctx.font = `${6 * sc}px monospace`;
+  ctx.fillText('GAS', w * 0.48, -h * 0.12);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('₱54.90', w * 0.48, -h * 0.05);
+  ctx.fillText('DIESEL', w * 0.48, -h * 0.02);
+  ctx.fillText('₱52.50', w * 0.48, -h * 0.11);
+  
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
   ctx.font = `bold ${9 * sc}px 'Crimson Pro',serif`;
   ctx.textAlign = 'center';
-  ctx.fillText('Grand Merkado', 0, h * 0.2);
+  ctx.fillText('7-ELEVEN • ALWAYS OPEN', 0, h * 0.18);
 }

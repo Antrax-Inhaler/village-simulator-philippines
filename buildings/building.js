@@ -547,7 +547,20 @@ export function Building(type, x, y) {
 Building.prototype.getDef = function() {
   return BUILDING_DEFS[this.type] || BUILDING_DEFS.house;
 };
-
+Building.prototype.getMaxDimensions = function() {
+    var def = this.getDef();
+    var rules = getMainHallRules(VS.buildings || []);
+    var maxLv = this.type === 'mainHall' ? 7 : rules.maxBuildingLevel;
+    
+    // Calculate max width/height at max level (buildings grow ~10-15% per level)
+    var growthMultiplier = 1 + (maxLv - this.level) * 0.12;
+    
+    return {
+        w: def.w * growthMultiplier,
+        h: def.h * growthMultiplier,
+        maxLevel: maxLv
+    };
+};
 Building.prototype.getStats = function() {
   var def  = this.getDef();
   var lv   = this.level;

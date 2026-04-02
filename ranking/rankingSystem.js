@@ -8,12 +8,12 @@
 // Rank definitions
 export const RANKS = [
   { id: 1, title: "Humble Start", scoreRequired: 0, bonus: 0, badge: "🌱", color: "#6c757d", darkColor: "#495057" },
-  { id: 2, title: "Rising Leader", scoreRequired: 100, bonus: 5, badge: "📈", color: "#e67e22", darkColor: "#b85e0a" },
-  { id: 3, title: "Respected Noble", scoreRequired: 250, bonus: 8, badge: "👑", color: "#3498db", darkColor: "#1f618d" },
-  { id: 4, title: "Town Leader", scoreRequired: 450, bonus: 10, badge: "🏛️", color: "#f1c40f", darkColor: "#b8860b" },
-  { id: 5, title: "Provincial Leader", scoreRequired: 700, bonus: 12, badge: "🌾", color: "#2ecc71", darkColor: "#1f8a4c" },
-  { id: 6, title: "National Figure", scoreRequired: 1000, bonus: 15, badge: "🇵🇭", color: "#1abc9c", darkColor: "#117a65" },
-  { id: 7, title: "Monument to the People", scoreRequired: 1400, bonus: 18, badge: "🏆", color: "#9b59b6", darkColor: "#6c3483" },
+  { id: 2, title: "Rising Leader", scoreRequired: 50, bonus: 5, badge: "📈", color: "#e67e22", darkColor: "#b85e0a" },
+  { id: 3, title: "Respected Noble", scoreRequired: 150, bonus: 8, badge: "👑", color: "#3498db", darkColor: "#1f618d" },
+  { id: 4, title: "Town Leader", scoreRequired: 250, bonus: 10, badge: "🏛️", color: "#f1c40f", darkColor: "#b8860b" },
+  { id: 5, title: "Provincial Leader", scoreRequired: 500, bonus: 12, badge: "🌾", color: "#2ecc71", darkColor: "#1f8a4c" },
+  { id: 6, title: "National Figure", scoreRequired: 850, bonus: 15, badge: "🇵🇭", color: "#1abc9c", darkColor: "#117a65" },
+  { id: 7, title: "Monument to the People", scoreRequired: 1200, bonus: 18, badge: "🏆", color: "#9b59b6", darkColor: "#6c3483" },
   { id: 8, title: "Living Hero", scoreRequired: 1900, bonus: 20, badge: "⭐", color: "#e74c3c", darkColor: "#c0392b" },
   { id: 9, title: "People's Chosen", scoreRequired: 2500, bonus: 25, badge: "👑✨", color: "#3498db", darkColor: "#1f618d" },
   { id: 10, title: "Legend", scoreRequired: 3200, bonus: 30, badge: "🏆🌟", color: "#f39c12", darkColor: "#d35400" }

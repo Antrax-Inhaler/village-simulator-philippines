@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — render/renderer.js  (with Missile Warfare Support)
+Mini Bayan — render/renderer.js  (with Missile Warfare Support)
 ══════════════════════════════════════════════════════════════ */
-
 import { perspScale, clamp, lerp }  from '../utils/perspective.js';
 import { getTimeStr, getTimeOfDay, getOverlayColor, getSunMoonState } from '../utils/time.js';
 import { drawGroundSprite }         from '../utils/sprites.js';
@@ -13,7 +12,14 @@ import { getWasteStats }     from '../resources/economy.js';
 import { drawZoneArrows }    from '../world/zones.js';
 
 /* ══════════════════════════════════════════════════════════════
-   Missile Sprite System Imports
+USER ADJUSTABLE: Max Upgrade Footprint Multiplier
+2.0 = 2x the base building size (green guide shows max upgrade space)
+MUST MATCH input.js VALUE!
+══════════════════════════════════════════════════════════════ */
+var MAX_UPGRADE_FOOTPRINT_MULTIPLIER = 2.0;
+
+/* ══════════════════════════════════════════════════════════════
+Missile Sprite System Imports
 ══════════════════════════════════════════════════════════════ */
 import {
   drawMissileOnMap,
@@ -23,7 +29,7 @@ import {
 } from './missileSprites.js';
 
 /* ══════════════════════════════════════════════════════════════
-   Wind particles — persist across frames
+Wind particles — persist across frames
 ══════════════════════════════════════════════════════════════ */
 var _windParticles = (function() {
   var arr = [];
@@ -40,20 +46,19 @@ var _windParticles = (function() {
 })();
 
 /* ══════════════════════════════════════════════════════════════
-   Missile Effects Storage (for current session)
+Missile Effects Storage (for current session)
 ══════════════════════════════════════════════════════════════ */
 var _missileTrails = {};      // missileId → trail particles array
 var _missileImpacts = [];     // Active impact effects
 var _missileLaunches = [];    // Active launch effects
 
 /* ══════════════════════════════════════════════════════════════
-   renderFrame
-   Single entry point called by main.js each animation frame.
+renderFrame
+Single entry point called by main.js each animation frame.
 ══════════════════════════════════════════════════════════════ */
 export function renderFrame(canvas, ctx, state) {
   var VW = state.VW, VH = state.VH;
   if (!VW || !ctx) return;
-
   ctx.clearRect(0, 0, VW, VH);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.shadowBlur = 0;
@@ -64,15 +69,15 @@ export function renderFrame(canvas, ctx, state) {
 
   /* ── World-space draws ─────────────────────────────────── */
   camApply(ctx);
-    if (state.shakeX || state.shakeY) {
-      ctx.translate(state.shakeX || 0, state.shakeY || 0);
-    }
-    drawGround(ctx, VW, VH);
-    if (state.drawZoneGrid)   state.drawZoneGrid(ctx, VW, VH, state.VS);
-    drawZoneArrows(ctx, VW, VH, state.VS);
-    drawEntitiesSorted(ctx, state);
-    drawBuildPreview(ctx, state);
-    drawMissileEffects(ctx, state);  // NEW: Draw missiles & effects
+  if (state.shakeX || state.shakeY) {
+    ctx.translate(state.shakeX || 0, state.shakeY || 0);
+  }
+  drawGround(ctx, VW, VH);
+  if (state.drawZoneGrid)   state.drawZoneGrid(ctx, VW, VH, state.VS);
+  drawZoneArrows(ctx, VW, VH, state.VS);
+  drawEntitiesSorted(ctx, state);
+  drawBuildPreview(ctx, state);
+  drawMissileEffects(ctx, state);
   camReset(ctx);
 
   /* ── Calamity overlay ──────────────────────────────────── */
@@ -86,7 +91,7 @@ export function renderFrame(canvas, ctx, state) {
   drawHUD(ctx, state.VS, VW);
   drawZoomBadge(ctx, VW, VH);
   drawRankBadge(ctx, VW, VH, state.VS);
-  drawMissileStatusBadge(ctx, VW, VH, state.VS);  // NEW: Missile inventory badge
+  drawMissileStatusBadge(ctx, VW, VH, state.VS);
   updateBarUI(state.VS, state.dayCount);
   updateBubblePositions(canvas, state.activeBubbles, state.VW, state.VH);
 
@@ -95,36 +100,25 @@ export function renderFrame(canvas, ctx, state) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Update Missile Effects (launch, travel, impact)
+Update Missile Effects (launch, travel, impact)
 ══════════════════════════════════════════════════════════════ */
 function _updateMissileEffects(VS, dt) {
   var frameCount = Math.floor(performance.now() / 16);
-  
-  // Update active impact effects
   _missileImpacts = _missileImpacts.filter(function(effect) {
     return effect.update(dt);
   });
-  
-  // Update active launch effects
   _missileLaunches = _missileLaunches.filter(function(effect) {
     return effect.update(dt);
   });
-  
-  // Process outgoing missiles for visual tracking
   if (VS.missiles && VS.missiles.outgoing) {
     VS.missiles.outgoing.forEach(function(missile) {
       if (missile.status === 'traveling' && !missile.cancelled) {
-        // Initialize trail if not exists
         if (!_missileTrails[missile.id]) {
           _missileTrails[missile.id] = [];
         }
-        
-        // Update progress for rendering
         var elapsed = Date.now() - missile.launchTime;
         var total = missile.impactTime - missile.launchTime;
         missile.progress = clamp(elapsed / total, 0, 1);
-        
-        // Store start position if not set
         if (!missile.startX || !missile.startY) {
           var silo = _findMissileSilo(VS);
           missile.startX = silo ? silo.x : (WORLD_W / 2);
@@ -132,8 +126,6 @@ function _updateMissileEffects(VS, dt) {
         }
       }
     });
-    
-    // Clean up finished missile trails
     Object.keys(_missileTrails).forEach(function(id) {
       var missile = VS.missiles.outgoing.find(function(m) { return m.id === id; });
       if (!missile || missile.status !== 'traveling') {
@@ -144,7 +136,7 @@ function _updateMissileEffects(VS, dt) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Find Missile Silo building (for launch position)
+Find Missile Silo building (for launch position)
 ══════════════════════════════════════════════════════════════ */
 function _findMissileSilo(VS) {
   if (!VS || !VS.buildings) return null;
@@ -158,19 +150,15 @@ function _findMissileSilo(VS) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Draw Missile Effects (traveling missiles, impacts, launches)
+Draw Missile Effects (traveling missiles, impacts, launches)
 ══════════════════════════════════════════════════════════════ */
 function drawMissileEffects(ctx, state) {
   var VS = state.VS;
   var sc = cam.zoom;
   var frameCount = Math.floor(performance.now() / 16);
-  
-  // Draw active launch effects
   _missileLaunches.forEach(function(effect) {
     effect.draw(ctx);
   });
-  
-  // Draw traveling missiles
   if (VS.missiles && VS.missiles.outgoing) {
     VS.missiles.outgoing.forEach(function(missile) {
       if (missile.status === 'traveling' && !missile.cancelled && missile.progress !== undefined) {
@@ -179,15 +167,13 @@ function drawMissileEffects(ctx, state) {
       }
     });
   }
-  
-  // Draw active impact effects
   _missileImpacts.forEach(function(effect) {
     effect.draw(ctx);
   });
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Add Missile Launch Effect (called when missile launches)
+Add Missile Launch Effect (called when missile launches)
 ══════════════════════════════════════════════════════════════ */
 export function addMissileLaunch(siloX, siloY, missileType) {
   var sc = cam.zoom;
@@ -200,7 +186,7 @@ export function addMissileLaunch(siloX, siloY, missileType) {
     maxProgress: 1,
     active: true,
     update: function(dt) {
-      this.progress += dt * 2; // 0.5 second launch animation
+      this.progress += dt * 2;
       if (this.progress >= this.maxProgress) {
         this.active = false;
       }
@@ -214,7 +200,7 @@ export function addMissileLaunch(siloX, siloY, missileType) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Add Missile Impact Effect (called when missile hits)
+Add Missile Impact Effect (called when missile hits)
 ══════════════════════════════════════════════════════════════ */
 export function addMissileImpact(targetX, targetY, missileType) {
   var sc = cam.zoom;
@@ -223,7 +209,7 @@ export function addMissileImpact(targetX, targetY, missileType) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Clear All Missile Effects (for cleanup)
+Clear All Missile Effects (for cleanup)
 ══════════════════════════════════════════════════════════════ */
 export function clearMissileEffects() {
   _missileTrails = {};
@@ -232,8 +218,7 @@ export function clearMissileEffects() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   updateWasteDisplay
-   Reads wasteStats from VS and calls window.updateWasteDisplay
+updateWasteDisplay
 ══════════════════════════════════════════════════════════════ */
 export function updateWasteDisplay(VS) {
   if (typeof window.updateWasteDisplay !== 'function') return;
@@ -243,10 +228,9 @@ export function updateWasteDisplay(VS) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawGround
+drawGround
 ══════════════════════════════════════════════════════════════ */
 export function drawGround(ctx, canvasW, canvasH) {
-  // 1. Fill whole canvas with base gradient
   var g = ctx.createLinearGradient(0, 0, 0, canvasH);
   g.addColorStop(0,    '#4a7c5a');
   g.addColorStop(0.35, '#5d8c6b');
@@ -255,13 +239,11 @@ export function drawGround(ctx, canvasW, canvasH) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, canvasW, canvasH);
 
-  // 2. World‑specific decorations (only inside the original world rectangle)
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, WORLD_W, WORLD_H);
   ctx.clip();
 
-  // existing dirt path
   ctx.fillStyle = 'rgba(150,110,55,0.22)';
   ctx.beginPath();
   ctx.moveTo(WORLD_W*0.46, 0);
@@ -284,7 +266,6 @@ export function drawGround(ctx, canvasW, canvasH) {
   ctx.closePath();
   ctx.fill();
 
-  // decorative dots
   ctx.fillStyle = 'rgba(38,90,38,0.28)';
   var dots = [
     [0.063,0.132],[0.156,0.243],[0.328,0.083],[0.547,0.118],[0.742,0.271],[0.859,0.188],
@@ -296,19 +277,16 @@ export function drawGround(ctx, canvasW, canvasH) {
     ctx.fill();
   });
 
-  // ground sprite (only inside world)
   drawGroundSprite(ctx, 'grass', 0, 0, WORLD_W, WORLD_H);
-
   ctx.restore();
 
-  // 3. Optional world border
   ctx.strokeStyle = 'rgba(197, 154, 78, 0.5)';
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawEntitiesSorted
+drawEntitiesSorted — Shows ALL buildings' max footprints when moving
 ══════════════════════════════════════════════════════════════ */
 export function drawEntitiesSorted(ctx, state) {
   var VS     = state.VS;
@@ -316,14 +294,71 @@ export function drawEntitiesSorted(ctx, state) {
   var drawer = state.drawer;
   var ents   = [];
 
+  /* ── Draw ALL buildings' max footprints when moving a building ── */
+  var isMovingBuilding = (drag && drag.building && drag.moved);
+  
   VS.buildings.forEach(function(b) {
     ents.push({
       y: b.y,
       draw: function() {
+        /* Show max footprint for ALL other buildings when dragging */
+        if (isMovingBuilding && drag.building !== b) {
+          var sc = perspScale(b.y);
+          var def = b.getDef();
+          var maxW = def.w * sc * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+          var maxH = def.h * sc * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+          
+          ctx.save();
+          ctx.globalAlpha = 0.08;
+          ctx.fillStyle = '#44ff88';
+          ctx.fillRect(b.x - maxW/2, b.y - maxH, maxW, maxH);
+          ctx.strokeStyle = '#44ff88';
+          ctx.lineWidth = 1 / cam.zoom;
+          ctx.setLineDash([4/cam.zoom, 4/cam.zoom]);
+          ctx.strokeRect(b.x - maxW/2, b.y - maxH, maxW, maxH);
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+        
+        /* Draw building being dragged with overlap feedback */
         if (drag && drag.building === b && drag.moved) {
           var sc = perspScale(b.y);
+          var def = b.getDef();
+          
+          /* Determine color based on overlap/zone violation */
+          var hasOverlap = b._hasOverlap || false;
+          var hasZoneViolation = b._zoneViolation || false;
+          var isInvalid = hasOverlap || hasZoneViolation;
+          
+          var footprintColor = isInvalid ? '#ff4444' : '#44ff88';
+          var fillColor = isInvalid ? 'rgba(255,68,68,0.15)' : 'rgba(68,255,136,0.15)';
+          
+          /* MAX UPGRADE FOOTPRINT (GREEN or RED) */
+          var maxW = def.w * sc * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+          var maxH = def.h * sc * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+          
           ctx.save();
-          ctx.strokeStyle = '#44ff88';
+          ctx.globalAlpha = 0.15;
+          ctx.fillStyle = fillColor;
+          ctx.fillRect(b.x - maxW/2, b.y - maxH, maxW, maxH);
+          ctx.strokeStyle = footprintColor;
+          ctx.lineWidth = 2 / cam.zoom;
+          ctx.setLineDash([8/cam.zoom, 6/cam.zoom]);
+          ctx.strokeRect(b.x - maxW/2, b.y - maxH, maxW, maxH);
+          ctx.setLineDash([]);
+          
+          /* Label */
+          ctx.globalAlpha = 0.9;
+          ctx.fillStyle = footprintColor;
+          ctx.font = 'bold ' + (8*sc) + 'px "Oldenburg",serif';
+          ctx.textAlign = 'center';
+          var label = isInvalid ? '⚠️ Overlap!' : 'Max Upgrade';
+          ctx.fillText(label, b.x, b.y - maxH - 5*sc);
+          ctx.restore();
+          
+          /* Current size outline */
+          ctx.save();
+          ctx.strokeStyle = footprintColor;
           ctx.lineWidth   = 2 / cam.zoom;
           ctx.setLineDash([6 / cam.zoom, 4 / cam.zoom]);
           ctx.globalAlpha = 0.85;
@@ -331,6 +366,7 @@ export function drawEntitiesSorted(ctx, state) {
           ctx.setLineDash([]);
           ctx.restore();
         }
+        
         b.draw(ctx);
       },
     });
@@ -368,7 +404,7 @@ export function drawEntitiesSorted(ctx, state) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawBuildPreview
+drawBuildPreview — Shows guide when PLACING NEW buildings
 ══════════════════════════════════════════════════════════════ */
 export function drawBuildPreview(ctx, state) {
   var gameMode         = state.gameMode;
@@ -378,31 +414,68 @@ export function drawBuildPreview(ctx, state) {
   var BUILDING_DEFS    = state.BUILDING_DEFS;
   var drawer           = state.drawer;
 
+  /* ── MOVE BUILDING MODE (existing building) ──────────────── */
   if (gameMode === 'move_building' && drawer && drawer.target) {
     var wp0 = state.s2w(mouseX, mouseY);
     var bm  = drawer.target;
     var sc0 = perspScale(wp0.y);
+    var def = bm.getDef();
+    
+    /* Determine color based on overlap/zone violation */
+    var hasOverlap = bm._hasOverlap || false;
+    var hasZoneViolation = bm._zoneViolation || false;
+    var isInvalid = hasOverlap || hasZoneViolation;
+    
+    var footprintColor = isInvalid ? '#ff4444' : '#44ff88';
+    var fillColor = isInvalid ? 'rgba(255,68,68,0.15)' : 'rgba(68,255,136,0.15)';
+
+    /* MAX UPGRADE FOOTPRINT (GREEN or RED) */
+    var maxW = def.w * sc0 * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+    var maxH = def.h * sc0 * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(wp0.x - maxW/2, wp0.y - maxH, maxW, maxH);
+    ctx.strokeStyle = footprintColor;
+    ctx.lineWidth = 2 / cam.zoom;
+    ctx.setLineDash([8/cam.zoom, 6/cam.zoom]);
+    ctx.strokeRect(wp0.x - maxW/2, wp0.y - maxH, maxW, maxH);
+    ctx.setLineDash([]);
+
+    /* Label */
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = footprintColor;
+    ctx.font = 'bold ' + (8*sc0) + 'px "Oldenburg",serif';
+    ctx.textAlign = 'center';
+    var label = isInvalid ? '⚠️ Overlap!' : 'Max Upgrade';
+    ctx.fillText(label, wp0.x, wp0.y - maxH - 5*sc0);
+    ctx.restore();
+
+    /* Current size outline */
     ctx.save();
     ctx.shadowBlur  = 0;
-    ctx.strokeStyle = '#44ff88';
+    ctx.strokeStyle = footprintColor;
     ctx.lineWidth   = 2 / cam.zoom;
     ctx.globalAlpha = 0.7;
     ctx.setLineDash([6/cam.zoom, 4/cam.zoom]);
     ctx.strokeRect(wp0.x - bm.w*sc0*0.6, wp0.y - bm.h*sc0*1.2, bm.w*sc0*1.2, bm.h*sc0*1.4);
     ctx.setLineDash([]);
     ctx.globalAlpha = 0.6;
-    ctx.fillStyle   = 'rgba(68,255,136,0.08)';
+    ctx.fillStyle   = fillColor;
     ctx.fillRect(wp0.x - bm.w*sc0*0.6, wp0.y - bm.h*sc0*1.2, bm.w*sc0*1.2, bm.h*sc0*1.4);
-    ctx.fillStyle   = '#44ff88';
+    ctx.fillStyle   = footprintColor;
     ctx.globalAlpha = 0.9;
     ctx.font        = (9*sc0) + 'px "Oldenburg",serif';
     ctx.textAlign   = 'center';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText('I-drop dito', wp0.x, wp0.y - bm.h*sc0*1.3);
+    var dropLabel = isInvalid ? 'Hindi pwede!' : 'I-drop dito';
+    ctx.fillText(dropLabel, wp0.x, wp0.y - bm.h*sc0*1.3);
     ctx.restore();
     return;
   }
 
+  /* ── BUILD SHOP MODE (new building placement) ────────────── */
   if (gameMode !== 'build_shop' || !pendingBuildType) return;
 
   var wp  = state.s2w(mouseX, mouseY);
@@ -411,6 +484,29 @@ export function drawBuildPreview(ctx, state) {
   var bw  = def.w * sc;
   var bh  = def.h * sc;
 
+  /* MAX UPGRADE FOOTPRINT (GREEN GUIDE) — NEW BUILDINGS */
+  var maxW = def.w * sc * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+  var maxH = def.h * sc * MAX_UPGRADE_FOOTPRINT_MULTIPLIER;
+
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = '#44ff88';
+  ctx.fillRect(Math.round(wp.x - maxW/2), Math.round(wp.y - maxH), Math.round(maxW), Math.round(maxH));
+  ctx.strokeStyle = '#44ff88';
+  ctx.lineWidth = 2 / cam.zoom;
+  ctx.setLineDash([8/cam.zoom, 6/cam.zoom]);
+  ctx.strokeRect(Math.round(wp.x - maxW/2), Math.round(wp.y - maxH), Math.round(maxW), Math.round(maxH));
+  ctx.setLineDash([]);
+
+  /* Label */
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#44ff88';
+  ctx.font = 'bold ' + (8*sc) + 'px "Oldenburg",serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Max Upgrade', wp.x, wp.y - maxH - 5*sc);
+  ctx.restore();
+
+  /* Zone validation check */
   var zoneOk  = true;
   var zoneMsg = '';
   if (state.canBuildInZone) {
@@ -419,6 +515,7 @@ export function drawBuildPreview(ctx, state) {
     zoneMsg = zr.msg || '';
   }
 
+  /* Current building preview */
   var strokeClr = zoneOk ? '#44ff88' : '#ff3333';
   var fillClr   = zoneOk ? 'rgba(68,255,136,0.08)' : 'rgba(255,50,50,0.22)';
   var textClr   = zoneOk ? '#44ff88' : '#ff6666';
@@ -433,6 +530,7 @@ export function drawBuildPreview(ctx, state) {
   ctx.fillStyle = fillClr;
   ctx.fillRect(Math.round(wp.x-bw/2), Math.round(wp.y-bh), Math.round(bw), Math.round(bh));
   ctx.setLineDash([]);
+
   ctx.globalAlpha  = 0.95;
   ctx.fillStyle    = textClr;
   ctx.font         = 'bold ' + (10*sc) + 'px "Oldenburg",serif';
@@ -466,7 +564,7 @@ function _rrectPrev(ctx, x, y, w, h, r) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawTimeOverlay
+drawTimeOverlay
 ══════════════════════════════════════════════════════════════ */
 export function drawTimeOverlay(ctx, VW, VH, time) {
   ctx.shadowBlur = 0;
@@ -489,30 +587,27 @@ export function drawTimeOverlay(ctx, VW, VH, time) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawHUD
+drawHUD
 ══════════════════════════════════════════════════════════════ */
 export function drawHUD(ctx, VS, VW) {
   /* No-op — replaced by the DOM left sidebar (dashboard.js). */
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawZoomBadge
+drawZoomBadge
 ══════════════════════════════════════════════════════════════ */
 export function drawZoomBadge(ctx, VW, VH) {
   if (cam.zoom < 1.15) return;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.shadowBlur = 0;
-  
   var isMobile = VW < 768;
   var bottomMargin = isMobile ? 70 : 80;
   var leftMargin = 12;
-  
   var badgeWidth = 110;
   var badgeHeight = 28;
   var x = leftMargin;
   var y = VH - bottomMargin;
-  
   ctx.fillStyle = 'rgba(13,8,4,0.82)';
   rrect(ctx, x, y, badgeWidth, badgeHeight, 5);
   ctx.fill();
@@ -529,43 +624,35 @@ export function drawZoomBadge(ctx, VW, VH) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawRankBadge
+drawRankBadge
 ══════════════════════════════════════════════════════════════ */
 function drawRankBadge(ctx, VW, VH, VS) {
   if (!VS || !VS.rank) return;
-  
   import('../ranking/rankingSystem.js').then(module => {
     const rank = module.getRankFromScore(VS.rank.score);
-    
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.shadowBlur = 0;
-    
     const isMobile = VW < 768;
     const bottomMargin = isMobile ? 60 : 70;
     const x = (VW / 2) - 65;
     const y = VH - bottomMargin;
-    
     const badgeWidth = 130;
     const badgeHeight = 28;
-    
     ctx.fillStyle = 'rgba(26, 18, 8, 0.85)';
     ctx.strokeStyle = '#c49a4e';
     ctx.lineWidth = 1;
     rrect(ctx, x, y, badgeWidth, badgeHeight, 20);
     ctx.fill();
     ctx.stroke();
-    
     ctx.fillStyle = '#f5c842';
     ctx.font = 'bold 11px "Oldenburg",serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${rank.badge} ${rank.title}`, x + 8, y + badgeHeight/2);
-    
     ctx.fillStyle = '#88dd88';
     ctx.font = 'bold 9px monospace';
     ctx.fillText(`${Math.floor(VS.rank.score)} pts`, x + badgeWidth - 38, y + badgeHeight/2);
-    
     ctx.restore();
   }).catch(err => {
     console.warn('[renderer] Failed to load ranking module:', err);
@@ -573,42 +660,32 @@ function drawRankBadge(ctx, VW, VH, VS) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawMissileStatusBadge
-   Shows missile inventory counts in a small HUD badge
+drawMissileStatusBadge
 ══════════════════════════════════════════════════════════════ */
 function drawMissileStatusBadge(ctx, VW, VH, VS) {
   if (!VS || !VS.missileInventory) return;
-  
   var inv = VS.missileInventory;
   var hasMissiles = inv.basic > 0 || inv.precision > 0 || inv.ballistic > 0 || inv.mirv > 0;
   if (!hasMissiles) return;
-  
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.shadowBlur = 0;
-  
   var isMobile = VW < 768;
   var x = isMobile ? VW - 140 : VW - 160;
   var y = isMobile ? VH - 110 : VH - 100;
   var badgeW = 130;
   var badgeH = 80;
-  
-  // Background
   ctx.fillStyle = 'rgba(20, 25, 40, 0.9)';
   ctx.strokeStyle = '#4a6aff';
   ctx.lineWidth = 1;
   rrect(ctx, x, y, badgeW, badgeH, 8);
   ctx.fill();
   ctx.stroke();
-  
-  // Title
   ctx.fillStyle = '#4a8aff';
   ctx.font = 'bold 10px "Oldenburg",serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText('🚀 Missile Stock', x + badgeW/2, y + 6);
-  
-  // Inventory list
   ctx.font = '9px monospace';
   ctx.textAlign = 'left';
   var items = [
@@ -617,7 +694,6 @@ function drawMissileStatusBadge(ctx, VW, VH, VS) {
     { label: 'Ballistic', count: inv.ballistic, color: '#ff6644' },
     { label: 'MIRV', count: inv.mirv, color: '#ff44ff' }
   ];
-  
   var itemY = y + 24;
   items.forEach(function(item, i) {
     if (item.count > 0) {
@@ -629,12 +705,11 @@ function drawMissileStatusBadge(ctx, VW, VH, VS) {
       ctx.textAlign = 'left';
     }
   });
-  
   ctx.restore();
 }
 
 /* ══════════════════════════════════════════════════════════════
-   updateBarUI
+updateBarUI
 ══════════════════════════════════════════════════════════════ */
 export function updateBarUI(VS, dayCount) {
   var ts  = document.getElementById('barTimeStr');
@@ -646,7 +721,7 @@ export function updateBarUI(VS, dayCount) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   updateBubblePositions
+updateBubblePositions
 ══════════════════════════════════════════════════════════════ */
 export function updateBubblePositions(canvas, activeBubbles, VW, VH) {
   if (!canvas || !activeBubbles) return;
@@ -670,13 +745,12 @@ function _repoBubble(el, v, cr, side) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   drawCalamityOverlay
+drawCalamityOverlay
 ══════════════════════════════════════════════════════════════ */
 function drawCalamityOverlay(ctx, VW, VH, cal) {
   var t   = cal.intensity;
   var now = performance.now();
   ctx.save();
-
   if (cal.type === 'bagyo') {
     ctx.globalAlpha = 0.30 * t;
     ctx.fillStyle   = 'rgba(10,20,60,1)';
@@ -687,7 +761,6 @@ function drawCalamityOverlay(ctx, VW, VH, cal) {
     vgn.addColorStop(1, 'rgba(0,10,40,1)');
     ctx.fillStyle = vgn;
     ctx.fillRect(0, 0, VW, VH);
-
     var activePct = 0.3 + t * 0.7;
     var speedMult = 0.4 + t * 0.6;
     var dt_ms     = 16;
@@ -711,14 +784,12 @@ function drawCalamityOverlay(ctx, VW, VH, cal) {
       ctx.lineTo(wx - len, wy + len * 0.08);
       ctx.stroke();
     }
-
   } else if (cal.type === 'lindol') {
     var mag = t * 6;
     ctx.translate((Math.random()-0.5)*mag*2, (Math.random()-0.5)*mag*2);
     ctx.globalAlpha = 0.22 * t;
     ctx.fillStyle   = 'rgba(120,60,10,1)';
     ctx.fillRect(-10, -10, VW+20, VH+20);
-
   } else if (cal.type === 'tagtuyot') {
     ctx.globalAlpha = 0.20 * t;
     ctx.fillStyle   = 'rgba(200,120,0,1)';
@@ -733,17 +804,14 @@ function drawCalamityOverlay(ctx, VW, VH, cal) {
     ctx.globalAlpha = 0.06 * t * (0.7 + 0.3 * Math.sin(now / 800));
     ctx.fillStyle   = 'rgba(255,180,0,1)';
     ctx.fillRect(0, 0, VW, VH);
-
   } else if (cal.type === 'implasyon' || cal.type === 'welga') {
     ctx.globalAlpha = 0.14 * t;
     ctx.fillStyle   = 'rgba(100,20,20,1)';
     ctx.fillRect(0, 0, VW, VH);
-
   } else if (cal.type === 'protesta' || cal.type === 'iskandalo') {
     ctx.globalAlpha = 0.12 * t;
     ctx.fillStyle   = 'rgba(60,20,80,1)';
     ctx.fillRect(0, 0, VW, VH);
-
   } else {
     ctx.globalAlpha = 0.12 * t;
     ctx.fillStyle   = 'rgba(40,40,40,1)';
@@ -753,7 +821,7 @@ function drawCalamityOverlay(ctx, VW, VH, cal) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Canvas helpers
+Canvas helpers
 ══════════════════════════════════════════════════════════════ */
 export function rrect(ctx, x, y, w, h, r) {
   r = Math.min(r, w/2, h/2);

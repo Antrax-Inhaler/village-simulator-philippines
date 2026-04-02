@@ -15,12 +15,12 @@ let hoverEffectTimeout = null;
 // Rank definitions with enhanced colors and hype elements
 export const RANK_LIST = [
   { id: 1, name: 'Humble Start', vibe: 'Baguhan', scoreRequired: 0, accent: '#9aa0b4', badge: '🌱', color: '#4a5568', darkColor: '#2d3748', glow: '#718096', achievement: 'First Step' },
-  { id: 2, name: 'Rising Leader', vibe: 'Sumisikat', scoreRequired: 100, accent: '#f39c12', badge: '📈', color: '#e67e22', darkColor: '#b85e0a', glow: '#f39c12', achievement: 'Community Builder' },
-  { id: 3, name: 'Respected Noble', vibe: 'Kagalang-galang', scoreRequired: 250, accent: '#3498db', badge: '👑', color: '#2980b9', darkColor: '#1f618d', glow: '#5dade2', achievement: 'Esteemed Leader' },
-  { id: 4, name: 'Town Leader', vibe: 'Pinuno ng Bayan', scoreRequired: 450, accent: '#f1c40f', badge: '🏛️', color: '#f39c12', darkColor: '#d35400', glow: '#f5c842', achievement: 'Town Hero' },
-  { id: 5, name: 'Provincial Leader', vibe: 'Lalawigan', scoreRequired: 700, accent: '#2ecc71', badge: '🌾', color: '#27ae60', darkColor: '#1f8a4c', glow: '#2ecc71', achievement: 'Regional Icon' },
-  { id: 6, name: 'National Figure', vibe: 'Pambansa', scoreRequired: 1000, accent: '#1abc9c', badge: '🇵🇭', color: '#16a085', darkColor: '#117a65', glow: '#1abc9c', achievement: 'National Pride' },
-  { id: 7, name: 'Monument to the People', vibe: 'Monumento', scoreRequired: 1400, accent: '#9b59b6', badge: '🏆', color: '#8e44ad', darkColor: '#6c3483', glow: '#9b59b6', achievement: 'Living Monument' },
+  { id: 2, name: 'Rising Leader', vibe: 'Sumisikat', scoreRequired: 50, accent: '#f39c12', badge: '📈', color: '#e67e22', darkColor: '#b85e0a', glow: '#f39c12', achievement: 'Community Builder' },
+  { id: 3, name: 'Respected Noble', vibe: 'Kagalang-galang', scoreRequired: 150, accent: '#3498db', badge: '👑', color: '#2980b9', darkColor: '#1f618d', glow: '#5dade2', achievement: 'Esteemed Leader' },
+  { id: 4, name: 'Town Leader', vibe: 'Pinuno ng Bayan', scoreRequired: 250, accent: '#f1c40f', badge: '🏛️', color: '#f39c12', darkColor: '#d35400', glow: '#f5c842', achievement: 'Town Hero' },
+  { id: 5, name: 'Provincial Leader', vibe: 'Lalawigan', scoreRequired: 500, accent: '#2ecc71', badge: '🌾', color: '#27ae60', darkColor: '#1f8a4c', glow: '#2ecc71', achievement: 'Regional Icon' },
+  { id: 6, name: 'National Figure', vibe: 'Pambansa', scoreRequired: 800, accent: '#1abc9c', badge: '🇵🇭', color: '#16a085', darkColor: '#117a65', glow: '#1abc9c', achievement: 'National Pride' },
+  { id: 7, name: 'Monument to the People', vibe: 'Monumento', scoreRequired: 1200, accent: '#9b59b6', badge: '🏆', color: '#8e44ad', darkColor: '#6c3483', glow: '#9b59b6', achievement: 'Living Monument' },
   { id: 8, name: 'Living Hero', vibe: 'Bayani', scoreRequired: 1900, accent: '#e74c3c', badge: '⭐', color: '#c0392b', darkColor: '#a93226', glow: '#e74c3c', achievement: 'True Hero' },
   { id: 9, name: "People's Chosen", vibe: 'Hinirang', scoreRequired: 2500, accent: '#3498db', badge: '👑✨', color: '#2980b9', darkColor: '#1f618d', glow: '#5dade2', achievement: 'Voice of the People' },
   { id: 10, name: 'Legend', vibe: 'Alamat', scoreRequired: 3200, accent: '#f39c12', badge: '🏆🌟', color: '#e67e22', darkColor: '#b85e0a', glow: '#f5c842', achievement: 'Eternal Legend' }
