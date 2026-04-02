@@ -143,7 +143,7 @@ export function drawSprite(ctx, sc, w, h, def, level, now) {
       drawSevenLv1(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo });
       break;
     case 2:
-      drawSevenLv2(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo });
+      drawSevenLv2(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump });
       break;
     case 3:
       drawSevenLv3(ctx, sc, w, h, def, t, { drawBase, stdWin, sevenAwning, sevenSign, sevenLogo, gasPump });
@@ -270,8 +270,10 @@ function drawSevenLv2(ctx, sc, w, h, def, t, helpers) {
   sevenSign(-w * 0.38, -h * 0.6, w * 0.76, 12 * sc);
   
   // Gas pumps
-  gasPump(-w * 0.3, 2 * sc);
-  gasPump(w * 0.1, 2 * sc);
+  if (gasPump) {
+    gasPump(-w * 0.3, 2 * sc);
+    gasPump(w * 0.1, 2 * sc);
+  }
   
   // Canopy over pumps
   ctx.fillStyle = 'rgba(44,110,158,0.7)';
@@ -327,10 +329,12 @@ function drawSevenLv3(ctx, sc, w, h, def, t, helpers) {
   }
   
   // Four gas pumps
-  gasPump(-w * 0.45, 3 * sc);
-  gasPump(-w * 0.15, 3 * sc);
-  gasPump(w * 0.05, 3 * sc);
-  gasPump(w * 0.35, 3 * sc);
+  if (gasPump) {
+    gasPump(-w * 0.45, 3 * sc);
+    gasPump(-w * 0.15, 3 * sc);
+    gasPump(w * 0.05, 3 * sc);
+    gasPump(w * 0.35, 3 * sc);
+  }
   
   // Glass storefront
   ctx.fillStyle = 'rgba(100,180,255,0.6)';
@@ -423,8 +427,10 @@ function drawSevenLv4(ctx, sc, w, h, def, t, helpers) {
   sevenAwning(-w / 2, -h * 0.42, w, 10 * sc, true);
   
   // Gas pumps
-  gasPump(-w * 0.3, 2 * sc);
-  gasPump(w * 0.1, 2 * sc);
+  if (gasPump) {
+    gasPump(-w * 0.3, 2 * sc);
+    gasPump(w * 0.1, 2 * sc);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -500,8 +506,10 @@ function drawSevenLv5(ctx, sc, w, h, def, t, helpers) {
   ctx.fillRect(-w * 0.48, -h * 0.32, 16 * sc, 10 * sc);
   ctx.fillStyle = '#f5deb3';
   ctx.fillRect(-w * 0.47, -h * 0.3, 14 * sc, 6 * sc);
-  coffeeCup(-w * 0.42, -h * 0.27);
-  coffeeCup(-w * 0.35, -h * 0.27);
+  if (coffeeCup) {
+    coffeeCup(-w * 0.42, -h * 0.27);
+    coffeeCup(-w * 0.35, -h * 0.27);
+  }
   
   // Slurpee station (right side)
   ctx.fillStyle = '#e6332a';
@@ -519,8 +527,10 @@ function drawSevenLv5(ctx, sc, w, h, def, t, helpers) {
   // Gas pumps with canopy
   ctx.fillStyle = 'rgba(44,110,158,0.9)';
   ctx.fillRect(-w * 0.65, -8 * sc, w * 1.3, 14 * sc);
-  for (let i = 0; i < 6; i++) {
-    gasPump(-w * 0.5 + i * 20 * sc, 3 * sc);
+  if (gasPump) {
+    for (let i = 0; i < 6; i++) {
+      gasPump(-w * 0.5 + i * 20 * sc, 3 * sc);
+    }
   }
   
   // LED strip animation
