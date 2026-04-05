@@ -496,7 +496,7 @@ export function checkVillagerInteractions(villagers, dt, currentHour, activeBubb
   if (_playerGreetTimer <= 0 && villagers.length > 0) {
     _playerGreetTimer = 18 + Math.random() * 14;
     var greeter = villagers[randInt(0, villagers.length - 1)];
-    if (greeter.collisionCooldown <= 0 && !greeter._quip) {
+    if (greeter && !greeter.isInsideBuilding && greeter.collisionCooldown <= 0 && !greeter._quip) {
       greeter.collisionCooldown = 10.0;
       greeter.waitT = 4.5;
       spawnPlayerQuip(greeter);
@@ -505,11 +505,14 @@ export function checkVillagerInteractions(villagers, dt, currentHour, activeBubb
 
   /* Proximity pair chat */
   _grid.clear();
-  for (var j = 0; j < villagers.length; j++) _grid.insert(villagers[j]);
+  for (var j = 0; j < villagers.length; j++) {
+    if (!villagers[j].isInsideBuilding) _grid.insert(villagers[j]); // skip hidden
+  }
   var pairs = _grid.queryPairs(26);
 
   for (var p = 0; p < pairs.length; p++) {
     var a = pairs[p][0], b = pairs[p][1];
+    if (a.isInsideBuilding || b.isInsideBuilding) continue; // double-guard
     if (a.collisionCooldown > 0 || b.collisionCooldown > 0) continue;
     if (activeBubbles.length >= 5) continue;
     if (Math.random() > 0.012) continue;

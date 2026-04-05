@@ -1,50 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — buildings/buildingUpgrade.js  (new)
-
-   UPGRADE PATH SYSTEM
-   ─────────────────────────────────────────────────────────────
-   When a player upgrades a building they choose one of three
-   strategic paths. The choice is permanent for that building.
-
-   PATHS
-   ─────────────────────────────────────────────────────────────
-   capacity    — Serves more citizens / stores more resources.
-                 Storage bonuses ×1.5, population cap ×1.5.
-                 Good for: houses, storage, ospital.
-
-   efficiency  — Produces faster with fewer workers.
-                 Production rate ×1.4, efficiency ×1.2.
-                 Slightly reduces happiness contribution.
-                 Good for: farm, palengke, mine.
-
-   quality     — Improves citizen happiness and trust.
-                 Production ×1.1, adds happiness bonus per tick.
-                 Costs 25% more to upgrade.
-                 Good for: templo, paaralan, ospital, house.
-
-   CHOOSING A PATH
-   ─────────────────────────────────────────────────────────────
-   choosePath(building, path, VS, notifyFn)
-     - Can only be called when upgrading from level 1 to level 2
-       (first upgrade locks in the path).
-     - After that, further upgrades follow the same path.
-     - Path cannot be changed once set.
-
-   READING PATH EFFECTS
-   ─────────────────────────────────────────────────────────────
-   building.upgradePath is read by building.js getStats()
-   to apply the multipliers. No other module needs to import
-   buildingUpgrade.js to read the effects.
-
-   EXPORTS
-   ─────────────────────────────────────────────────────────────
-   PATH_DEFS                                   — catalogue
-   choosePath(building, path, VS, notifyFn)    — set path on upgrade
-   getAvailablePaths(building)                 — paths valid for type
-   getPathDescription(path)                    — UI label + effects
-   upgradeWithPath(building, path, VS, notifyFn) — combined action
-═══════════════════════════════════════════════════════════════ */
-
 import { clamp } from '../utils/perspective.js';
 
 /* ── Path catalogue ───────────────────────────────────────── */
@@ -181,21 +134,7 @@ export function choosePath(building, path, VS, notifyFn) {
   return { ok: true, msg: 'Landas napili: ' + def.label };
 }
 
-/* ══════════════════════════════════════════════════════════════
-   upgradeWithPath
-   Combined action: choose path and upgrade in one call.
-   Used by ui/drawer.js when player picks a path from the modal.
 
-   If building already has a path set, path param is ignored
-   and the existing upgrade() logic runs normally.
-   If building.level === 1 and no path yet, path must be provided.
-
-   @param {Building} building
-   @param {string}   path       — required only for first upgrade
-   @param {object}   VS
-   @param {Function} [notifyFn]
-   @returns {{ ok, msg }}
-══════════════════════════════════════════════════════════════ */
 export function upgradeWithPath(building, path, VS, notifyFn) {
   /* First upgrade — must choose a path */
   if (building.level === 1 && !building.upgradePath) {

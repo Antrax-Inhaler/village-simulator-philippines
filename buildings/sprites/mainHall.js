@@ -1,31 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — buildings/sprites/mainHall.js
-
-   Bahay-Bayan (Main Hall) — Level 1–5 sprites
-   Faithful recreation of the designs from bahay-bayan-levels.html
-   with proper perspective scaling (sc) and positioning relative
-   to building origin (x=0, y=0 at ground level).
-
-   LEVEL 1 — Bahay-Bayan (simple hall)
-   LEVEL 2 — Bahay-Bayan II (side wings + flag)
-   LEVEL 3 — Bahay-Bayan III (colonial style, 4 columns, tile roof)
-   LEVEL 4 — Bahay-Bayan IV (2-storey + clock tower + grand portico)
-   LEVEL 5 — Bahay-Bayan V (Capitol with grand dome)
-
-   Each level uses dimensions proportional to the building's
-   def.w / def.h scaled by `sc` parameter for consistent sizing.
-═══════════════════════════════════════════════════════════════ */
-
-/* ─────────────────────────────────────────────────────────────
-   drawSprite — main entry point for buildingSprites.js
-   @param ctx      Canvas 2D context (already translated to building origin)
-   @param sc       perspective scale (from perspScale)
-   @param w        scaled building width  (def.w * sc)
-   @param h        scaled building height (def.h * sc)
-   @param def      BUILDING_DEFS entry
-   @param level    building.level (1–5)
-   @param now      performance.now() timestamp for animations
-──────────────────────────────────────────────────────────────── */
 export function drawSprite(ctx, sc, w, h, def, level, now) {
   const t = now * 0.001;
 

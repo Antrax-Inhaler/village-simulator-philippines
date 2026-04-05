@@ -1,27 +1,39 @@
 /* ═══════════════════════════════════════════════════════════════
-   Mini Bayan — buildings/building.js  (with Missile Warfare)
+   Mini Bayan — buildings/building.js
 
-   KEY CHANGES
+   BUILDING CATALOGUE, RULES, CONSTRUCTOR & CORE LIFECYCLE
    ─────────────────────────────────────────────────────────────
-   1. Langis now collectable like gold (uncollectedLangis)
-   2. Collection indicators only appear when uncollected >= 40% of capacity
-   3. NEW: Langis consumption system
-      - Buildings consume langis when operating
-      - Without langis, production drops to 20% of normal rate
-      - Training/education buildings cannot train without langis
-   4. NEW: minalangis (Minahan ng Langis) — ONLY langis producer
-   5. Removed langis production from: paaralan, templo, hukuman
-   6. NEW: Missile Warfare Buildings (Hall Lv 6-7)
-      - missilesilo: Launch long-range attacks
-      - radarstation: Detect incoming missiles early
-      - interceptor: Auto-shoot down incoming missiles
+   This file is intentionally lean. Functionality is split into:
+
+     buildingStats.js    — getStats, getUpgradeCost, indicators,
+                           langis/train helpers
+     buildingMilitary.js — missile silo & interceptor methods
+     buildingDraw.js     — Building.prototype.draw + all shape
+                           renderers
+
+   KEY FEATURES
+   ─────────────────────────────────────────────────────────────
+   1. Langis collectable like gold (uncollectedLangis)
+   2. Collection indicators at >= 40% cap
+   3. Langis consumption system — production drops to 20% without
+   4. minalangis (Minahan ng Langis) — only langis producer
+   5. Missile Warfare Buildings (Hall Lv 6-7)
+      - missilesilo    : long-range attacks
+      - radarstation   : incoming missile detection
+      - interceptor    : auto-shoot-down
+   6. Max building / Hall level raised to 10
 ═══════════════════════════════════════════════════════════════ */
 
-import { perspScale, clamp } from '../utils/perspective.js';
-import { drawBuilding }      from './buildingSprites.js';
+import { perspScale, clamp }       from '../utils/perspective.js';
+import { drawBuilding }            from './buildingSprites.js';
+import { isBuildingOnRoad }        from '../world/world.js';
+import { applyStatsPrototypes }    from './buildingStats.js';
+import { applyMilitaryPrototypes } from './buildingMilitary.js';
+import { applyDrawPrototypes }     from './buildingDraw.js';
 
 /* ══════════════════════════════════════════════════════════════
-   BUILDING CATALOGUE with LANGIS CONSUMPTION & MISSILE PROPERTIES
+   BUILDING CATALOGUE
+   (langis consumption & missile properties included)
 ══════════════════════════════════════════════════════════════ */
 export var BUILDING_DEFS = {
 
@@ -36,9 +48,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:200,
     attackRange:0, attackDPS:0, minHallLevel:1,
     requiredZone:null, buildTime:0, workerSlots:0,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   house: {
@@ -52,9 +62,7 @@ export var BUILDING_DEFS = {
     popBonus:4, isHome:true, defenceHP:30,
     attackRange:0, attackDPS:0, minHallLevel:1,
     requiredZone:null, buildTime:30, workerSlots:0,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   palengke: {
@@ -68,9 +76,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:20,
     attackRange:0, attackDPS:0, minHallLevel:1,
     requiredZone:null, buildTime:60, workerSlots:4,
-    maxUncollectedGold: 400,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 400, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   farm: {
@@ -84,9 +90,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:10,
     attackRange:0, attackDPS:0, minHallLevel:1,
     requiredZone:null, buildTime:45, workerSlots:6,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 500,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 500, maxUncollectedLangis: 0,
   },
 
   storage: {
@@ -100,9 +104,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:40,
     attackRange:0, attackDPS:0, minHallLevel:1,
     requiredZone:null, buildTime:50, workerSlots:2,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   /* ── Hall Lv 2 ───────────────────────────────────────────── */
@@ -117,9 +119,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:30,
     attackRange:0, attackDPS:0, minHallLevel:2,
     requiredZone:null, buildTime:90, workerSlots:4,
-    maxUncollectedGold: 500,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 500, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   minalangis: {
@@ -133,9 +133,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:40,
     attackRange:0, attackDPS:0, minHallLevel:2,
     requiredZone:null, buildTime:120, workerSlots:5,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 400,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 400,
     serviceEffect:{
       exportNote:'Maaaring i-export ang langis sa ibang bansa.',
       importNote:'Maaari ring mag-import kung kulang ang langis.',
@@ -153,9 +151,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:20,
     attackRange:0, attackDPS:0, minHallLevel:2,
     requiredZone:null, buildTime:80, workerSlots:3,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
     trainsRoles:['magsasaka','guro','doktor','mangangalakal','mangingisda','albularyo'],
   },
 
@@ -171,9 +167,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:100,
     attackRange:0, attackDPS:0, minHallLevel:3,
     requiredZone:null, buildTime:120, workerSlots:4,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
     trainsRoles:['bantay','bayani','marine','airforce'],
   },
 
@@ -188,9 +182,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:50,
     attackRange:0, attackDPS:0, minHallLevel:3,
     requiredZone:null, buildTime:100, workerSlots:2,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   moog: {
@@ -204,9 +196,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:120,
     attackRange:180, attackDPS:8, minHallLevel:2,
     requiredZone:null, buildTime:90, workerSlots:2,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   kuta: {
@@ -220,9 +210,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:200,
     attackRange:0, attackDPS:0, minHallLevel:2,
     requiredZone:null, buildTime:60, workerSlots:0,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   /* ── Hall Lv 4 ───────────────────────────────────────────── */
@@ -237,9 +225,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:180,
     attackRange:260, attackDPS:18, minHallLevel:4,
     requiredZone:null, buildTime:150, workerSlots:2,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   hukuman: {
@@ -253,9 +239,7 @@ export var BUILDING_DEFS = {
     popBonus:2, isHome:false, defenceHP:60,
     attackRange:0, attackDPS:0, minHallLevel:4,
     requiredZone:null, buildTime:180, workerSlots:3,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
   },
 
   /* ── Service buildings ───────────────────────────────────── */
@@ -270,9 +254,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:30,
     attackRange:0, attackDPS:0, minHallLevel:2,
     requiredZone:null, buildTime:120, workerSlots:4,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
     serviceEffect:{ healthRegenBonus:0.03, deathRiskReduction:0.20, servedPerLevel:8 },
   },
 
@@ -287,9 +269,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:80,
     attackRange:120, attackDPS:5, minHallLevel:2,
     requiredZone:null, buildTime:100, workerSlots:4,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
     serviceEffect:{ angerDecayBonus:0.04, crimeReduction:0.30, trustBonus:0.002 },
   },
 
@@ -304,9 +284,7 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:40,
     attackRange:0, attackDPS:0, minHallLevel:2,
     requiredZone:'dagat', buildTime:150, workerSlots:3,
-    maxUncollectedGold: 400,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 400, maxUncollectedFood: 0, maxUncollectedLangis: 0,
     serviceEffect:{ exportRewardBonus:0.20, importPriceDiscount:0.10, tradeRepGainBonus:1 },
   },
 
@@ -321,37 +299,27 @@ export var BUILDING_DEFS = {
     popBonus:0, isHome:false, defenceHP:5,
     attackRange:0, attackDPS:0, minHallLevel:1,
     requiredZone:null, buildTime:20, workerSlots:0,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
     serviceEffect:{ nearbyProdBonus:0.10, villagerSpeedBonus:0.15 },
   },
 
-  /* ════════════════════════════════════════════════════════════
-     MISSILE WARFARE BUILDINGS (Hall Level 6-7)
-     ════════════════════════════════════════════════════════════ */
-
+  /* ── Missile Warfare Buildings (Hall Lv 6-7) ─────────────── */
   missilesilo: {
     label:'Missile Silo', category:'military',
     wallColor:'#3a3a4a', roofColor:'#1a1a2a',
     doorColor:'rgba(10,10,20,0.95)', winColor:'rgba(80,120,180,0.3)',
     w:64, h:72, shopCost:{ gold:2500, rice:400, langis:200 },
     prodRes:null, prodRate:0,
-    langisConsumption: 1.0,  // High consumption for missile operations
+    langisConsumption: 1.0,
     storageBonus:{ gold:0, rice:0, langis:300 },
     popBonus:0, isHome:false, defenceHP:250,
     attackRange:0, attackDPS:0, minHallLevel:6,
     requiredZone:null, buildTime:300, workerSlots:6,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
-    // Missile-specific properties
-    missileCapacity: 10,      // Max missiles that can be stored
-    missileReloadTime: 120,   // Seconds between launches
-    missileTypes: ['basic', 'precision', 'ballistic', 'mirv'],  // Types this silo can hold
-    serviceEffect:{
-      note:'Nag-iimbak at naglulunsad ng mga missile para sa long-range attacks.',
-    },
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
+    missileCapacity: 10,
+    missileReloadTime: 120,
+    missileTypes: ['basic', 'precision', 'ballistic', 'mirv'],
+    serviceEffect:{ note:'Nag-iimbak at naglulunsad ng mga missile para sa long-range attacks.' },
   },
 
   radarstation: {
@@ -360,21 +328,16 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(15,20,30,0.9)', winColor:'rgba(100,180,255,0.4)',
     w:48, h:56, shopCost:{ gold:1800, rice:300, langis:150 },
     prodRes:null, prodRate:0,
-    langisConsumption: 0.8,  // Radar needs constant power
+    langisConsumption: 0.8,
     storageBonus:{ gold:0, rice:0, langis:100 },
     popBonus:0, isHome:false, defenceHP:150,
     attackRange:0, attackDPS:0, minHallLevel:6,
     requiredZone:null, buildTime:200, workerSlots:4,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
-    // Radar-specific properties
-    detectionRange: Infinity,  // Detects all incoming missiles
-    earlyWarningTime: 15,      // Seconds of advance warning before impact
-    interceptBonus: 10,        // +10% intercept chance when paired with interceptor
-    serviceEffect:{
-      note:'Nagde-detect ng incoming missiles at nagbibigay ng early warning.',
-    },
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
+    detectionRange: Infinity,
+    earlyWarningTime: 15,
+    interceptBonus: 10,
+    serviceEffect:{ note:'Nagde-detect ng incoming missiles at nagbibigay ng early warning.' },
   },
 
   interceptor: {
@@ -383,40 +346,39 @@ export var BUILDING_DEFS = {
     doorColor:'rgba(10,25,15,0.95)', winColor:'rgba(80,180,120,0.35)',
     w:56, h:48, shopCost:{ gold:3000, rice:500, langis:300 },
     prodRes:null, prodRate:0,
-    langisConsumption: 1.2,  // Highest consumption for defense systems
+    langisConsumption: 1.2,
     storageBonus:{ gold:0, rice:0, langis:200 },
     popBonus:0, isHome:false, defenceHP:300,
-    attackRange:400, attackDPS:0, minHallLevel:7,  // AttackRange = intercept range
+    attackRange:400, attackDPS:0, minHallLevel:7,
     requiredZone:null, buildTime:400, workerSlots:8,
-    maxUncollectedGold: 0,
-    maxUncollectedFood: 0,
-    maxUncollectedLangis: 0,
-    // Interceptor-specific properties
-    interceptBaseChance: 40,   // Base 40% chance to shoot down missile
-    interceptBonusPerUnit: 10, // +10% per additional battery (max 80%)
-    interceptorMissileStock: 5, // Starting interceptor missiles
-    canInterceptBallistic: true,  // Can shoot down Ballistic/MIRV (unlike radar alone)
-    cooldown: 30,              // Seconds between intercept attempts
-    serviceEffect:{
-      note:'Awtomatikong nag-i-intercept ng incoming missiles. Mas maraming battery = mas mataas ang tsansa.',
-    },
+    maxUncollectedGold: 0, maxUncollectedFood: 0, maxUncollectedLangis: 0,
+    interceptBaseChance: 40,
+    interceptBonusPerUnit: 10,
+    interceptorMissileStock: 5,
+    canInterceptBallistic: true,
+    cooldown: 30,
+    serviceEffect:{ note:'Awtomatikong nag-i-intercept ng incoming missiles. Mas maraming battery = mas mataas ang tsansa.' },
   },
-
 };
 
-// Training rates multiplier when no langis (20% speed)
+// Production multiplier when langis is unavailable
 export const TRAINING_NO_LANGIS_MULTIPLIER = 0.2;
 
 /* ══════════════════════════════════════════════════════════════
    MAIN HALL GATING
+   Each entry unlocks at the Hall level equal to its array index + 1.
+   mainHall itself goes up to level 10.
 ══════════════════════════════════════════════════════════════ */
 export var MAIN_HALL_RULES = [
-  { maxBuildings:  6, maxBuildingLevel: 2 },
-  { maxBuildings: 12, maxBuildingLevel: 3 },
-  { maxBuildings: 18, maxBuildingLevel: 4 },
-  { maxBuildings: 26, maxBuildingLevel: 5 },
-  { maxBuildings: 34, maxBuildingLevel: 6 },  // NEW: Lv6 for missile buildings
-  { maxBuildings:999, maxBuildingLevel: 7 },  // NEW: Lv7 for interceptor
+  { maxBuildings:  6, maxBuildingLevel: 2 },  // Hall Lv 1
+  { maxBuildings: 12, maxBuildingLevel: 3 },  // Hall Lv 2
+  { maxBuildings: 18, maxBuildingLevel: 4 },  // Hall Lv 3
+  { maxBuildings: 26, maxBuildingLevel: 5 },  // Hall Lv 4
+  { maxBuildings: 34, maxBuildingLevel: 6 },  // Hall Lv 5 — missile buildings unlock
+  { maxBuildings: 42, maxBuildingLevel: 7 },  // Hall Lv 6 — interceptor unlocks
+  { maxBuildings: 52, maxBuildingLevel: 8 },  // Hall Lv 7
+  { maxBuildings: 62, maxBuildingLevel: 9 },  // Hall Lv 8
+  { maxBuildings:999, maxBuildingLevel:10 },  // Hall Lv 9-10 max
 ];
 
 export function getMainHallLevel(buildings) {
@@ -432,20 +394,7 @@ export function getMainHallRules(buildings) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   canPlaceBuilding(type, buildings, wx, wy, unlockedZones, getZoneAt)
-   ─────────────────────────────────────────────────────────────
-   wx, wy          — world coordinates of the intended placement
-   unlockedZones   — array of zone keys the player owns (e.g. ['dagat'])
-   getZoneAt       — optional fn(wx, wy) → zone key string | null
-                     supplied by input.js via _deps so building.js
-                     stays decoupled from zones.js
-
-   Checks (in order):
-     1. Hall level requirement
-     2. Max-building cap
-     3. If def.requiredZone set → zone type must be unlocked
-     4. If getZoneAt provided → placement must lie inside that zone
-        (prevents dragging a zone-locked building onto open land)
+   canPlaceBuilding
 ══════════════════════════════════════════════════════════════ */
 export function canPlaceBuilding(type, buildings, wx, wy, unlockedZones, getZoneAt) {
   var def = BUILDING_DEFS[type];
@@ -454,7 +403,11 @@ export function canPlaceBuilding(type, buildings, wx, wy, unlockedZones, getZone
   var mhLv  = getMainHallLevel(buildings);
   var rules = getMainHallRules(buildings);
   var count = buildings.filter(function(b) { return b.type !== 'mainHall'; }).length;
+  var bw = def.w || 80, bh = def.h || 80;
 
+  if (isBuildingOnRoad(wx - bw/2, wy - bh/2, bw, bh)) {
+    return { ok: false, msg: 'Hindi pwede — nasa daan!' };
+  }
   if (mhLv < def.minHallLevel) {
     return { ok: false, msg: def.label + ' ay nangangailangan ng Bahay-Bayan Level ' + def.minHallLevel + '.' };
   }
@@ -464,23 +417,12 @@ export function canPlaceBuilding(type, buildings, wx, wy, unlockedZones, getZone
 
   if (def.requiredZone) {
     var zones = unlockedZones || [];
-
-    /* Zone type must be unlocked */
     if (zones.indexOf(def.requiredZone) === -1) {
-      return {
-        ok: false,
-        msg: def.label + ' ay nangangailangan ng ' + def.requiredZone + ' zone. I-unlock muna.',
-      };
+      return { ok: false, msg: def.label + ' ay nangangailangan ng ' + def.requiredZone + ' zone. I-unlock muna.' };
     }
-
-    /* Placement coordinates must lie inside a matching owned zone */
     if (typeof getZoneAt === 'function' && wx !== undefined && wy !== undefined) {
-      var zoneAtPos = getZoneAt(wx, wy);
-      if (zoneAtPos !== def.requiredZone) {
-        return {
-          ok: false,
-          msg: def.label + ' ay dapat ilagay sa loob ng ' + def.requiredZone + ' zone.',
-        };
+      if (getZoneAt(wx, wy) !== def.requiredZone) {
+        return { ok: false, msg: def.label + ' ay dapat ilagay sa loob ng ' + def.requiredZone + ' zone.' };
       }
     }
   }
@@ -493,19 +435,19 @@ export function getShopCatalogue(buildings, unlockedZones) {
   var zones = unlockedZones || [];
   return Object.keys(BUILDING_DEFS).filter(function(k) {
     var def = BUILDING_DEFS[k];
-    if (!def.shopCost) return false;
-    if (mhLv < def.minHallLevel) return false;
+    if (!def.shopCost)                                               return false;
+    if (mhLv < def.minHallLevel)                                    return false;
     if (def.requiredZone && zones.indexOf(def.requiredZone) === -1) return false;
     return true;
   });
 }
 
-var UPGRADE_BASE = { gold: 150, rice: 40 };
-var _bldCounter  = 0;
-
 /* ══════════════════════════════════════════════════════════════
-   Building Class
+   Building Class — constructor only
+   All prototype methods are attached below via apply*Prototypes.
 ══════════════════════════════════════════════════════════════ */
+var _bldCounter = 0;
+
 export function Building(type, x, y) {
   var def            = BUILDING_DEFS[type] || BUILDING_DEFS.house;
   this.id            = 'bld_' + (_bldCounter++);
@@ -519,251 +461,67 @@ export function Building(type, x, y) {
   this.prodAccum     = 0;
   this.pulse         = 0;
   this._occupants    = [];
-  this.uncollectedGold = 0;
-  this.uncollectedFood = 0;
-  this.uncollectedLangis = 0;
-  this.upgradePath     = null;
-  this.underConstruction = false;
-  this.constructionTime  = 0;
-  this.constructionMax   = 0;
-  this.workers           = [];
-  this._assignedWorkers  = [];
-  // Track if building has langis this frame
-  this._hasLangis = true;
+  this.uncollectedGold       = 0;
+  this.uncollectedFood       = 0;
+  this.uncollectedLangis     = 0;
+  this.upgradePath           = null;
+  this.underConstruction     = false;
+  this.constructionTime      = 0;
+  this.constructionMax       = 0;
+  this.workers               = [];
+  this._assignedWorkers      = [];
+  this._hasLangis            = true;
   this._langisShortageWarned = false;
-  
-  // Missile-specific state (for military buildings)
+
+  // Missile Silo state
   if (def.missileCapacity !== undefined) {
-    this.missileStock = { basic: 0, precision: 0, ballistic: 0, mirv: 0 };
-    this.reloadTimer = 0;
+    this.missileStock   = { basic: 0, precision: 0, ballistic: 0, mirv: 0 };
+    this.reloadTimer    = 0;
     this.lastLaunchTime = 0;
   }
+  // Interceptor Battery state
   if (def.interceptBaseChance !== undefined) {
-    this.interceptorStock = def.interceptorMissileStock || 0;
+    this.interceptorStock  = def.interceptorMissileStock || 0;
     this.interceptCooldown = 0;
   }
 }
 
+/* ── Core prototype methods (kept here — tightly coupled to DEFS/RULES) ── */
+
 Building.prototype.getDef = function() {
   return BUILDING_DEFS[this.type] || BUILDING_DEFS.house;
 };
+
 Building.prototype.getMaxDimensions = function() {
-    var def = this.getDef();
-    var rules = getMainHallRules(VS.buildings || []);
-    var maxLv = this.type === 'mainHall' ? 7 : rules.maxBuildingLevel;
-    
-    // Calculate max width/height at max level (buildings grow ~10-15% per level)
-    var growthMultiplier = 1 + (maxLv - this.level) * 0.12;
-    
-    return {
-        w: def.w * growthMultiplier,
-        h: def.h * growthMultiplier,
-        maxLevel: maxLv
-    };
-};
-Building.prototype.getStats = function() {
-  var def  = this.getDef();
-  var lv   = this.level;
-  var pathMult = { prod: 1, storage: 1, pop: 1, efficiency: 1, defense: 1 };
-  if (this.upgradePath === 'capacity')   { pathMult.storage = 1.5; pathMult.pop = 1.5; }
-  if (this.upgradePath === 'efficiency') { pathMult.prod = 1.4; pathMult.efficiency = 1.2; }
-  if (this.upgradePath === 'quality')    { pathMult.prod = 1.1; pathMult.defense = 1.3; }
-  
-  var stats = {
-    productionRate: def.prodRate * lv * pathMult.prod,
-    storageBonus: {
-      gold:  (def.storageBonus.gold  || 0) * lv * pathMult.storage,
-      rice:  (def.storageBonus.rice  || 0) * lv * pathMult.storage,
-      langis:(def.storageBonus.langis || 0) * lv * pathMult.storage,
-    },
-    populationMax:  (def.popBonus || 0) * lv * pathMult.pop,
-    efficiency:     clamp(0.6 + 0.1 * lv * pathMult.efficiency, 0.6, 1.0),
-    defenceHP:      (def.defenceHP  || 0) * lv * pathMult.defense,
-    attackDPS:      (def.attackDPS  || 0) * lv,
-    attackRange:    (def.attackRange || 0) * (1 + (lv - 1) * 0.2),
-    maxUncollectedGold: (def.maxUncollectedGold || 0) * lv,
-    maxUncollectedFood: (def.maxUncollectedFood || 0) * lv,
-    maxUncollectedLangis: (def.maxUncollectedLangis || 0) * lv,
-    // Langis consumption scales with level (higher levels consume more)
-    langisConsumption: (def.langisConsumption || 0) * (1 + (lv - 1) * 0.3),
-  };
-  
-  // Add missile-specific stats if applicable
-  if (def.missileCapacity !== undefined) {
-    stats.missileCapacity = (def.missileCapacity || 0) * lv;
-    stats.missileReloadTime = Math.max(30, (def.missileReloadTime || 120) / (1 + (lv-1)*0.15));
-  }
-  if (def.interceptBaseChance !== undefined) {
-    stats.interceptBaseChance = def.interceptBaseChance + (lv - 1) * 5;  // +5% per level
-    stats.interceptorStock = (def.interceptorMissileStock || 0) + (lv - 1) * 2;
-  }
-  if (def.detectionRange !== undefined) {
-    stats.detectionRange = def.detectionRange;
-    stats.earlyWarningTime = def.earlyWarningTime + (lv - 1) * 3;
-  }
-  
-  return stats;
-};
-
-// Get effective production multiplier based on langis availability
-Building.prototype.getProductionMultiplier = function(VS) {
-  var def = this.getDef();
-  var consumption = this.getStats().langisConsumption;
-  if (consumption <= 0) return 1.0;  // No langis needed
-  
-  // Check if we have enough langis
-  var hasLangis = (VS.res.langis || 0) >= consumption * 0.1; // Need at least 10% of consumption rate
-  
-  this._hasLangis = hasLangis;
-  
-  if (!hasLangis && !this._langisShortageWarned && Math.random() < 0.01) {
-    this._langisShortageWarned = true;
-    if (window.showMsg) window.showMsg('⚠️ ' + def.label + ' walang langis! Bumagal ang operasyon.', 'warning');
-  }
-  if (hasLangis) this._langisShortageWarned = false;
-  
-  // Without langis, production drops to 20%
-  return hasLangis ? 1.0 : 0.2;
-};
-
-// Check if training is possible (needs langis for paaralan/cuartel)
-Building.prototype.canTrain = function(VS) {
-  var def = this.getDef();
-  var consumption = this.getStats().langisConsumption;
-  if (consumption <= 0) return true;  // No langis needed for training
-  
-  var hasLangis = (VS.res.langis || 0) >= consumption * 0.1;
-  return hasLangis;
-};
-
-// Check if missile can be launched (for Missile Silo)
-Building.prototype.canLaunchMissile = function(missileType) {
-  var def = this.getDef();
-  if (!def.missileCapacity) return false;
-  
-  // Check reload timer
-  if (this.reloadTimer > 0) return false;
-  
-  // Check if missile type is supported
-  if (def.missileTypes && def.missileTypes.indexOf(missileType) === -1) return false;
-  
-  // Check stock
-  return (this.missileStock && this.missileStock[missileType] > 0);
-};
-
-// Launch missile from this silo
-Building.prototype.launchMissile = function(missileType) {
-  if (!this.canLaunchMissile(missileType)) return false;
-  
-  // Deduct from stock
-  if (this.missileStock) {
-    this.missileStock[missileType]--;
-  }
-  
-  // Start reload timer
-  var stats = this.getStats();
-  this.reloadTimer = stats.missileReloadTime;
-  this.lastLaunchTime = Date.now();
-  
-  return true;
-};
-
-// Update missile reload timer
-Building.prototype.updateMissileTimers = function(dt) {
-  if (this.reloadTimer > 0) {
-    this.reloadTimer -= dt;
-    if (this.reloadTimer < 0) this.reloadTimer = 0;
-  }
-  if (this.interceptCooldown > 0) {
-    this.interceptCooldown -= dt;
-    if (this.interceptCooldown < 0) this.interceptCooldown = 0;
-  }
-};
-
-// Calculate intercept chance for this battery
-Building.prototype.getInterceptChance = function(missileType, hasRadar) {
-  var def = this.getDef();
-  var stats = this.getStats();
-  
-  // Ballistic/MIRV can only be intercepted if this battery supports it
-  if ((missileType === 'ballistic' || missileType === 'mirv') && !def.canInterceptBallistic) {
-    return 0;
-  }
-  
-  var chance = stats.interceptBaseChance;
-  
-  // Bonus if radar station is present
-  if (hasRadar && def.interceptBonus) {
-    chance += def.interceptBonus;
-  }
-  
-  // Bonus from interceptor missiles in stock
-  if (this.interceptorStock > 0) {
-    chance = Math.max(chance, 60);  // At least 60% if we have interceptors
-  }
-  
-  return clamp(chance, 0, 80);  // Max 80%
-};
-
-// Attempt to intercept a missile
-Building.prototype.attemptIntercept = function(missileType, hasRadar) {
-  if (this.interceptCooldown > 0) return false;
-  
-  var chance = this.getInterceptChance(missileType, hasRadar);
-  var success = Math.random() * 100 < chance;
-  
-  if (success && this.interceptorStock > 0) {
-    this.interceptorStock--;  // Consume interceptor missile
-  }
-  
-  if (success) {
-    this.interceptCooldown = this.getDef().cooldown || 30;
-  }
-  
-  return success;
-};
-
-Building.prototype.getUpgradeCost = function() {
-  var lv = this.level;
-  var def = this.getDef();
-  // Military buildings cost more to upgrade
-  var militaryMult = (def.category === 'military') ? 1.5 : 1.0;
-  return { 
-    gold: Math.floor(UPGRADE_BASE.gold * lv * lv * militaryMult), 
-    rice: Math.floor(UPGRADE_BASE.rice * lv * militaryMult) 
-  };
-};
-
-Building.prototype.getCapacity   = function() { return this.getStats().populationMax; };
-Building.prototype.getWorkerSlots = function() { return (this.getDef().workerSlots || 0) * this.level; };
-Building.prototype.getWorkerCount = function() {
-  this._assignedWorkers = this._assignedWorkers.filter(function(v) { return v && v.workBuilding; });
-  return this._assignedWorkers.length;
-};
-Building.prototype.getOccupancy = function() {
-  this._occupants = this._occupants.filter(function(v) { return v && v.isHome; });
-  return this._occupants.length;
-};
-Building.prototype.getServiceEffect = function() {
-  var def = this.getDef();
-  return def.serviceEffect || null;
+  var def   = this.getDef();
+  var rules = getMainHallRules(VS.buildings || []);
+  var maxLv = this.type === 'mainHall' ? 10 : rules.maxBuildingLevel;
+  var growthMultiplier = 1 + (maxLv - this.level) * 0.12;
+  return { w: def.w * growthMultiplier, h: def.h * growthMultiplier, maxLevel: maxLv };
 };
 
 Building.prototype.upgrade = function(VS) {
   var rules = getMainHallRules(VS.buildings || []);
-  var maxLv = this.type === 'mainHall' ? 7 : rules.maxBuildingLevel;
+  var maxLv = this.type === 'mainHall' ? 10 : rules.maxBuildingLevel;
   var mhLv  = getMainHallLevel(VS.buildings || []);
-  if (this.underConstruction) return { ok:false, msg:'Nag-co-construct pa ang '+this.getDef().label+'!' };
-  if (this.level >= maxLv) {
-    if (this.type !== 'mainHall' && maxLv < 7) return { ok:false, msg:'I-upgrade muna ang Bahay-Bayan (Lv'+mhLv+')!' };
-    return { ok:false, msg:'Maximum na ang level ng '+this.getDef().label+'!' };
+
+  if (this.underConstruction) {
+    return { ok: false, msg: 'Nag-co-construct pa ang ' + this.getDef().label + '!' };
   }
+  if (this.level >= maxLv) {
+    if (this.type !== 'mainHall' && maxLv < 10) {
+      return { ok: false, msg: 'I-upgrade muna ang Bahay-Bayan (Lv' + mhLv + ')!' };
+    }
+    return { ok: false, msg: 'Maximum na ang level ng ' + this.getDef().label + '!' };
+  }
+
   var cost = this.getUpgradeCost();
   if (VS.res.gold < cost.gold || VS.res.rice < cost.rice) {
-    return { ok:false, msg:'Kulang! Kailangan: '+cost.gold+' ginto '+cost.rice+' bigas.' };
+    return { ok: false, msg: 'Kulang! Kailangan: ' + cost.gold + ' ginto ' + cost.rice + ' bigas.' };
   }
   VS.res.gold -= cost.gold;
   VS.res.rice -= cost.rice;
+
   var def    = this.getDef();
   var base   = def.buildTime || 30;
   var upTime = Math.ceil(base * 0.6 * (this.level + 1));
@@ -772,12 +530,15 @@ Building.prototype.upgrade = function(VS) {
     this.constructionTime  = upTime;
     this.constructionMax   = upTime;
     this._upgradeLevel     = this.level + 1;
-    return { ok:true, msg:this.getDef().label+' — nag-uupgrade sa Level '+(this.level+1)+'! ('+(upTime>=60?Math.ceil(upTime/60)+'min':upTime+'s')+')' };
-  } else {
-    this.level++;
-    this.pulse = 1.0;
-    return { ok:true, msg:this.getDef().label+' Level '+this.level+'!' };
+    return {
+      ok:  true,
+      msg: def.label + ' — nag-uupgrade sa Level ' + (this.level + 1) + '! (' +
+           (upTime >= 60 ? Math.ceil(upTime/60) + 'min' : upTime + 's') + ')',
+    };
   }
+  this.level++;
+  this.pulse = 1.0;
+  return { ok: true, msg: def.label + ' Level ' + this.level + '!' };
 };
 
 Building.prototype.update = function(dt, VS) {
@@ -794,645 +555,56 @@ Building.prototype.update = function(dt, VS) {
     if (this.pulse > 0) this.pulse = Math.max(0, this.pulse - dt * 2);
     return;
   }
-  
+
   var def   = this.getDef();
   var stats = this.getStats();
-  
-  // Update missile/interceptor timers for military buildings
+
+  // Military timer tick
   if (def.missileCapacity !== undefined || def.interceptBaseChance !== undefined) {
     this.updateMissileTimers(dt);
   }
-  
-  // Handle langis consumption for non-production buildings first
+
+  // Langis consumption
   var consumption = stats.langisConsumption;
   if (consumption > 0) {
-    // Consume langis if available
-    var langisNeeded = consumption * dt;
+    var langisNeeded    = consumption * dt;
     var availableLangis = VS.res.langis || 0;
-    var langisTaken = Math.min(langisNeeded, availableLangis);
-    VS.res.langis = Math.max(0, availableLangis - langisTaken);
-    
-    // Track if we have enough for production multiplier
-    this._hasLangis = langisTaken >= langisNeeded * 0.9;
+    var langisTaken     = Math.min(langisNeeded, availableLangis);
+    VS.res.langis       = Math.max(0, availableLangis - langisTaken);
+    this._hasLangis     = langisTaken >= langisNeeded * 0.9;
   }
-  
-  // Handle production
+
+  // Production tick
   if (def.prodRes && stats.productionRate > 0) {
-    var prodMult = this.getProductionMultiplier(VS);
+    var prodMult      = this.getProductionMultiplier(VS);
     var effectiveRate = stats.productionRate * stats.efficiency * prodMult;
-    
-    this.prodAccum += dt * effectiveRate;
+    this.prodAccum   += dt * effectiveRate;
+
     if (this.prodAccum >= 1) {
       var produced   = Math.floor(this.prodAccum);
       this.prodAccum -= produced;
       var zoneMult   = (VS.getZoneMult && def.prodRes) ? VS.getZoneMult(def.prodRes, this.x, this.y) : 1.0;
       var producedZ  = Math.round(produced * zoneMult);
-      
+
       if (def.prodRes === 'gold') {
-        var maxGold = stats.maxUncollectedGold || 999;
-        this.uncollectedGold = Math.min(maxGold, this.uncollectedGold + producedZ);
+        this.uncollectedGold = Math.min(stats.maxUncollectedGold || 999, this.uncollectedGold + producedZ);
       } else if (def.prodRes === 'rice') {
-        var maxFood = stats.maxUncollectedFood || 999;
-        this.uncollectedFood = Math.min(maxFood, (this.uncollectedFood || 0) + producedZ);
+        this.uncollectedFood = Math.min(stats.maxUncollectedFood || 999, (this.uncollectedFood || 0) + producedZ);
       } else if (def.prodRes === 'langis') {
-        var maxLangis = stats.maxUncollectedLangis || 999;
-        this.uncollectedLangis = Math.min(maxLangis, (this.uncollectedLangis || 0) + producedZ);
+        this.uncollectedLangis = Math.min(stats.maxUncollectedLangis || 999, (this.uncollectedLangis || 0) + producedZ);
       } else {
         VS.res[def.prodRes] = Math.min(VS.resCap[def.prodRes] || 9999, (VS.res[def.prodRes] || 0) + producedZ);
       }
     }
   }
-  
+
   if (this.pulse > 0) this.pulse = Math.max(0, this.pulse - dt * 2);
 };
 
-Building.prototype.shouldShowGoldIndicator = function() {
-  var stats = this.getStats();
-  var maxGold = stats.maxUncollectedGold || 0;
-  if (maxGold === 0) return false;
-  return this.uncollectedGold >= (maxGold * 0.4);
-};
-
-Building.prototype.shouldShowFoodIndicator = function() {
-  var stats = this.getStats();
-  var maxFood = stats.maxUncollectedFood || 0;
-  if (maxFood === 0) return false;
-  return this.uncollectedFood >= (maxFood * 0.4);
-};
-
-Building.prototype.shouldShowLangisIndicator = function() {
-  var stats = this.getStats();
-  var maxLangis = stats.maxUncollectedLangis || 0;
-  if (maxLangis === 0) return false;
-  return this.uncollectedLangis >= (maxLangis * 0.4);
-};
-
-/* ══════════════════════════════════════════════════════════════
-   RENDERING
-══════════════════════════════════════════════════════════════ */
-Building.prototype.draw = function(ctx, now) {
-  var def = this.getDef();
-  var sc  = perspScale(this.y);
-  var w   = this.w * sc, h = this.h * sc;
-  ctx.save();
-  ctx.translate(this.x, this.y);
-
-  if (this.isWreck) { _drawWreck(ctx, sc, w, h, this); ctx.restore(); return; }
-
-  if (this.pulse > 0) {
-    ctx.globalAlpha = this.pulse * 0.6;
-    ctx.strokeStyle = '#f5c842'; ctx.lineWidth = 3 * sc;
-    ctx.beginPath(); ctx.ellipse(0, 0, w*0.75+(1-this.pulse)*20*sc, h*0.5, 0, 0, Math.PI*2); ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-
-  // Draw langis shortage indicator (red overlay or warning)
-  if (!this._hasLangis && this.getStats().langisConsumption > 0 && !this.underConstruction) {
-    ctx.globalAlpha = 0.25 + Math.sin(Date.now() / 500) * 0.15;
-    ctx.fillStyle = '#ff3300';
-    ctx.fillRect(-w/2, -h/2, w, h);
-    ctx.globalAlpha = 1;
-  }
-
-  // Draw missile reload indicator for Missile Silo
-  if (def.missileCapacity !== undefined && this.reloadTimer > 0 && !this.underConstruction) {
-    var reloadPct = 1 - (this.reloadTimer / this.getStats().missileReloadTime);
-    ctx.save();
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = 'rgba(30,30,50,0.9)';
-    ctx.strokeStyle = '#4a8aff';
-    ctx.lineWidth = 2 * sc;
-    var barW = w * 0.8, barH = 6 * sc;
-    var barX = -barW/2, barY = -h * 1.6;
-    _rrect(ctx, barX, barY, barW, barH, 3*sc);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#4a8aff';
-    _rrect(ctx, barX, barY, barW * reloadPct, barH, 3*sc);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold ' + (7*sc) + 'px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(Math.ceil(this.reloadTimer) + 's', 0, barY + barH/2);
-    ctx.restore();
-  }
-
-  // Draw intercept cooldown indicator for Interceptor
-  if (def.interceptBaseChance !== undefined && this.interceptCooldown > 0 && !this.underConstruction) {
-    var cdPct = 1 - (this.interceptCooldown / (def.cooldown || 30));
-    ctx.save();
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = 'rgba(30,50,40,0.9)';
-    ctx.strokeStyle = '#4aff8a';
-    ctx.lineWidth = 2 * sc;
-    var barW = w * 0.8, barH = 6 * sc;
-    var barX = -barW/2, barY = -h * 1.6;
-    _rrect(ctx, barX, barY, barW, barH, 3*sc);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#4aff8a';
-    _rrect(ctx, barX, barY, barW * cdPct, barH, 3*sc);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold ' + (7*sc) + 'px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(Math.ceil(this.interceptCooldown) + 's', 0, barY + barH/2);
-    ctx.restore();
-  }
-
-  if (this.underConstruction) {
-    var pct = this.constructionMax > 0 ? 1 - this.constructionTime / this.constructionMax : 0;
-    var renderer0 = {
-      farm:_drawFarm, paaralan:_drawPaaralan, cuartel:_drawCuartel,
-      moog:_drawMoog, kuta:_drawKuta, bantayan:_drawBantayan,
-      templo:_drawTemplo, hukuman:_drawHukuman, ospital:_drawOspital,
-      pulisya:_drawPulisya, daungan:_drawDaungan, kalye:_drawKalye,
-      minalangis:_drawMinalangis,
-      missilesilo:_drawMissileSilo, radarstation:_drawRadarStation, interceptor:_drawInterceptor,
-    }[this.type];
-    ctx.globalAlpha = 0.25;
-    if (renderer0) renderer0(ctx, sc, w, h, def, this.level, 0);
-    else _drawStandard(ctx, sc, w, h, def, this.type, this.level);
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = '#8b6030'; ctx.lineWidth = 2 * sc;
-    ctx.beginPath(); ctx.moveTo(-w*0.5, 0); ctx.lineTo(-w*0.5, -h*1.25); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo( w*0.5, 0); ctx.lineTo( w*0.5, -h*1.25); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-w*0.5, -h*0.7); ctx.lineTo(w*0.5, -h*0.7); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-w*0.5, -h*1.25); ctx.lineTo(w*0.5, -h*1.25); ctx.stroke();
-    ctx.strokeStyle = 'rgba(139,96,48,0.5)';
-    ctx.beginPath(); ctx.moveTo(-w*0.5,-h*1.25); ctx.lineTo(w*0.5, 0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo( w*0.5,-h*1.25); ctx.lineTo(-w*0.5, 0); ctx.stroke();
-    var pbW = w * 1.1, pbH = 8 * sc, pbX = -pbW/2, pbY = -h*1.42;
-    ctx.fillStyle = '#1a0e06'; ctx.fillRect(pbX, pbY, pbW, pbH);
-    ctx.fillStyle = pct > 0.66 ? '#44aa44' : pct > 0.33 ? '#f5c842' : '#e67e22';
-    ctx.fillRect(pbX, pbY, pbW * pct, pbH);
-    ctx.strokeStyle = '#8b6030'; ctx.lineWidth = 1; ctx.strokeRect(pbX, pbY, pbW, pbH);
-    var secsLeft = Math.ceil(this.constructionTime);
-    var timeStr  = secsLeft > 60 ? Math.ceil(secsLeft/60)+'min '+secsLeft%60+'s' : secsLeft+'s';
-    ctx.fillStyle = '#f5c842'; ctx.font = 'bold '+(10*sc)+'px Oldenburg,serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    ctx.fillText(timeStr, 0, pbY - 3*sc);
-    if (this.workers && this.workers.length > 0) {
-      ctx.fillStyle = '#44aa44'; ctx.font = 'bold '+(9*sc)+'px monospace';
-      ctx.fillText('👷 '+this.workers.length+' manggagawa', 0, pbY - 14*sc);
-    }
-    ctx.restore();
-    return;
-  }
-
-  if (this.type !== 'farm') {
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.beginPath(); ctx.ellipse(0, h*0.12, w*0.62, h*0.2, 0, 0, Math.PI*2); ctx.fill();
-  }
-
-  var _inlineRenderers = {
-    farm:_drawFarm, paaralan:_drawPaaralan, cuartel:_drawCuartel,
-    moog:_drawMoog, kuta:_drawKuta, bantayan:_drawBantayan,
-    templo:_drawTemplo, hukuman:_drawHukuman, ospital:_drawOspital,
-    pulisya:_drawPulisya, daungan:_drawDaungan, kalye:_drawKalye,
-    minalangis:_drawMinalangis,
-    missilesilo:_drawMissileSilo, radarstation:_drawRadarStation, interceptor:_drawInterceptor,
-  };
-
-  drawBuilding(ctx, sc, w, h, def, this.type, this.level, now, _inlineRenderers);
-
-  if (def.isHome) {
-    var occ = this.getOccupancy(), cap = this.getCapacity();
-    _drawOccupancyBadge(ctx, sc, w, h, occ, cap, 'home');
-  } else if ((def.workerSlots || 0) > 0) {
-    var wSlots = this.getWorkerSlots();
-    var wCount = this._assignedWorkers ? this._assignedWorkers.length : 0;
-    if (wSlots > 0) _drawOccupancyBadge(ctx, sc, w, h, wCount, wSlots, 'work');
-  }
-
-  if (def.attackRange > 0) {
-    ctx.globalAlpha = 0.07;
-    ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(0, 0, def.attackRange*sc, 0, Math.PI*2); ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-
-  // Draw gold indicator
-  if (this.shouldShowGoldIndicator()) {
-    var ug   = Math.floor(this.uncollectedGold);
-    var bob2 = Math.sin(Date.now()/600 + this.x) * 3 * sc;
-    ctx.fillStyle = '#f5c842';
-    ctx.beginPath(); ctx.arc(0, -h*1.55+bob2, 13*sc, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#c49a1a'; ctx.lineWidth = 1.5*sc; ctx.stroke();
-    ctx.fillStyle = '#7a5010'; ctx.font = 'bold '+(9*sc)+'px Oldenburg,serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('🪙', 0, -h*1.55+bob2);
-    ctx.fillStyle = '#f5c842'; ctx.font = 'bold '+(8*sc)+'px monospace';
-    ctx.textBaseline = 'top';
-    ctx.fillText('+'+ug, 0, -h*1.55+bob2+15*sc);
-    ctx.textBaseline = 'alphabetic';
-  }
-  
-  // Draw rice indicator
-  if (this.shouldShowFoodIndicator()) {
-    var uf   = Math.floor(this.uncollectedFood);
-    var bob3 = Math.sin(Date.now()/700 + this.x + 1) * 3 * sc;
-    var xOff = this.shouldShowGoldIndicator() ? w * 0.7 : 0;
-    ctx.fillStyle = '#44bb44';
-    ctx.beginPath(); ctx.arc(xOff, -h*1.55+bob3, 13*sc, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#228822'; ctx.lineWidth = 1.5*sc; ctx.stroke();
-    ctx.fillStyle = '#0a2a0a'; ctx.font = 'bold '+(9*sc)+'px Oldenburg,serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('🌾', xOff, -h*1.55+bob3);
-    ctx.fillStyle = '#88ee88'; ctx.font = 'bold '+(8*sc)+'px monospace';
-    ctx.textBaseline = 'top';
-    ctx.fillText('+'+uf, xOff, -h*1.55+bob3+15*sc);
-    ctx.textBaseline = 'alphabetic';
-  }
-  
-  // Draw langis indicator
-  if (this.shouldShowLangisIndicator()) {
-    var ul   = Math.floor(this.uncollectedLangis);
-    var bobL = Math.sin(Date.now()/800 + this.x + 2) * 3 * sc;
-    var xOff = 0;
-    
-    if (this.shouldShowGoldIndicator() && this.shouldShowFoodIndicator()) {
-      xOff = -w * 0.5;
-    } else if (this.shouldShowGoldIndicator()) {
-      xOff = w * 0.35;
-    } else if (this.shouldShowFoodIndicator()) {
-      xOff = -w * 0.35;
-    }
-    
-    ctx.fillStyle = '#2a4a3a';
-    ctx.beginPath(); 
-    ctx.arc(xOff, -h*1.55+bobL, 13*sc, 0, Math.PI*2); 
-    ctx.fill();
-    ctx.strokeStyle = '#4a8a6a'; 
-    ctx.lineWidth = 1.5*sc; 
-    ctx.stroke();
-    ctx.fillStyle = '#0a2a1a'; 
-    ctx.font = 'bold '+(9*sc)+'px Oldenburg,serif';
-    ctx.textAlign = 'center'; 
-    ctx.textBaseline = 'middle';
-    ctx.fillText('⛽', xOff, -h*1.55+bobL);
-    ctx.fillStyle = '#88eeaa'; 
-    ctx.font = 'bold '+(8*sc)+'px monospace';
-    ctx.textBaseline = 'top';
-    ctx.fillText('+'+ul, xOff, -h*1.55+bobL+15*sc);
-    ctx.textBaseline = 'alphabetic';
-  }
-
-  if (this.level > 1) {
-    ctx.fillStyle = '#f5c842';
-    ctx.beginPath(); ctx.arc(w*0.38, -h*1.22, 7*sc, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#1a0f06'; ctx.font = 'bold '+(10*sc)+'px Oldenburg,serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(this.level, w*0.38, -h*1.22+0.5*sc);
-    ctx.textBaseline = 'alphabetic';
-  }
-  ctx.fillStyle = 'rgba(255,225,155,0.82)';
-  ctx.font = (11*sc)+'px Crimson Pro,serif'; ctx.textAlign = 'center';
-  ctx.fillText(def.label, 0, h*0.28);
-  ctx.restore();
-};
-
-/* ── Wreck drawing functions (unchanged) ──────────────────── */
-function _drawWreck(ctx, sc, w, h, b) {
-  var def = b.getDef ? b.getDef() : {};
-  ctx.fillStyle = 'rgba(80,60,40,0.75)'; ctx.fillRect(-w*0.45,-h*0.28,w*0.9,h*0.32);
-  ctx.fillStyle = 'rgba(100,80,55,0.65)';
-  [[-w*0.3,-h*0.35,w*0.18,h*0.1],[w*0.15,-h*0.3,w*0.22,h*0.12],[-w*0.45,-h*0.1,w*0.15,h*0.1]].forEach(function(r){ctx.fillRect(r[0],r[1],r[2],r[3]);});
-  if (def.wallColor) { ctx.globalAlpha=0.35; ctx.fillStyle=def.wallColor; ctx.fillRect(-w*0.42,-h*0.3,w*0.84,h*0.34); ctx.globalAlpha=1; }
-  ctx.strokeStyle=def.roofColor||'#5a3a10'; ctx.lineWidth=2.5*sc;
-  ctx.beginPath(); ctx.moveTo(-w*0.25,-h*0.28); ctx.lineTo(0,-h*0.58); ctx.lineTo(w*0.18,-h*0.28); ctx.stroke();
-  ctx.fillStyle='rgba(10,6,2,0.78)';
-  var pw=32*sc,ph=13*sc,px=-pw/2,py=-h*0.82;
-  _rrectWreck(ctx,px,py,pw,ph,3*sc); ctx.fill();
-  ctx.fillStyle='#ffcc44'; ctx.font='bold '+Math.max(7,Math.round(9*sc))+'px monospace';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('🔧 SIRA',0,py+ph/2); ctx.textBaseline='alphabetic';
-}
-
-function _rrectWreck(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
-
-function _drawOccupancyBadge(ctx,sc,w,h,occ,cap,mode){var text=occ+'/'+cap;var icon=mode==='work'?'👷':'🏠';var label=icon+text;var bx=-w*0.48,by=-h*1.28,bw=Math.max((label.length*6+10)*sc,28*sc),bh=12*sc;ctx.save();if(mode==='work'){ctx.fillStyle=occ>=cap?'#1a4a1a':occ>0?'#1a3a0a':'#1a1808';ctx.strokeStyle=occ>=cap?'#44aa44':'#5a8a3a';}else{ctx.fillStyle=occ>=cap?'#c0392b':occ>0?'#1a4a8a':'#1a1808';ctx.strokeStyle=occ>=cap?'#e74c3c':'#4a8abf';}ctx.lineWidth=0.8;_rrect(ctx,bx,by,bw,bh,2*sc);ctx.fill();ctx.stroke();ctx.fillStyle='#fff';ctx.font=(8*sc)+'px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,bx+bw/2,by+bh/2);ctx.textBaseline='alphabetic';ctx.restore();}
-
-function _rrect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
-
-/* ══════════════════════════════════════════════════════════════
-   DRAW FUNCTIONS (including new missile buildings)
-══════════════════════════════════════════════════════════════ */
-function _drawFarm(ctx,sc,w,h,def,level,now){var t=now?now/1000:0;var rows=Math.min(2+level,5);var fw=w*1.1,fh=h*0.9,top=-fh*0.5,rowH=fh/rows;for(var r=0;r<rows;r++){var ry=top+r*rowH;ctx.fillStyle=(r%2===0)?'rgba(80,140,160,0.72)':'rgba(60,120,140,0.65)';ctx.fillRect(-fw*0.5,ry,fw,rowH-1.5*sc);var shimmer=Math.sin(t*0.9+r*1.1)*0.12+0.10;ctx.fillStyle='rgba(200,240,255,'+shimmer+')';ctx.fillRect(-fw*0.3,ry+rowH*0.35,fw*0.6,1.5*sc);ctx.fillStyle='rgba(180,220,255,0.15)';ctx.fillRect(-fw*0.5,ry+1.5*sc,fw,rowH*0.18);ctx.fillStyle='#6b4c2a';ctx.fillRect(-fw*0.52,ry+rowH-1.5*sc,fw*1.04,3.5*sc);ctx.fillStyle='#7a5830';ctx.fillRect(-fw*0.52,ry,3*sc,rowH);ctx.fillRect(fw*0.49,ry,3*sc,rowH);var stalksPerRow=Math.floor(fw/(8*sc)),stalkSpacing=fw/(stalksPerRow+1);for(var s=0;s<stalksPerRow;s++){var sx2=-fw*0.5+stalkSpacing*(s+1);var sway=Math.sin(t*1.2+s*0.7+r*2.1)*0.8*sc;var stalkH=(rowH*0.62)*(0.85+0.3*((s*7+r*3)%5)/5);var stalkBase=ry+rowH-2*sc;ctx.strokeStyle='#4a7a28';ctx.lineWidth=1.2*sc;ctx.beginPath();ctx.moveTo(sx2,stalkBase);ctx.quadraticCurveTo(sx2+sway,stalkBase-stalkH*0.5,sx2+sway*1.5,stalkBase-stalkH);ctx.stroke();ctx.strokeStyle='#8aae38';ctx.lineWidth=1.8*sc;ctx.beginPath();ctx.moveTo(sx2+sway*1.5,stalkBase-stalkH);ctx.quadraticCurveTo(sx2+sway*1.5+2*sc,stalkBase-stalkH+2*sc,sx2+sway*1.5+1*sc,stalkBase-stalkH+4.5*sc);ctx.stroke();ctx.fillStyle='rgba(200,170,40,0.85)';ctx.beginPath();ctx.ellipse(sx2+sway*1.5+1*sc,stalkBase-stalkH+5.5*sc,1.4*sc,2.2*sc,0.3,0,Math.PI*2);ctx.fill();}}ctx.strokeStyle='#5a3c18';ctx.lineWidth=2*sc;ctx.strokeRect(-fw*0.52,top,fw*1.04,fh+2*sc);var scx=fw*0.32,scy=top+fh*0.25;ctx.strokeStyle='#6b4020';ctx.lineWidth=1.8*sc;ctx.beginPath();ctx.moveTo(scx,scy+10*sc);ctx.lineTo(scx,scy-14*sc);ctx.stroke();ctx.beginPath();ctx.moveTo(scx-7*sc,scy-5*sc);ctx.lineTo(scx+7*sc,scy-5*sc);ctx.stroke();ctx.fillStyle='#c8a040';ctx.beginPath();ctx.ellipse(scx,scy-15*sc,4.5*sc,2.5*sc,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(scx,scy-17*sc,2.5*sc,2.5*sc,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(200,80,40,0.7)';ctx.fillRect(scx-3.5*sc,scy-10*sc,7*sc,6*sc);}
-
-function _drawStandard(ctx,sc,w,h,def,type,level){ctx.fillStyle=def.wallColor;ctx.fillRect(-w/2,-h*0.55,w,h*0.67);var ws=ctx.createLinearGradient(-w/2,0,w/2,0);ws.addColorStop(0,'rgba(0,0,0,0)');ws.addColorStop(0.7,'rgba(0,0,0,0)');ws.addColorStop(1,'rgba(0,0,0,0.18)');ctx.fillStyle=ws;ctx.fillRect(-w/2,-h*0.55,w,h*0.67);ctx.fillStyle=def.roofColor;ctx.beginPath();ctx.moveTo(-w*0.58,-h*0.55);ctx.lineTo(0,-h*1.12);ctx.lineTo(w*0.58,-h*0.55);ctx.closePath();ctx.fill();ctx.fillStyle='rgba(255,255,255,0.08)';ctx.beginPath();ctx.moveTo(-w*0.1,-h*0.55);ctx.lineTo(0,-h*1.12);ctx.lineTo(w*0.1,-h*0.55);ctx.closePath();ctx.fill();ctx.fillStyle=def.doorColor||'rgba(30,15,5,0.8)';var dw=10*sc,dh=h*0.34;ctx.beginPath();ctx.rect(-dw/2,-dh,dw,dh);ctx.arc(0,-dh,dw/2,Math.PI,0,true);ctx.fill();var ww=9*sc,wh=7*sc;ctx.fillStyle=def.winColor||'rgba(255,230,140,0.6)';ctx.fillRect(-w*0.32,-h*0.48,ww,wh);ctx.fillRect(w*0.22,-h*0.48,ww,wh);ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=0.8*sc;[-w*0.32+ww/2,w*0.22+ww/2].forEach(function(wx){ctx.beginPath();ctx.moveTo(wx,-h*0.48);ctx.lineTo(wx,-h*0.48+wh);ctx.moveTo(wx-ww/2,-h*0.48+wh/2);ctx.lineTo(wx+ww/2,-h*0.48+wh/2);ctx.stroke();});if(type==='storage'){ctx.fillStyle='rgba(100,80,40,0.7)';ctx.beginPath();ctx.ellipse(0,-h*0.28,8*sc,10*sc,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#6b4c2a';ctx.lineWidth=1.5*sc;for(var bi=0;bi<2;bi++){ctx.beginPath();ctx.ellipse(0,-h*0.28+(bi-0.5)*8*sc,8*sc,2.5*sc,0,0,Math.PI*2);ctx.stroke();}}}
-
-function _drawPaaralan(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.fillRect(-w/2,-h*0.55,w,h*0.67);ctx.fillStyle=def.roofColor;ctx.fillRect(-w*0.6,-h*0.6,w*1.2,h*0.1);ctx.fillStyle=def.winColor;for(var wi=-1;wi<=1;wi++){ctx.fillRect(wi*w*0.28-7*sc,-h*0.5,14*sc,10*sc);ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=0.8*sc;ctx.strokeRect(wi*w*0.28-7*sc,-h*0.5,14*sc,10*sc);}ctx.strokeStyle='#888';ctx.lineWidth=1.5*sc;ctx.beginPath();ctx.moveTo(w*0.38,-h*0.6);ctx.lineTo(w*0.38,-h*1.25);ctx.stroke();ctx.fillStyle='#3a80c0';ctx.fillRect(w*0.38,-h*1.23,12*sc,7*sc);ctx.fillStyle='#fff';ctx.fillRect(w*0.38,-h*1.23,12*sc,3*sc);ctx.fillStyle=def.doorColor||'rgba(80,60,0,0.8)';ctx.fillRect(-6*sc,-h*0.28,12*sc,h*0.28);ctx.fillStyle='#fff8c0';ctx.fillRect(-w*0.35,-h*0.68,w*0.7,9*sc);ctx.fillStyle='#5a3800';ctx.font=(9*sc)+'px Oldenburg,serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('PAARALAN',0,-h*0.68+4.5*sc);ctx.textBaseline='alphabetic';}
-
-function _drawCuartel(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.fillRect(-w/2,-h*0.55,w,h*0.67);ctx.fillStyle=def.roofColor;ctx.fillRect(-w*0.55,-h*0.62,w*1.1,h*0.1);for(var bi=-2;bi<=2;bi++)ctx.fillRect(bi*w*0.22-5*sc,-h*0.76,10*sc,15*sc);ctx.fillStyle='rgba(10,20,5,0.7)';for(var si=-1;si<=1;si++)ctx.fillRect(si*w*0.28-2.5*sc,-h*0.53,5*sc,13*sc);ctx.fillStyle=def.doorColor||'rgba(10,30,5,0.9)';ctx.fillRect(-9*sc,-h*0.3,18*sc,h*0.3);ctx.strokeStyle='#6b4c2a';ctx.lineWidth=2*sc;ctx.strokeRect(-9*sc,-h*0.3,18*sc,h*0.3);ctx.fillStyle='#8b7040';for(var di=0;di<3;di++){ctx.beginPath();ctx.arc(-4*sc,-h*0.26+di*5*sc,1.5*sc,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(4*sc,-h*0.26+di*5*sc,1.5*sc,0,Math.PI*2);ctx.fill();}ctx.fillStyle='#8b4513';ctx.fillRect(-w*0.42,-h*0.51,3*sc,12*sc);ctx.fillStyle='#ff8c00';ctx.beginPath();ctx.ellipse(-w*0.42+1.5*sc,-h*0.54,4*sc,5*sc,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,200,50,0.6)';ctx.beginPath();ctx.ellipse(-w*0.42+1.5*sc,-h*0.56,2.5*sc,3.5*sc,0,0,Math.PI*2);ctx.fill();}
-
-function _drawMoog(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.beginPath();ctx.rect(-w*0.4,-h*0.9,w*0.8,h*1.05);ctx.fill();ctx.fillStyle=def.roofColor;ctx.fillRect(-w*0.5,-h*0.92,w*1.0,h*0.12);for(var mi=-2;mi<=2;mi++)ctx.fillRect(mi*w*0.22-4*sc,-h*1.05,8*sc,14*sc);ctx.fillStyle='rgba(10,8,5,0.7)';ctx.fillRect(-3*sc,-h*0.6,6*sc,14*sc);ctx.fillRect(-3*sc,-h*0.3,6*sc,14*sc);ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=0.8*sc;for(var si2=0;si2<4;si2++){ctx.beginPath();ctx.moveTo(-w*0.4,-h*0.6+si2*h*0.2);ctx.lineTo(w*0.4,-h*0.6+si2*h*0.2);ctx.stroke();}ctx.fillStyle=def.doorColor||'rgba(50,30,5,0.9)';ctx.beginPath();ctx.rect(-5*sc,0,10*sc,h*0.2);ctx.arc(0,0,5*sc,Math.PI,0,true);ctx.fill();}
-
-function _drawKuta(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.fillRect(-w*0.55,-h*0.4,w*1.1,h*0.55);ctx.fillStyle=def.roofColor;ctx.fillRect(-w*0.55,-h*0.45,w*1.1,h*0.1);var nParts=Math.floor(w*0.9/12);for(var ki=0;ki<nParts;ki++){var kx=-w*0.5+ki*(w/nParts);ctx.fillRect(kx,-h*0.56,w*0.04,h*0.15);}ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=0.6*sc;ctx.beginPath();ctx.moveTo(-w*0.55,-h*0.15);ctx.lineTo(w*0.55,-h*0.15);ctx.stroke();ctx.beginPath();ctx.moveTo(-w*0.55,-h*0.3);ctx.lineTo(w*0.55,-h*0.3);ctx.stroke();}
-
-function _drawBantayan(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.beginPath();ctx.rect(-w*0.35,-h*1.1,w*0.7,h*1.25);ctx.fill();ctx.fillStyle=def.roofColor;ctx.beginPath();ctx.moveTo(-w*0.42,-h*1.1);ctx.lineTo(0,-h*1.55);ctx.lineTo(w*0.42,-h*1.1);ctx.closePath();ctx.fill();ctx.fillStyle=def.roofColor;ctx.fillRect(-w*0.42,-h*0.55,w*0.84,h*0.08);for(var ai=-1;ai<=1;ai++)ctx.fillRect(ai*w*0.25-4*sc,-h*0.64,8*sc,10*sc);ctx.fillStyle='rgba(10,8,5,0.7)';ctx.fillRect(-2.5*sc,-h*0.9,5*sc,12*sc);ctx.fillRect(-2.5*sc,-h*0.35,5*sc,12*sc);ctx.fillStyle=def.doorColor||'rgba(20,15,5,0.95)';ctx.beginPath();ctx.rect(-5*sc,0,10*sc,h*0.2);ctx.arc(0,0,5*sc,Math.PI,0,true);ctx.fill();ctx.fillStyle='#DAA520';ctx.beginPath();ctx.moveTo(-3*sc,-h*1.53);ctx.lineTo(0,-h*1.7);ctx.lineTo(3*sc,-h*1.53);ctx.closePath();ctx.fill();}
-
-function _drawTemplo(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.fillRect(-w/2,-h*0.55,w,h*0.67);ctx.fillStyle=def.roofColor;ctx.beginPath();ctx.moveTo(-w*0.58,-h*0.55);ctx.lineTo(0,-h*1.0);ctx.lineTo(w*0.58,-h*0.55);ctx.closePath();ctx.fill();ctx.fillStyle='rgba(255,255,255,0.1)';ctx.beginPath();ctx.moveTo(-w*0.35,-h*0.55);ctx.lineTo(0,-h*1.0);ctx.lineTo(w*0.35,-h*0.55);ctx.closePath();ctx.fill();ctx.fillStyle='rgba(50,30,0,0.9)';ctx.fillRect(-8*sc,-h*0.35,16*sc,h*0.35);ctx.fillStyle='#DAA520';ctx.beginPath();ctx.arc(0,-h*0.7,6*sc,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fffaaa';ctx.beginPath();ctx.arc(0,-h*0.7,3.5*sc,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(200,200,255,0.3)';ctx.lineWidth=1.5*sc;for(var ti=0;ti<2;ti++){ctx.beginPath();ctx.moveTo((ti?5:-5)*sc,-h*0.55);ctx.quadraticCurveTo((ti?12:-12)*sc,-h*0.75,(ti?6:-6)*sc,-h*0.95);ctx.stroke();}}
-
-function _drawHukuman(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.fillRect(-w/2,-h*0.55,w,h*0.67);ctx.fillStyle=_darken(def.wallColor,0.15);for(var ci=-1;ci<=1;ci++){ctx.fillRect(ci*w*0.28-3*sc,-h*0.55,6*sc,h*0.5);}ctx.fillStyle=def.roofColor;ctx.beginPath();ctx.moveTo(-w*0.58,-h*0.55);ctx.lineTo(0,-h*0.9);ctx.lineTo(w*0.58,-h*0.55);ctx.closePath();ctx.fill();ctx.fillStyle=def.doorColor||'rgba(50,30,5,0.9)';ctx.fillRect(-9*sc,-h*0.3,18*sc,h*0.3);ctx.strokeStyle='#DAA520';ctx.lineWidth=1.5*sc;ctx.beginPath();ctx.moveTo(0,-h*0.72);ctx.lineTo(0,-h*0.62);ctx.stroke();ctx.beginPath();ctx.moveTo(-8*sc,-h*0.72);ctx.lineTo(8*sc,-h*0.72);ctx.stroke();ctx.beginPath();ctx.arc(-6*sc,-h*0.68,4*sc,0,Math.PI);ctx.stroke();ctx.beginPath();ctx.arc(6*sc,-h*0.68,4*sc,0,Math.PI);ctx.stroke();}
-
-function _drawOspital(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.fillRect(-w/2,-h*0.55,w,h*0.67);ctx.fillStyle=def.roofColor;ctx.fillRect(-w*0.55,-h*0.6,w*1.1,h*0.1);ctx.fillStyle=def.winColor;for(var wi=-1;wi<=1;wi++){ctx.fillRect(wi*w*0.28-7*sc,-h*0.5,14*sc,10*sc);}ctx.fillStyle='#cc2222';ctx.fillRect(-3*sc,-h*0.48,6*sc,18*sc);ctx.fillRect(-9*sc,-h*0.38,18*sc,6*sc);ctx.fillStyle=def.doorColor;ctx.fillRect(-7*sc,-h*0.28,14*sc,h*0.28);}
-
-function _drawPulisya(ctx,sc,w,h,def,level){ctx.fillStyle=def.wallColor;ctx.fillRect(-w/2,-h*0.55,w,h*0.67);ctx.fillStyle=def.roofColor;ctx.beginPath();ctx.moveTo(-w*0.58,-h*0.55);ctx.lineTo(0,-h*1.0);ctx.lineTo(w*0.58,-h*0.55);ctx.closePath();ctx.fill();ctx.fillStyle='#f5c842';ctx.beginPath();ctx.arc(0,-h*0.35,8*sc,0,Math.PI*2);ctx.fill();ctx.fillStyle=def.wallColor;ctx.font='bold '+(6*sc)+'px Oldenburg,serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('PNP',0,-h*0.35+0.5*sc);ctx.textBaseline='alphabetic';ctx.fillStyle=def.doorColor;ctx.fillRect(-7*sc,-h*0.28,14*sc,h*0.28);}
-
-function _drawDaungan(ctx,sc,w,h,def,level){ctx.fillStyle='#5a4020';ctx.fillRect(-w*0.55,-h*0.25,w*1.1,h*0.35);for(var pi=-2;pi<=2;pi++){ctx.fillStyle='#4a3010';ctx.fillRect(pi*w*0.22-2*sc,0,4*sc,h*0.3);}ctx.fillStyle=def.wallColor;ctx.fillRect(-w*0.35,-h*0.55,w*0.7,h*0.32);ctx.fillStyle=def.roofColor;ctx.fillRect(-w*0.4,-h*0.6,w*0.8,h*0.1);ctx.fillStyle='rgba(60,120,180,0.35)';ctx.fillRect(-w*0.55,h*0.22,w*1.1,h*0.12);ctx.strokeStyle='#e8d4a0';ctx.lineWidth=1.5*sc;ctx.beginPath();ctx.arc(0,-h*0.38,4*sc,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(0,-h*0.38-4*sc);ctx.lineTo(0,-h*0.38+8*sc);ctx.stroke();}
-
-function _drawKalye(ctx,sc,w,h,def,level){ctx.fillStyle='#7a6a50';ctx.fillRect(-w*0.55,-h*0.3,w*1.1,h*0.45);ctx.strokeStyle='rgba(240,230,180,0.5)';ctx.lineWidth=1.5*sc;ctx.setLineDash([8*sc,6*sc]);ctx.beginPath();ctx.moveTo(-w*0.5,0);ctx.lineTo(w*0.5,0);ctx.stroke();ctx.setLineDash([]);ctx.strokeStyle='rgba(255,230,150,0.3)';ctx.lineWidth=1*sc;ctx.beginPath();ctx.moveTo(-w*0.55,-h*0.29);ctx.lineTo(w*0.55,-h*0.29);ctx.stroke();ctx.beginPath();ctx.moveTo(-w*0.55,h*0.14);ctx.lineTo(w*0.55,h*0.14);ctx.stroke();}
-
-function _drawMinalangis(ctx, sc, w, h, def, level) {
-  ctx.fillStyle = '#3a2808';
-  ctx.fillRect(-w*0.5, -h*0.2, w, h*0.32);
-  ctx.strokeStyle = '#5a3a10'; ctx.lineWidth = 3.5 * sc;
-  ctx.beginPath(); ctx.moveTo(-w*0.35, 0); ctx.lineTo(0, -h*1.05); ctx.lineTo(w*0.35, 0); ctx.stroke();
-  ctx.lineWidth = 2 * sc; ctx.strokeStyle = '#4a2a08';
-  ctx.beginPath(); ctx.moveTo(-w*0.25, -h*0.35); ctx.lineTo(w*0.25, -h*0.35); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-w*0.18, -h*0.65); ctx.lineTo(w*0.18, -h*0.65); ctx.stroke();
-  ctx.fillStyle = '#7a4018'; ctx.fillRect(-w*0.38, -h*0.38, w*0.28, h*0.2);
-  ctx.strokeStyle = '#c87828'; ctx.lineWidth = 4 * sc;
-  ctx.beginPath(); ctx.moveTo(-w*0.24, -h*0.3); ctx.lineTo(-w*0.08, -h*0.52); ctx.stroke();
-  ctx.strokeStyle = '#1a1008'; ctx.lineWidth = 5 * sc;
-  ctx.beginPath(); ctx.moveTo(-w*0.08, -h*0.52); ctx.lineTo(-w*0.08, 0); ctx.stroke();
-  ctx.fillStyle = 'rgba(10,8,4,0.55)';
-  ctx.beginPath(); ctx.ellipse(-w*0.08, h*0.08, 10*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#5a3810';
-  ctx.beginPath(); ctx.ellipse(w*0.3, -h*0.1, 11*sc, 11*sc, 0, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#8a5820'; ctx.lineWidth = 1.5 * sc;
-  for (var ring = -1; ring <= 1; ring++) {
-    ctx.beginPath(); ctx.ellipse(w*0.3, -h*0.1 + ring*5*sc, 11*sc, 3*sc, 0, 0, Math.PI*2); ctx.stroke();
-  }
-  ctx.fillStyle = '#f5c842'; ctx.fillRect(-3*sc, -h*1.08, 6*sc, 6*sc);
-  ctx.fillStyle = '#cc2222'; ctx.fillRect(-3*sc, -h*1.08, 3*sc, 3*sc); ctx.fillRect(0, -h*1.05, 3*sc, 3*sc);
-  if (level >= 2) {
-    ctx.fillStyle = '#2a1808';
-    ctx.beginPath(); ctx.ellipse(w*0.44, -h*0.22, 5*sc, 7*sc, 0, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#5a3010'; ctx.lineWidth = 1 * sc;
-    ctx.beginPath(); ctx.ellipse(w*0.44, -h*0.22, 5*sc, 2*sc, 0, 0, Math.PI); ctx.stroke();
-  }
-}
-
-/* ══════════════════════════════════════════════════════════════
-   NEW: Missile Warfare Building Draw Functions
-══════════════════════════════════════════════════════════════ */
-
-function _drawMissileSilo(ctx, sc, w, h, def, level, now) {
-  // Base structure
-  ctx.fillStyle = def.wallColor;
-  ctx.fillRect(-w*0.45, -h*0.3, w*0.9, h*0.45);
-  
-  // Reinforced walls
-  ctx.strokeStyle = '#5a5a7a';
-  ctx.lineWidth = 3 * sc;
-  ctx.strokeRect(-w*0.45, -h*0.3, w*0.9, h*0.45);
-  
-  // Missile silo door (large hangar-style)
-  ctx.fillStyle = def.doorColor;
-  ctx.fillRect(-w*0.35, -h*0.15, w*0.7, h*0.25);
-  ctx.strokeStyle = '#3a3a5a';
-  ctx.lineWidth = 2 * sc;
-  ctx.strokeRect(-w*0.35, -h*0.15, w*0.7, h*0.25);
-  
-  // Roof with radar dish
-  ctx.fillStyle = def.roofColor;
-  ctx.beginPath();
-  ctx.moveTo(-w*0.5, -h*0.3);
-  ctx.lineTo(0, -h*0.85);
-  ctx.lineTo(w*0.5, -h*0.3);
-  ctx.closePath();
-  ctx.fill();
-  
-  // Radar dish on top
-  ctx.fillStyle = '#4a6aff';
-  ctx.beginPath();
-  ctx.ellipse(0, -h*0.92, 12*sc, 8*sc, 0, 0, Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle = '#2a4aff';
-  ctx.lineWidth = 2 * sc;
-  ctx.stroke();
-  
-  // Missile visible in silo (level-dependent)
-  if (level >= 2) {
-    ctx.fillStyle = '#8a4a2a';
-    ctx.fillRect(-w*0.08, -h*0.12, w*0.16, h*0.18);
-    ctx.fillStyle = '#cc2222';
-    ctx.beginPath();
-    ctx.moveTo(0, -h*0.12);
-    ctx.lineTo(-w*0.05, -h*0.05);
-    ctx.lineTo(w*0.05, -h*0.05);
-    ctx.closePath();
-    ctx.fill();
-  }
-  
-  // Control tower window
-  ctx.fillStyle = def.winColor;
-  ctx.fillRect(-w*0.15, -h*0.55, w*0.3, h*0.15);
-  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-  ctx.lineWidth = 1 * sc;
-  ctx.strokeRect(-w*0.15, -h*0.55, w*0.3, h*0.15);
-  
-  // Warning stripes
-  ctx.fillStyle = 'rgba(255,100,100,0.6)';
-  for (var i = 0; i < 3; i++) {
-    ctx.fillRect(-w*0.42 + i*w*0.28, -h*0.35, w*0.12, h*0.08);
-  }
-  
-  // Level indicator glow
-  if (level >= 3) {
-    ctx.globalAlpha = 0.3 + 0.2 * Math.sin((now||0)/300);
-    ctx.fillStyle = '#4aff8a';
-    ctx.beginPath();
-    ctx.arc(0, -h*0.95, 6*sc, 0, Math.PI*2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-}
-
-function _drawRadarStation(ctx, sc, w, h, def, level, now) {
-  // Base platform
-  ctx.fillStyle = '#3a4a5a';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, w*0.55, h*0.15, 0, 0, Math.PI*2);
-  ctx.fill();
-  
-  // Support tower
-  ctx.fillStyle = def.wallColor;
-  ctx.fillRect(-w*0.12, -h*0.65, w*0.24, h*0.7);
-  ctx.strokeStyle = '#2a3a4a';
-  ctx.lineWidth = 2 * sc;
-  ctx.strokeRect(-w*0.12, -h*0.65, w*0.24, h*0.7);
-  
-  // Ladder detail
-  ctx.strokeStyle = '#5a6a7a';
-  ctx.lineWidth = 1.5 * sc;
-  for (var rung = 0; rung < 5; rung++) {
-    ctx.beginPath();
-    ctx.moveTo(-w*0.08, -h*0.55 + rung*h*0.12);
-    ctx.lineTo(w*0.08, -h*0.55 + rung*h*0.12);
-    ctx.stroke();
-  }
-  
-  // Radar dish assembly
-  ctx.save();
-  ctx.translate(0, -h*0.72);
-  
-  // Rotating dish (animated)
-  var rotation = (now || 0) / 800;
-  ctx.rotate(rotation);
-  
-  // Dish support arm
-  ctx.fillStyle = '#4a5a6a';
-  ctx.fillRect(-2*sc, -h*0.05, 4*sc, h*0.25);
-  
-  // Main dish
-  ctx.fillStyle = '#5a8aff';
-  ctx.beginPath();
-  ctx.ellipse(0, -h*0.15, w*0.35, w*0.12, 0, 0, Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle = '#3a6aff';
-  ctx.lineWidth = 2 * sc;
-  ctx.stroke();
-  
-  // Dish center hub
-  ctx.fillStyle = '#2a4a6a';
-  ctx.beginPath();
-  ctx.arc(0, -h*0.15, 5*sc, 0, Math.PI*2);
-  ctx.fill();
-  
-  ctx.restore();
-  
-  // Signal wave animation (when detecting)
-  if (level >= 2) {
-    ctx.globalAlpha = 0.2 + 0.15 * Math.sin((now||0)/200);
-    ctx.strokeStyle = '#4affff';
-    ctx.lineWidth = 2 * sc;
-    ctx.setLineDash([8*sc, 6*sc]);
-    ctx.beginPath();
-    ctx.arc(0, -h*0.72, w*0.6, 0, Math.PI*2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-  }
-  
-  // Control room window
-  ctx.fillStyle = def.winColor;
-  ctx.fillRect(-w*0.08, -h*0.45, w*0.16, h*0.12);
-  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-  ctx.lineWidth = 1 * sc;
-  ctx.strokeRect(-w*0.08, -h*0.45, w*0.16, h*0.12);
-  
-  // Antenna array on top (higher levels)
-  if (level >= 3) {
-    ctx.fillStyle = '#6a8aff';
-    for (var ant = -1; ant <= 1; ant++) {
-      ctx.fillRect(ant*w*0.18 - 2*sc, -h*0.82, 4*sc, h*0.12);
-    }
-  }
-}
-
-function _drawInterceptor(ctx, sc, w, h, def, level, now) {
-  // Concrete bunker base
-  ctx.fillStyle = '#4a5a4a';
-  ctx.fillRect(-w*0.5, -h*0.25, w, h*0.35);
-  
-  // Reinforced roof
-  ctx.fillStyle = def.roofColor;
-  ctx.beginPath();
-  ctx.moveTo(-w*0.55, -h*0.25);
-  ctx.lineTo(0, -h*0.55);
-  ctx.lineTo(w*0.55, -h*0.25);
-  ctx.closePath();
-  ctx.fill();
-  
-  // Blast doors (front)
-  ctx.fillStyle = def.doorColor;
-  ctx.fillRect(-w*0.25, -h*0.15, w*0.5, h*0.2);
-  ctx.strokeStyle = '#2a3a2a';
-  ctx.lineWidth = 3 * sc;
-  ctx.strokeRect(-w*0.25, -h*0.15, w*0.5, h*0.2);
-  
-  // Door hinge details
-  ctx.fillStyle = '#6a7a6a';
-  for (var hinge = -1; hinge <= 1; hinge += 2) {
-    ctx.fillRect(hinge*w*0.22 - 3*sc, -h*0.1, 6*sc, h*0.12);
-  }
-  
-  // Missile launcher turret (rotating)
-  ctx.save();
-  ctx.translate(0, -h*0.35);
-  var turretRot = Math.sin((now||0)/1000) * 0.3;
-  ctx.rotate(turretRot);
-  
-  // Launcher base
-  ctx.fillStyle = '#3a5a3a';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, w*0.25, h*0.08, 0, 0, Math.PI*2);
-  ctx.fill();
-  
-  // Launcher arms
-  ctx.fillStyle = '#4a6a4a';
-  for (var arm = -1; arm <= 1; arm += 2) {
-    ctx.save();
-    ctx.rotate(arm * 0.4);
-    ctx.fillRect(-3*sc, -h*0.05, 6*sc, h*0.35);
-    // Missile in launcher
-    ctx.fillStyle = '#8a4a2a';
-    ctx.fillRect(-2*sc, -h*0.28, 4*sc, h*0.25);
-    ctx.fillStyle = '#cc2222';
-    ctx.beginPath();
-    ctx.moveTo(0, -h*0.28);
-    ctx.lineTo(-2*sc, -h*0.22);
-    ctx.lineTo(2*sc, -h*0.22);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-  
-  ctx.restore();
-  
-  // Radar sensor on bunker
-  ctx.fillStyle = '#4a8aff';
-  ctx.beginPath();
-  ctx.arc(w*0.35, -h*0.32, 5*sc, 0, Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle = '#2a6aff';
-  ctx.lineWidth = 1.5 * sc;
-  ctx.stroke();
-  
-  // Warning lights (blinking when active)
-  if (level >= 2) {
-    ctx.globalAlpha = 0.4 + 0.4 * Math.sin((now||0)/150);
-    ctx.fillStyle = '#ff4444';
-    ctx.beginPath();
-    ctx.arc(-w*0.35, -h*0.32, 4*sc, 0, Math.PI*2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-  
-  // Ventilation stacks
-  ctx.fillStyle = '#5a6a5a';
-  for (var vent = -1; vent <= 1; vent += 2) {
-    ctx.fillRect(vent*w*0.4 - 4*sc, -h*0.28, 8*sc, h*0.15);
-    ctx.fillStyle = '#3a4a3a';
-    ctx.fillRect(vent*w*0.4 - 3*sc, -h*0.35, 6*sc, h*0.08);
-    ctx.fillStyle = '#5a6a5a';
-  }
-  
-  // Level upgrade indicator
-  if (level >= 3) {
-    ctx.fillStyle = 'rgba(100,255,150,0.3)';
-    ctx.beginPath();
-    ctx.arc(0, -h*0.65, w*0.4, 0, Math.PI*2);
-    ctx.fill();
-  }
-}
-
-function _darken(hex,amount){var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);r=Math.max(0,Math.round(r*(1-amount)));g=Math.max(0,Math.round(g*(1-amount)));b=Math.max(0,Math.round(b*(1-amount)));return '#'+('0'+r.toString(16)).slice(-2)+('0'+g.toString(16)).slice(-2)+('0'+b.toString(16)).slice(-2);}
+/* ── Attach all external prototype groups ────────────────── */
+applyStatsPrototypes(Building);
+applyMilitaryPrototypes(Building);
+applyDrawPrototypes(Building);
 
 /* ══════════════════════════════════════════════════════════════
    FACTORIES
@@ -1453,13 +625,13 @@ export function createDefaultBuildings(VW, VH) {
 
 export function rebuildFromSave(savedBuildings) {
   return savedBuildings.map(function(d) {
-    var b = new Building(d.type, d.x, d.y);
-    b.id      = d.id;
-    b.level   = d.level !== undefined ? d.level : 1;
+    var b      = new Building(d.type, d.x, d.y);
+    b.id       = d.id;
+    b.level    = d.level    !== undefined ? d.level    : 1;
     b.unlocked = d.unlocked !== undefined ? d.unlocked : true;
     if (d.isWreck) { b.isWreck = true; b.originalType = d.originalType || d.type; }
-    b.uncollectedGold = d.uncollectedGold || 0;
-    b.uncollectedFood = d.uncollectedFood || 0;
+    b.uncollectedGold   = d.uncollectedGold   || 0;
+    b.uncollectedFood   = d.uncollectedFood   || 0;
     b.uncollectedLangis = d.uncollectedLangis || 0;
     if (d.underConstruction) {
       b.underConstruction = true;
@@ -1467,15 +639,14 @@ export function rebuildFromSave(savedBuildings) {
       b.constructionMax   = d.constructionMax  || 0;
       if (d.upgradeLevel) b._upgradeLevel = d.upgradeLevel;
     }
-    // Restore missile/interceptor state for military buildings
     var def = BUILDING_DEFS[d.type];
     if (def && def.missileCapacity !== undefined && d.missileStock) {
-      b.missileStock = d.missileStock;
-      b.reloadTimer = d.reloadTimer || 0;
+      b.missileStock   = d.missileStock;
+      b.reloadTimer    = d.reloadTimer    || 0;
       b.lastLaunchTime = d.lastLaunchTime || 0;
     }
     if (def && def.interceptBaseChance !== undefined) {
-      b.interceptorStock = d.interceptorStock !== undefined ? d.interceptorStock : (def.interceptorMissileStock || 0);
+      b.interceptorStock  = d.interceptorStock !== undefined ? d.interceptorStock : (def.interceptorMissileStock || 0);
       b.interceptCooldown = d.interceptCooldown || 0;
     }
     return b;

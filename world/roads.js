@@ -11,10 +11,10 @@ export var ROAD_CONFIG = {
   width: 11,              /* Road width: 22px → 11px (2x smaller) */
   mainRoadWidth: 14,      /* Main roads: 28px → 14px (2x smaller) */
   spacing: 180,           /* Distance between main roads */
-  color: '#7a6a50',       /* Road base color (matches _drawKalye) */
-  borderColor: '#5a4a38', /* Road border */
-  dashColor: 'rgba(240,230,180,0.5)',  /* Center dashed line */
-  edgeColor: 'rgba(255,230,150,0.3)',  /* Road edges */
+  color: '#CDBE9F',       /* Road base color - warm beige */
+  borderColor: '#B5A585', /* Road border - darker beige */
+  dashColor: 'rgba(140,120,90,0.5)',  /* Center dashed line - darker for contrast */
+  edgeColor: 'rgba(221,206,175,0.4)',  /* Road edges - lighter cream (#DDCEAF) */
   cornerRadius: 7,        /* Rounded corner radius (15px → 7px) */
 };
 
@@ -252,7 +252,7 @@ export function drawRoads(ctx, VS) {
     
     /* Road edges - THINNER for smaller roads */
     ctx.strokeStyle = ROAD_CONFIG.edgeColor;
-    ctx.lineWidth = 0.5;  /* Was 1px, now 0.5px */
+    ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(startX, road.y - halfW + 1);
     ctx.lineTo(endX, road.y - halfW + 1);
@@ -263,11 +263,11 @@ export function drawRoads(ctx, VS) {
     ctx.lineTo(endX, road.y + halfW - 1);
     ctx.stroke();
     
-    /* Center dashed line for main roads - THINNER */
+    /* Center dashed line for main roads - SMALLER dashes */
     if (road.type === 'main') {
       ctx.strokeStyle = ROAD_CONFIG.dashColor;
-      ctx.lineWidth = 0.6;  /* Was 1.2px, now 0.6px */
-      ctx.setLineDash([4, 4]);  /* Smaller dashes for smaller roads */
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([2, 3]);  /* Smaller dashes: 2px on, 3px off */
       ctx.beginPath();
       ctx.moveTo(startX, road.y);
       ctx.lineTo(endX, road.y);
@@ -327,11 +327,11 @@ export function drawRoads(ctx, VS) {
     ctx.lineTo(road.x + halfW - 1, endY);
     ctx.stroke();
     
-    /* Center dashed line for main roads - THINNER */
+    /* Center dashed line for main roads - SMALLER dashes */
     if (road.type === 'main') {
       ctx.strokeStyle = ROAD_CONFIG.dashColor;
-      ctx.lineWidth = 0.6;
-      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([2, 3]);
       ctx.beginPath();
       ctx.moveTo(road.x, startY);
       ctx.lineTo(road.x, endY);
@@ -427,7 +427,7 @@ export function snapToSlot(wx, wy) {
   
   if (nearestH) {
     var halfRoadH = (nearestH.width || ROAD_CONFIG.width) / 2;
-    var snapDist = 45; /* Reduced from 50 for narrower roads */
+    var snapDist = 45;
     
     if (wy < nearestH.y) {
       slotY = nearestH.y - halfRoadH - snapDist;
@@ -497,3 +497,17 @@ export function isRoadVisible(road, VS) {
     return x >= stageData.rect.x1 && x <= stageData.rect.x2;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   USAGE
+   ──────────────────────────────────────────────────────────────
+   renderer.js — after drawGround():
+     import { drawRoads, initRoads } from '../world/roads.js';
+     initRoads();
+     drawRoads(ctx, VS);
+
+   building.js / canPlaceBuilding():
+     import { isPointOnRoad, snapToSlot } from '../world/roads.js';
+     if (isPointOnRoad(wx, wy)) return { ok:false, msg:'Nasa daan!' };
+     var snapped = snapToSlot(wx, wy);
+══════════════════════════════════════════════════════════════ */

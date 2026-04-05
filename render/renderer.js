@@ -10,7 +10,7 @@ import { cam, camApply, camReset, w2s, WORLD_W, WORLD_H } from './camera.js';
 import { getActiveCalamity } from '../government/events.js';
 import { getWasteStats }     from '../resources/economy.js';
 import { drawZoneArrows }    from '../world/zones.js';
-
+ import { drawRoads } from '../world/world.js';
 /* ══════════════════════════════════════════════════════════════
 USER ADJUSTABLE: Max Upgrade Footprint Multiplier
 2.0 = 2x the base building size (green guide shows max upgrade space)
@@ -33,7 +33,7 @@ Wind particles — persist across frames
 ══════════════════════════════════════════════════════════════ */
 var _windParticles = (function() {
   var arr = [];
-  for (var i = 0; i < 120; i++) {
+  for (var i = 0; i < 40; i++) {   // ← was 120, reduced to 40
     arr.push({
       x:    Math.random(),
       y:    Math.random(),
@@ -73,6 +73,7 @@ export function renderFrame(canvas, ctx, state) {
     ctx.translate(state.shakeX || 0, state.shakeY || 0);
   }
   drawGround(ctx, VW, VH);
+  drawRoads(ctx);
   if (state.drawZoneGrid)   state.drawZoneGrid(ctx, VW, VH, state.VS);
   drawZoneArrows(ctx, VW, VH, state.VS);
   drawEntitiesSorted(ctx, state);
@@ -286,6 +287,21 @@ export function drawGround(ctx, canvasW, canvasH) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+Off-screen culling helper
+Returns true if the world-space point (wx,wy) is within the
+visible viewport (with a small margin so pop-in is invisible).
+══════════════════════════════════════════════════════════════ */
+function _isOnScreen(wx, wy, margin) {
+  margin = margin || 80;
+  var s = w2s(wx, wy);
+  // cam._vw/_vh may not exist — fall back to reasonable canvas size
+  var vw = (cam._vw || cam.vw || 1280);
+  var vh = (cam._vh || cam.vh || 720);
+  return s.x > -margin && s.x < vw + margin &&
+         s.y > -margin && s.y < vh + margin;
+}
+
+/* ══════════════════════════════════════════════════════════════
 drawEntitiesSorted — Shows ALL buildings' max footprints when moving
 ══════════════════════════════════════════════════════════════ */
 export function drawEntitiesSorted(ctx, state) {
@@ -298,6 +314,9 @@ export function drawEntitiesSorted(ctx, state) {
   var isMovingBuilding = (drag && drag.building && drag.moved);
   
   VS.buildings.forEach(function(b) {
+    // Always include the dragged building and buildings being moved
+    var isDragged = drag && drag.building === b && drag.moved;
+    if (!isDragged && !_isOnScreen(b.x, b.y, 120)) return; // cull off-screen
     ents.push({
       y: b.y,
       draw: function() {
@@ -373,6 +392,7 @@ export function drawEntitiesSorted(ctx, state) {
   });
 
   VS.resourceNodes.forEach(function(n) {
+    if (!_isOnScreen(n.x, n.y, 80)) return; // cull off-screen
     ents.push({
       y: n.y,
       draw: function() { n.draw(ctx, performance.now()); },
@@ -380,6 +400,8 @@ export function drawEntitiesSorted(ctx, state) {
   });
 
   VS.villagers.forEach(function(v) {
+    if (v.isInsideBuilding) return; // hidden inside building — don't draw
+    if (!_isOnScreen(v.x, v.y, 60)) return; // cull off-screen
     ents.push({
       y: v.y,
       draw: function() {
@@ -626,37 +648,39 @@ export function drawZoomBadge(ctx, VW, VH) {
 /* ══════════════════════════════════════════════════════════════
 drawRankBadge
 ══════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+drawRankBadge — cached module to avoid per-frame dynamic import
+══════════════════════════════════════════════════════════════ */
+var _rankModule = null;
+import('../ranking/rankingSystem.js').then(function(m) { _rankModule = m; }).catch(function() {});
+
 function drawRankBadge(ctx, VW, VH, VS) {
-  if (!VS || !VS.rank) return;
-  import('../ranking/rankingSystem.js').then(module => {
-    const rank = module.getRankFromScore(VS.rank.score);
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.shadowBlur = 0;
-    const isMobile = VW < 768;
-    const bottomMargin = isMobile ? 60 : 70;
-    const x = (VW / 2) - 65;
-    const y = VH - bottomMargin;
-    const badgeWidth = 130;
-    const badgeHeight = 28;
-    ctx.fillStyle = 'rgba(26, 18, 8, 0.85)';
-    ctx.strokeStyle = '#c49a4e';
-    ctx.lineWidth = 1;
-    rrect(ctx, x, y, badgeWidth, badgeHeight, 20);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#f5c842';
-    ctx.font = 'bold 11px "Oldenburg",serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${rank.badge} ${rank.title}`, x + 8, y + badgeHeight/2);
-    ctx.fillStyle = '#88dd88';
-    ctx.font = 'bold 9px monospace';
-    ctx.fillText(`${Math.floor(VS.rank.score)} pts`, x + badgeWidth - 38, y + badgeHeight/2);
-    ctx.restore();
-  }).catch(err => {
-    console.warn('[renderer] Failed to load ranking module:', err);
-  });
+  if (!VS || !VS.rank || !_rankModule) return;
+  var rank = _rankModule.getRankFromScore(VS.rank.score);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.shadowBlur = 0;
+  var isMobile = VW < 768;
+  var bottomMargin = isMobile ? 60 : 70;
+  var x = (VW / 2) - 65;
+  var y = VH - bottomMargin;
+  var badgeWidth = 130;
+  var badgeHeight = 28;
+  ctx.fillStyle = 'rgba(26, 18, 8, 0.85)';
+  ctx.strokeStyle = '#c49a4e';
+  ctx.lineWidth = 1;
+  rrect(ctx, x, y, badgeWidth, badgeHeight, 20);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#f5c842';
+  ctx.font = 'bold 11px "Oldenburg",serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(rank.badge + ' ' + rank.title, x + 8, y + badgeHeight/2);
+  ctx.fillStyle = '#88dd88';
+  ctx.font = 'bold 9px monospace';
+  ctx.fillText(Math.floor(VS.rank.score) + ' pts', x + badgeWidth - 38, y + badgeHeight/2);
+  ctx.restore();
 }
 
 /* ══════════════════════════════════════════════════════════════

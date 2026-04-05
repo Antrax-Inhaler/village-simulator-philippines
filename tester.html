@@ -1,77 +1,101 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Currency Converter</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Road Plan Design</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        /* The main container acting as the map frame */
+        .map-container {
+            position: relative;
+            width: 600px;
+            height: 400px;
+            background-color: white;
+            /* The thick outer border representing the main frame */
+            border: 10px solid black; 
+            box-sizing: border-box;
+        }
+
+        /* General style for all "roads" or lines */
+        .road {
+            position: absolute;
+            background-color: black;
+        }
+
+        /* Specific Lines based on the design in Image 0 */
+
+        /* --- Left Section --- */
+        /* Vertical line dropping down */
+        .v-left-main { top: 15%; left: 20%; width: 8px; height: 70%; }
+        /* Horizontal line branching right from the vertical one */
+        .h-left-mid { top: 40%; left: 20%; width: 15%; height: 8px; }
+        /* Horizontal line branching left from vertical one */
+        .h-left-lower-mid { top: 60%; left: 0; width: 20%; height: 8px; }
+        /* Top horizontal segment connecting to vertical */
+        .h-left-top { top: 15%; left: 0; width: 20%; height: 8px; }
+
+        /* --- Center Section (The Ladder) --- */
+        /* Left vertical of the ladder */
+        .v-center-left { top: 0; left: 35%; width: 8px; height: 100%; }
+        /* Right vertical of the ladder */
+        .v-center-right { top: 0; left: 60%; width: 8px; height: 100%; }
+        /* Top Rung */
+        .h-center-top { top: 25%; left: 35%; width: 25%; height: 8px; }
+        /* Middle Rung */
+        .h-center-mid { top: 45%; left: 35%; width: 25%; height: 8px; }
+        /* Bottom Rung */
+        .h-center-bot { top: 65%; left: 35%; width: 25%; height: 8px; }
+
+        /* --- Right Section --- */
+        /* Vertical line dropping down */
+        .v-right-main { top: 15%; left: 80%; width: 8px; height: 70%; }
+        /* Top horizontal segment coming from right edge */
+        .h-right-top { top: 15%; left: 80%; width: 20%; height: 8px; }
+        /* Middle horizontal segment going to right edge */
+        .h-right-mid { top: 40%; left: 60%; width: 20%; height: 8px; }
+        /* Lower horizontal segment going to right edge */
+        .h-right-bot { top: 60%; left: 80%; width: 20%; height: 8px; }
+        
+        /* --- Bottom Connecting Lines --- */
+        /* Connecting left bottom area */
+        .h-bottom-left { top: 85%; left: 20%; width: 15%; height: 8px; }
+        /* Connecting right bottom area */
+        .h-bottom-right { top: 85%; left: 60%; width: 20%; height: 8px; }
+
+    </style>
 </head>
 <body>
 
-  <h2>Exchange Rate Converter</h2>
+    <div class="map-container">
+        <!-- Roads/Lines -->
+        <div class="road v-left-main"></div>
+        <div class="road h-left-mid"></div>
+        <div class="road h-left-lower-mid"></div>
+        <div class="road h-left-top"></div>
 
-  <input type="number" id="amount" placeholder="Enter amount" />
+        <div class="road v-center-left"></div>
+        <div class="road v-center-right"></div>
+        <div class="road h-center-top"></div>
+        <div class="road h-center-mid"></div>
+        <div class="road h-center-bot"></div>
 
-  <select id="from"></select>
-  <select id="to"></select>
+        <div class="road v-right-main"></div>
+        <div class="road h-right-top"></div>
+        <div class="road h-right-mid"></div>
+        <div class="road h-right-bot"></div>
 
-  <button onclick="convert()">Convert</button>
-
-  <h3 id="result"></h3>
-
-  <script>
-    const API_URL = "https://open.er-api.com/v6/latest/";
-
-    // Load currencies on page load
-    window.onload = async () => {
-      const res = await fetch(API_URL + "USD");
-      const data = await res.json();
-
-      const currencies = Object.keys(data.rates);
-      const fromSelect = document.getElementById("from");
-      const toSelect = document.getElementById("to");
-
-      currencies.forEach(currency => {
-        const option1 = new Option(currency, currency);
-        const option2 = new Option(currency, currency);
-        fromSelect.add(option1);
-        toSelect.add(option2);
-      });
-
-      // Default values
-      fromSelect.value = "USD";
-      toSelect.value = "PHP";
-    };
-
-    async function convert() {
-      const amount = document.getElementById('amount').value;
-      const from = document.getElementById('from').value;
-      const to = document.getElementById('to').value;
-      const resultEl = document.getElementById('result');
-
-      if (!amount || amount <= 0) {
-        resultEl.innerText = "Please enter a valid amount.";
-        return;
-      }
-
-      try {
-        const res = await fetch(API_URL + from);
-        const data = await res.json();
-
-        const rate = data.rates[to];
-
-        if (!rate) {
-          resultEl.innerText = "Currency not supported.";
-          return;
-        }
-
-        const converted = amount * rate;
-
-        resultEl.innerText =
-          `${amount} ${from} = ${converted.toFixed(2)} ${to}`;
-      } catch (err) {
-        resultEl.innerText = "Error fetching exchange rates.";
-        console.error(err);
-      }
-    }
-  </script>
+        <div class="road h-bottom-left"></div>
+        <div class="road h-bottom-right"></div>
+    </div>
 
 </body>
 </html>

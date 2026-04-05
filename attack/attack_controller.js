@@ -758,28 +758,28 @@ function _removeSoldiers(deadTroops) {
    CANVAS & VILLAGE LOADER (FIXED CENTERING)
    ════════════════════════════════════════════════════════════ */
 function _sizeCanvas() {
-  // Set canvas INTERNAL pixel dimensions to world size
-  _canvas.width = DEF_WORLD_W;
-  _canvas.height = DEF_WORLD_H;
-  
-  // ✅ CRITICAL: _VW/_VH must be canvas internal dimensions (matches main.js)
-  // These are used by _camApply() for the transform math
-  _VW = _canvas.width;   // = DEF_WORLD_W
-  _VH = _canvas.height;  // = DEF_WORLD_H
-  
-  // Use viewport ONLY for CSS display sizing (browser scales the canvas)
-  var screen = G('attack-screen');
-  var displayW = screen.clientWidth || window.innerWidth;
-  var displayH = screen.clientHeight || window.innerHeight;
-  
+  var scr = G('attack-screen');
+  // Viewport size = actual screen pixels available
+  var vw = scr.clientWidth  || window.innerWidth;
+  var vh = scr.clientHeight || window.innerHeight;
+
+  // Canvas internal pixels = viewport size (1:1 pixel ratio, browser never scales)
+  // The camera pans/zooms over DEF_WORLD_W x DEF_WORLD_H world-space internally
+  _canvas.width  = vw;
+  _canvas.height = vh;
+
+  // _VW/_VH = viewport dimensions — _camApply() pivots at (_VW/2, _VH/2)
+  _VW = vw;
+  _VH = vh;
+
+  // CSS: always fill the full attack-screen, never fixed px that could mismatch
   _canvas.style.position = 'absolute';
-  _canvas.style.top = '0';
-  _canvas.style.left = '0';
-  _canvas.style.width = displayW + 'px';
-  _canvas.style.height = displayH + 'px';
-  _canvas.style.display = 'block';
-  
-  // ✅ Set window globals to internal dimensions (matches main.js pattern)
+  _canvas.style.top      = '0';
+  _canvas.style.left     = '0';
+  _canvas.style.width    = '100%';
+  _canvas.style.height   = '100%';
+  _canvas.style.display  = 'block';
+
   window._VW = _VW;
   window._VH = _VH;
 }
@@ -810,7 +810,10 @@ function _loadVillage() {
 window.openAttackScreen = function() {
   _canvas = G('enemy-canvas');
   _ctx = _canvas.getContext('2d');
-  G('attack-screen').style.display = 'block';
+  var scr = G('attack-screen');
+  scr.style.display = 'block';
+  scr.style.contentVisibility = 'visible';
+  scr.style.visibility = 'visible';
   _loadVillage();
   
   // ════════════════════════════════════════════════════════
@@ -839,7 +842,10 @@ window.openAttackScreen = function() {
 };
 
 window._atkClose = function() {
-  G('attack-screen').style.display = 'none';
+  var scr = G('attack-screen');
+  scr.style.display = 'none';
+  scr.style.contentVisibility = '';
+  scr.style.visibility = '';
   _cam.selectedBuilding = null;
   _hideBuildingInfo();
   
@@ -909,16 +915,16 @@ window._previewMissileTargets = function(missileType, targetX, targetY) {
 window.addEventListener('resize', function() {
   var scr = G('attack-screen');
   if (!scr || scr.style.display === 'none' || !_canvas) return;
-  
-  // ✅ Update CSS display size ONLY - don't touch _VW/_VH!
-  var displayW = scr.clientWidth || window.innerWidth;
-  var displayH = scr.clientHeight || window.innerHeight;
-  _canvas.style.width = displayW + 'px';
-  _canvas.style.height = displayH + 'px';
-  
-  // ✅ Re-center camera on world center
-  _cam.x = _cam.tx = DEF_WORLD_W / 2;
-  _cam.y = _cam.ty = DEF_WORLD_H / 2;
+  // Re-read viewport size and resize canvas pixels to match
+  var vw = scr.clientWidth  || window.innerWidth;
+  var vh = scr.clientHeight || window.innerHeight;
+  _canvas.width  = vw;
+  _canvas.height = vh;
+  _VW = vw;
+  _VH = vh;
+  window._VW = _VW;
+  window._VH = _VH;
+  // Re-clamp camera so view stays valid at new size
   _clampCamTarget();
   _clampCamCurrent();
 });

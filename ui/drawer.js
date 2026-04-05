@@ -238,7 +238,7 @@ function _renderBuildingInfo() {
 
   var bdef  = b.getDef();
   var rules = _d.getMainHallRules(_d.VS.buildings);
-  var maxLv = b.type === 'mainHall' ? 5 : rules.maxBuildingLevel;
+  var maxLv = b.type === 'mainHall' ? 10 : rules.maxBuildingLevel;
   var mhLv  = _d.getMainHallLevel(_d.VS.buildings);
   var st    = b.getStats();
   var cost  = b.getUpgradeCost();

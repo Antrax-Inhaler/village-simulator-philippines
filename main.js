@@ -90,6 +90,9 @@ var _initialized = false;
 
 var BASE_RES_CAP = { gold: 2000, rice: 1500, langis: 800 };
 
+var _UI_TICK = 0;
+var _UI_INTERVAL = 1 / 10; // update DOM UI at 10fps max
+
 /* ═══════════════════════════════════════════════════════════════
    GAME STATE with Missile Warfare additions (Version 7)
 ═══════════════════════════════════════════════════════════════ */
@@ -163,9 +166,44 @@ function updateCenterTimeDisplay() {
 
 var lastTime = 0;
 var accumulator = 0;
-var TICK = 1 / 60;
+var TICK = 1 / 30;           // ← 30 FPS cap (was 1/60)
+var _TAB_ACTIVE = true;      // pause when tab hidden
+var _BG_TICK = 0;            // throttle background processes
+var _BG_INTERVAL = 1.0;      // background update every 1 second
+
+// Pause loop when user switches tabs
+document.addEventListener('visibilitychange', function() {
+  _TAB_ACTIVE = !document.hidden;
+  if (_TAB_ACTIVE) lastTime = performance.now(); // reset clock to avoid dt spike
+});
+
+/* ── Attack-screen pause/resume ───────────────────────────
+   Called by attack_controller.js when the attack screen
+   opens/closes. Stops all update + render work in main loop
+   so both canvases are never running simultaneously.
+─────────────────────────────────────────────────────────── */
+var _ATTACK_ACTIVE = false;
+
+window.pauseMainGame = function() {
+  _ATTACK_ACTIVE = true;
+};
+
+window.resumeMainGame = function() {
+  _ATTACK_ACTIVE = false;
+  lastTime = performance.now(); // reset dt so no spike on resume
+};
+
+// 30 FPS limiter — only render if at least 1/30 s has passed
+var _FPS_INTERVAL = 1000 / 30;
+var _lastFrameTime = 0;
 
 function gameLoop(ts) {
+  if (!_TAB_ACTIVE || _ATTACK_ACTIVE) { requestAnimationFrame(gameLoop); return; } // ← pause when hidden or attack screen open
+
+  // 30 FPS cap
+  if (ts - _lastFrameTime < _FPS_INTERVAL - 2) { requestAnimationFrame(gameLoop); return; }
+  _lastFrameTime = ts;
+
   var dt = Math.min(0.05, (ts - lastTime) / 1000);
   lastTime = ts;
   accumulator += dt;
@@ -208,9 +246,14 @@ function gameLoop(ts) {
     },
   });
 
-  updateDashboard(VS, dayCount);
-  updateCenterTimeDisplay();
-  _updateElectionBar();
+  // Throttle DOM updates to ~10fps — no need to reflow every render frame
+  _UI_TICK -= dt;
+  if (_UI_TICK <= 0) {
+    _UI_TICK = _UI_INTERVAL;
+    updateDashboard(VS, dayCount);
+    updateCenterTimeDisplay();
+    _updateElectionBar();
+  }
 
   requestAnimationFrame(gameLoop);
 }
@@ -287,16 +330,19 @@ function update(dt) {
   tickEconomy(dt, VS);
   tickTrade(dt, VS, showMsg);
 
-  tickNeeds(dt, VS);
-  tickPolitics(dt, VS, showMsg);
-
-  VS.buildings.forEach(function(b) {
-    if (b.upgradePath === 'quality') applyQualityEffect(b, VS.villagers, dt, 120);
-  });
-
-  tickCorruption(dt, VS);
-  applyPolicies(dt, VS);
-  tickElection(dt, VS, showMsg);
+  // ── Throttle non-visual background processes to 1s intervals ──
+  _BG_TICK -= dt;
+  if (_BG_TICK <= 0) {
+    _BG_TICK = _BG_INTERVAL;
+    tickNeeds(_BG_INTERVAL, VS);
+    tickPolitics(_BG_INTERVAL, VS, showMsg);
+    VS.buildings.forEach(function(b) {
+      if (b.upgradePath === 'quality') applyQualityEffect(b, VS.villagers, _BG_INTERVAL, 120);
+    });
+    tickCorruption(_BG_INTERVAL, VS);
+    applyPolicies(_BG_INTERVAL, VS);
+    tickElection(_BG_INTERVAL, VS, showMsg);
+  }
   
   var _evLogLenBefore = (VS.events && VS.events.log) ? VS.events.log.length : 0;
   tickEvents(dt, VS, showMsg);

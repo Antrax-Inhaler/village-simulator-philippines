@@ -334,6 +334,20 @@ export function createVillager(typeIdx, x, y, parentA, parentB) {
     workShiftTimer: 0,
     roamTimer:      0,
 
+    /* ── Schedule system ──────────────────────────────────── */
+    // true  → villager is hidden inside a building (work or home)
+    // skip all movement, AI, collision, and drawing when true
+    isInsideBuilding: false,
+    // 'work'  → currently inside workplace  (9am–6pm schedule)
+    // 'home'  → gone home early             (6pm–9pm, 50% group)
+    // null    → roaming normally
+    scheduleState:    null,
+    // Which schedule group this villager belongs to (assigned once)
+    // 'work80'  → 80% that go inside buildings during work hours
+    // 'roam20'  → 20% that always roam
+    // 'home50'  → of the work80, 50% go home at 6pm instead of roaming
+    scheduleGroup:    null,
+
     /* Interaction state */
     collisionCooldown: 0,
     _hoverStopped:     false,
@@ -392,6 +406,9 @@ var ROAM_BREAK_MAX_S = 2  * REAL_SECS_PER_GAME_HOUR;
 var ENTER_RADIUS     = 22;
 
 export function updateVillager(v, dt, waypoints) {
+  /* ── Schedule building hide: skip ALL processing ─────────── */
+  if (v.isInsideBuilding) return;
+
   var hungerMult = v._hungerSpeedMult !== undefined ? v._hungerSpeedMult : 1.0;
   var healthMult = 1.0;
   if (v.health !== undefined && v.health < 30) {
