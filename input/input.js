@@ -980,7 +980,8 @@ function _touchDist(t0, t1) {
 }
 
 function _onTouchStart(e) {
-  e.preventDefault();
+  e.preventDefault(); 
+  
   const touches = e.touches;
   _touch.count = touches.length;
   
@@ -1018,17 +1019,21 @@ function _onTouchStart(e) {
     _touch.moved         = true;
   }
 }
-
 function _onTouchMove(e) {
-  e.preventDefault();
+  // ✅ FIX: Call preventDefault immediately to suppress the warning
+  e.preventDefault(); 
+  
   const touches = e.touches;
   _touch.count = touches.length;
 
+  // --- Pinch Zoom Logic ---
   if (touches.length === 2) {
     const t0 = _getTouch(touches, _touch.id0) || touches[0];
     const t1 = _getTouch(touches, _touch.id1) || touches[1];
     const currentDist = _touchDist(t0, t1);
+    
     if (_touch.pinchStartDist === 0) return;
+    
     const scaleFactor = currentDist / _touch.pinchStartDist;
     const nz = clamp(_touch.pinchStartZoom * scaleFactor, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM);
     const rect = _canvas.getBoundingClientRect();
@@ -1037,11 +1042,13 @@ function _onTouchMove(e) {
     const midSX = ((t0.clientX + t1.clientX) / 2 - rect.left) * scaleX;
     const midSY = ((t0.clientY + t1.clientY) / 2 - rect.top) * scaleY;
     const wp = s2w(midSX, midSY);
+    
     cam.followTarget = null;
     cam.tzoom = nz;
     cam.tx    = wp.x + (midSX - window._VW / 2) / (-nz);
     cam.ty    = wp.y + (midSY - window._VH / 2) / (-nz);
     cam.focused = cam.tzoom > CAMERA_MIN_ZOOM + 0.05;
+    
     const hw = window._VW / (2 * cam.tzoom), hh = window._VH / (2 * cam.tzoom);
     const extraW = WORLD_W * 0.05, extraH = WORLD_H * 0.05;
     cam.tx = (2 * hw >= WORLD_W + extraW) ? WORLD_W / 2 : clamp(cam.tx, hw - extraW, WORLD_W - hw + extraW);
@@ -1049,6 +1056,7 @@ function _onTouchMove(e) {
     return;
   }
 
+  // --- Single Touch Drag Logic ---
   if (touches.length !== 1 || !_touch.active) return;
 
   const t   = _getTouch(touches, _touch.id0) || touches[0];
@@ -1058,6 +1066,7 @@ function _onTouchMove(e) {
   const mode   = _deps.getGameMode();
   const drawer = _deps.getDrawer();
 
+  // Moving a building
   if (mode === 'move_building' && drawer && drawer.target) {
     if (drawer.target._moveOriginX === undefined) {
       drawer.target._moveOriginX = drawer.target.x;
@@ -1065,16 +1074,8 @@ function _onTouchMove(e) {
     }
     const wpM = s2w(pos.x, pos.y);
     
-    // Check overlap (touch version)
-    var overlapCheck = _checkBuildingOverlap(
-      drawer.target.type,
-      wpM.x,
-      wpM.y,
-      _deps.VS.buildings,
-      drawer.target
-    );
-    
-    // Check zone boundary (touch version)
+    // Check overlap & zone
+    var overlapCheck = _checkBuildingOverlap(drawer.target.type, wpM.x, wpM.y, _deps.VS.buildings, drawer.target);
     var zoneCheck = _checkZoneBoundary(drawer.target.type, wpM.x, wpM.y, _deps.VS);
     
     drawer.target._hasOverlap = overlapCheck.overlap;
@@ -1088,8 +1089,10 @@ function _onTouchMove(e) {
     return;
   }
 
+  // Camera Panning
   const dx = pos.x - _touch.startSX;
   const dy = pos.y - _touch.startSY;
+  
   if (!_touch.moved && Math.sqrt(dx*dx + dy*dy) > 8) _touch.moved = true;
   if (!_touch.moved) return;
   if (mode === 'build_shop') return;
@@ -1105,7 +1108,6 @@ function _onTouchMove(e) {
   cam.tx = (2 * hw2 >= WORLD_W + extraW) ? WORLD_W / 2 : clamp(cam.tx, hw2 - extraW, WORLD_W - hw2 + extraW);
   cam.ty = (2 * hh2 >= WORLD_H + extraH) ? WORLD_H / 2 : clamp(cam.ty, hh2 - extraH, WORLD_H - hh2 + extraH);
 }
-
 function _onTouchEnd(e) {
   e.preventDefault();
   if (_touch.count === 2 && e.touches.length === 1) {

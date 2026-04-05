@@ -268,158 +268,85 @@ function _hideBuildingInfo() {
 }
 
 /* ════════════════════════════════════════════════════════════
-   MISSILE SCOUTING FUNCTIONS (NEW)
+   SCOUT + MISSILE PANEL
+   Delegated to input.js exports via window.* bridges.
+   attack_controller only owns the attack-screen-specific
+   scout hint overlay and the _missileState.active flag.
    ════════════════════════════════════════════════════════════ */
 
 export function enterScoutMode() {
   _missileState.scoutMode = true;
   _missileState.capturedCoords = null;
-  _showScoutHint();
+  // Show hint overlay unique to attack screen
+  var hint = G('scout-hint');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.id = 'scout-hint';
+    hint.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#f5c842;padding:8px 16px;border-radius:8px;font-family:Oldenburg;font-size:14px;z-index:2000;pointer-events:none;';
+    document.body.appendChild(hint);
+  }
+  hint.textContent = '🔭 I-click ang building para kopyahin ang coordinates';
+  hint.style.opacity = '1';
   if (window.showMsg) window.showMsg('🔭 Scout Mode: I-click ang building para kumuha ng coordinates', 'info');
 }
 
 export function exitScoutMode() {
   _missileState.scoutMode = false;
   _missileState.targetPreview = null;
-  _hideScoutHint();
-}
-
-function _showScoutHint() {
-  var hint = G('scout-hint');
-  if (!hint) {
-    hint = document.createElement('div');
-    hint.id = 'scout-hint';
-    hint.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.85); color:#f5c842; padding:8px 16px; border-radius:8px; font-family:Oldenburg; font-size:14px; z-index:2000; pointer-events:none;';
-    document.body.appendChild(hint);
-  }
-  hint.textContent = '🔭 I-click ang building para kopyahin ang coordinates';
-  hint.style.opacity = '1';
-}
-
-function _hideScoutHint() {
   var h = G('scout-hint');
   if (h) h.style.opacity = '0';
 }
 
+/* Capture coords from a clicked building — used by _deployOrClickAtScreen */
 function _captureBuildingCoords(bld) {
   if (!_missileState.scoutMode) return null;
-  
   var zones = ['SENTRO', 'HILAGA', 'TIMOG', 'SILANGAN', 'KANLURAN'];
-  var zone = zones[Math.floor(Math.random() * zones.length)];
-  
+  var zone  = zones[Math.floor(Math.random() * zones.length)];
   var coords = {
-    x: bld.x.toFixed(2),
-    y: bld.y.toFixed(2),
+    x: bld.x.toFixed(2), y: bld.y.toFixed(2),
     zone: zone,
-    name: 'Nayon ni ' + ['Juan', 'Maria', 'Pedro', 'Ana'][Math.floor(Math.random() * 4)],
-    buildingType: bld.type,
-    buildingLevel: bld.level
+    name: 'Nayon ni ' + ['Juan','Maria','Pedro','Ana'][Math.floor(Math.random() * 4)],
+    buildingType: bld.type, buildingLevel: bld.level
   };
-  
   _missileState.capturedCoords = coords;
-  
-  if (window.showMsg) {
-    window.showMsg(`📍 Coordinates captured: X:${coords.x}, Y:${coords.y}, ZONE:${coords.zone}`, 'success');
-  }
-  
-  if (navigator.clipboard) {
-    var coordStr = `X:${coords.x}, Y:${coords.y}, ZONE:${coords.zone}`;
-    navigator.clipboard.writeText(coordStr).catch(function() {});
-  }
-  
-  _showCapturedCoordsPanel(coords);
+  // Delegate coord storage to input.js so both systems stay in sync
+  if (window.setCapturedCoords) window.setCapturedCoords(coords);
+  if (window.showMsg) window.showMsg('📍 Coordinates captured: X:' + coords.x + ', Y:' + coords.y + ', ZONE:' + coords.zone, 'success');
+  if (navigator.clipboard) navigator.clipboard.writeText('X:' + coords.x + ', Y:' + coords.y + ', ZONE:' + coords.zone).catch(function(){});
+  // Open missile panel immediately with the captured coords
+  _openMissilePanel(coords);
   return coords;
 }
 
-function _showCapturedCoordsPanel(coords) {
-  var panel = G('captured-coords-panel');
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'captured-coords-panel';
-    panel.style.cssText = 'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(20,30,50,0.95); border:2px solid #4a8aff; border-radius:12px; padding:12px 20px; min-width:280px; z-index:2000; font-family:Oldenburg;';
-    document.body.appendChild(panel);
-  }
-  
-  panel.innerHTML = `
-    <div style="color:#4a8aff; font-size:16px; margin-bottom:8px;">📍 Captured Coordinates</div>
-    <div style="color:#fff; font-size:13px; margin:4px 0;">Target: ${coords.name}</div>
-    <div style="color:#aaa; font-size:11px; margin:4px 0;">X: ${coords.x} | Y: ${coords.y}</div>
-    <div style="color:#aaa; font-size:11px; margin:4px 0;">Zone: ${coords.zone}</div>
-    <div style="margin-top:10px; display:flex; gap:8px;">
-      <button id="copy-coords-btn" style="flex:1; background:#4a8aff; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">📋 Copy</button>
-      <button id="use-coords-btn" style="flex:1; background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">🚀 Use</button>
-    </div>
-  `;
-  
-  panel.style.opacity = '1';
-  
-  setTimeout(function() {
-    var copyBtn = G('copy-coords-btn');
-    var useBtn = G('use-coords-btn');
-    if (copyBtn) copyBtn.onclick = function() {
-      var str = `X:${coords.x}, Y:${coords.y}, ZONE:${coords.zone}`;
-      if (navigator.clipboard) navigator.clipboard.writeText(str);
-      if (window.showMsg) window.showMsg('📋 Coordinates copied!', 'info');
-    };
-    if (useBtn) useBtn.onclick = function() {
-      _openMissilePanelWithCoords(coords);
-    };
-  }, 0);
-  
-  setTimeout(function() {
-    if (panel) panel.style.opacity = '0';
-  }, 10000);
-}
-
-function _openMissilePanelWithCoords(coords) {
-  exitScoutMode();
-  if (window.openMissilePanel && typeof window.openMissilePanel === 'function') {
-    window.openMissilePanel({
-      targetX: parseFloat(coords.x),
-      targetY: parseFloat(coords.y),
-      targetZone: coords.zone,
-      targetName: coords.name
-    });
-  }
-}
-
-/* ════════════════════════════════════════════════════════════
-   MISSILE PANEL INTEGRATION (NEW)
-   ════════════════════════════════════════════════════════════ */
-
+/* Open missile panel — thin wrapper around window.showMissilePanel */
 export function openMissilePanel(prefillCoords) {
   _missileState.active = true;
-  if (prefillCoords) {
-    _missileState.capturedCoords = prefillCoords;
-  }
-  if (window.showMissilePanel && typeof window.showMissilePanel === 'function') {
+  if (prefillCoords) _missileState.capturedCoords = prefillCoords;
+  if (window.showMissilePanel) {
     window.showMissilePanel({
       inventory: window._VS?.missileInventory || {},
-      prefill: prefillCoords,
-      onLaunch: _handleMissileLaunch,
-      onClose: function() { _missileState.active = false; }
+      prefill:   prefillCoords,
+      onLaunch:  _handleMissileLaunch,
+      onClose:   function() { _missileState.active = false; }
     });
   }
 }
 
 function _handleMissileLaunch(launchData) {
-  if (window._launchMissile && typeof window._launchMissile === 'function') {
-    var result = window._launchMissile(
-      launchData.missileType,
-      launchData.targetX,
-      launchData.targetY,
-      launchData.targetZone,
-      launchData.targetName,
-      launchData.count || 1
-    );
-    if (result?.ok) {
-      _missileState.active = false;
-      if (window.closeMissilePanel) window.closeMissilePanel();
-    }
-    return result;
+  if (!window._launchMissile) return { ok: false, msg: 'Missile system not initialized.' };
+  var result = window._launchMissile(
+    launchData.missileType, launchData.targetX, launchData.targetY,
+    launchData.targetZone,  launchData.targetName, launchData.count || 1
+  );
+  if (result?.ok) {
+    _missileState.active = false;
+    if (window.closeMissilePanel) window.closeMissilePanel();
   }
-  return { ok: false, msg: 'Missile system not initialized.' };
+  return result;
 }
+
+// Convenience alias used inside _deployOrClickAtScreen
+function _openMissilePanel(coords) { openMissilePanel(coords); }
 
 /* ════════════════════════════════════════════════════════════
    RENDER LOOP
@@ -759,29 +686,15 @@ function _removeSoldiers(deadTroops) {
    ════════════════════════════════════════════════════════════ */
 function _sizeCanvas() {
   var scr = G('attack-screen');
-  // Viewport size = actual screen pixels available
   var vw = scr.clientWidth  || window.innerWidth;
   var vh = scr.clientHeight || window.innerHeight;
-
-  // Canvas internal pixels = viewport size (1:1 pixel ratio, browser never scales)
-  // The camera pans/zooms over DEF_WORLD_W x DEF_WORLD_H world-space internally
-  _canvas.width  = vw;
-  _canvas.height = vh;
-
-  // _VW/_VH = viewport dimensions — _camApply() pivots at (_VW/2, _VH/2)
-  _VW = vw;
-  _VH = vh;
-
-  // CSS: always fill the full attack-screen, never fixed px that could mismatch
-  _canvas.style.position = 'absolute';
-  _canvas.style.top      = '0';
-  _canvas.style.left     = '0';
-  _canvas.style.width    = '100%';
-  _canvas.style.height   = '100%';
-  _canvas.style.display  = 'block';
-
-  window._VW = _VW;
-  window._VH = _VH;
+  // Internal pixels = viewport size. Camera pans over DEF_WORLD_W x DEF_WORLD_H world-space.
+  _canvas.width  = vw;  _canvas.height = vh;
+  // _VW/_VH = viewport — _camApply() pivots at (_VW/2, _VH/2)
+  _VW = vw; _VH = vh;
+  // CSS px must exactly match internal px — never use % (causes squish on resize)
+  _canvas.style.cssText = 'position:absolute;top:0;left:0;width:' + vw + 'px;height:' + vh + 'px;display:block;';
+  window._VW = _VW; window._VH = _VH;
 }
 
 function _loadVillage() {
@@ -810,6 +723,7 @@ function _loadVillage() {
 window.openAttackScreen = function() {
   _canvas = G('enemy-canvas');
   _ctx = _canvas.getContext('2d');
+  if (typeof window.pauseMainGame === 'function') window.pauseMainGame();
   var scr = G('attack-screen');
   scr.style.display = 'block';
   scr.style.contentVisibility = 'visible';
@@ -848,6 +762,7 @@ window._atkClose = function() {
   scr.style.visibility = '';
   _cam.selectedBuilding = null;
   _hideBuildingInfo();
+  if (typeof window.resumeMainGame === 'function') window.resumeMainGame();
   
   // ════════════════════════════════════════════════════════
   // RESUME DAY/NIGHT MUSIC
@@ -891,20 +806,20 @@ window._atkLusubin = function() {
 };
 
 /* ════════════════════════════════════════════════════════════
-   MISSILE WARFARE PUBLIC API (NEW)
+   MISSILE WARFARE PUBLIC API
    ════════════════════════════════════════════════════════════ */
-window._enterScoutMode = enterScoutMode;
-window._openMissilePanel = openMissilePanel;
-window._getCapturedCoords = function() { return _missileState.capturedCoords; };
-
+window._enterScoutMode    = enterScoutMode;
+window._openMissilePanel  = openMissilePanel;
+// Reads from both attack state and input.js state (whichever was last set)
+window._getCapturedCoords = function() {
+  return _missileState.capturedCoords ||
+    (window.getCapturedCoords ? window.getCapturedCoords() : null);
+};
 window._calculateMissileETA = function(missileType, targetX, targetY) {
   if (!_enemy) return null;
-  var playerPos = { x: DEF_WORLD_W/2, y: DEF_WORLD_H/2 };
-  var distance = getDistanceBetweenPoints(playerPos.x, playerPos.y, targetX, targetY);
-  return calculateETA(distance, missileType);
+  return calculateETA(getDistanceBetweenPoints(DEF_WORLD_W/2, DEF_WORLD_H/2, targetX, targetY), missileType);
 };
-
-window._previewMissileTargets = function(missileType, targetX, targetY) {
+window._previewMissileTargets = function(missileType) {
   if (!_enemy) return [];
   return selectMissileTargets(_enemy.buildings, missileType);
 };
@@ -915,16 +830,15 @@ window._previewMissileTargets = function(missileType, targetX, targetY) {
 window.addEventListener('resize', function() {
   var scr = G('attack-screen');
   if (!scr || scr.style.display === 'none' || !_canvas) return;
-  // Re-read viewport size and resize canvas pixels to match
   var vw = scr.clientWidth  || window.innerWidth;
   var vh = scr.clientHeight || window.innerHeight;
-  _canvas.width  = vw;
-  _canvas.height = vh;
-  _VW = vw;
-  _VH = vh;
-  window._VW = _VW;
-  window._VH = _VH;
-  // Re-clamp camera so view stays valid at new size
+  // Keep internal pixels, CSS px, and _VW/_VH in sync — prevents squish
+  _canvas.width        = vw;
+  _canvas.height       = vh;
+  _canvas.style.width  = vw + 'px';
+  _canvas.style.height = vh + 'px';
+  _VW = vw; _VH = vh;
+  window._VW = _VW; window._VH = _VH;
   _clampCamTarget();
   _clampCamCurrent();
 });
