@@ -3,7 +3,7 @@ import { clamp, lerp } from '../utils/perspective.js';
 export var WORLD_W = 1280;
 export var WORLD_H = 720;
 
-var MIN_ZOOM = 1.0;  // Default value
+var MIN_ZOOM = .7;  // Default value
 var MAX_ZOOM = 4.0;
 
 export var cam = {

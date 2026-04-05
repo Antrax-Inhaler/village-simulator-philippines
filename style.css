@@ -10,17 +10,17 @@
 }
 
 :root {
-  --clr-bg:          #0f1117;
-  --clr-panel:       #161b22f0;
-  --clr-panel-border:#2d333b;
-  --clr-accent:      #00d4aa;
-  --clr-accent-dim:  #008a70;
-  --clr-text:        #e6edf3;
-  --clr-text-dim:    #8b949e;
-  --clr-gold:        #ffca28;
-  --clr-rice:        #7ee787;
-  --clr-danger:      #f85149;
-  --clr-success:     #3fb950;
+  --clr-bg:          #1a1008;
+  --clr-panel:       #0d0804f0;
+  --clr-panel-border:#2a1808;
+  --clr-accent:      #f5c842;
+  --clr-accent-dim:  #c49a4e;
+  --clr-text:        #e8d4a0;
+  --clr-text-dim:    #8a6a3a;
+  --clr-gold:        #ffcc44;
+  --clr-rice:        #88dd88;
+  --clr-danger:      #e74c3c;
+  --clr-success:     #44aa44;
   --radius-sm:       3px;
   --radius-md:       6px;
   --font-display:    'Slackey', sans-serif;
