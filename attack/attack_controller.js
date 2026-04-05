@@ -762,25 +762,22 @@ function _sizeCanvas() {
   var vw = scr.clientWidth  || window.innerWidth;
   var vh = scr.clientHeight || window.innerHeight;
 
-  // Internal pixels = viewport size. Camera pans over DEF_WORLD_W x DEF_WORLD_H world-space.
+  // Internal pixels = viewport size. Camera pans over DEF_WORLD_W x DEF_WORLD_H.
   _canvas.width  = vw;
   _canvas.height = vh;
 
-  // _VW/_VH = viewport size — _camApply() pivots at (_VW/2, _VH/2)
+  // Private locals only — NEVER write to window._VW/window._VH.
+  // Those globals belong to main.js / perspScale and must not be clobbered.
   _VW = vw;
   _VH = vh;
 
-  // CSS must be EXACT pixel values matching internal dimensions.
-  // Never use percentages — % lets the browser scale internal pixels → squish.
+  // CSS px must exactly match internal px to prevent browser scaling/squish.
   _canvas.style.position = 'absolute';
   _canvas.style.top      = '0';
   _canvas.style.left     = '0';
   _canvas.style.width    = vw + 'px';
   _canvas.style.height   = vh + 'px';
   _canvas.style.display  = 'block';
-
-  window._VW = _VW;
-  window._VH = _VH;
 }
 
 function _loadVillage() {
@@ -810,13 +807,13 @@ window.openAttackScreen = function() {
   _canvas = G('enemy-canvas');
   _ctx = _canvas.getContext('2d');
 
-  // Pause main village — no point running both simultaneously
+  // Pause main village — never run both loops simultaneously
   if (typeof window.pauseMainGame === 'function') window.pauseMainGame();
 
   var scr = G('attack-screen');
-  scr.style.display = 'block';
+  scr.style.display          = 'block';
   scr.style.contentVisibility = 'visible';
-  scr.style.visibility = 'visible';
+  scr.style.visibility        = 'visible';
   _loadVillage();
   
   // ════════════════════════════════════════════════════════
@@ -846,13 +843,14 @@ window.openAttackScreen = function() {
 
 window._atkClose = function() {
   var scr = G('attack-screen');
-  scr.style.display = 'none';
+  scr.style.display           = 'none';
   scr.style.contentVisibility = '';
-  scr.style.visibility = '';
+  scr.style.visibility        = '';
   _cam.selectedBuilding = null;
   _hideBuildingInfo();
 
-  // Resume main village loop
+  // Resume main game — window._VW/VH are still the main village's values
+  // because we never wrote to them from attack_controller.
   if (typeof window.resumeMainGame === 'function') window.resumeMainGame();
   
   // ════════════════════════════════════════════════════════
@@ -923,16 +921,14 @@ window.addEventListener('resize', function() {
   if (!scr || scr.style.display === 'none' || !_canvas) return;
   var vw = scr.clientWidth  || window.innerWidth;
   var vh = scr.clientHeight || window.innerHeight;
-  // Always keep internal pixels, CSS px, and _VW/_VH all in sync.
-  // If any one of the three drifts the browser will scale/squish.
+  // Sync internal pixels + CSS px + local _VW/_VH together (prevents squish).
+  // Do NOT touch window._VW/window._VH — those belong to main.js/perspScale.
   _canvas.width        = vw;
   _canvas.height       = vh;
   _canvas.style.width  = vw + 'px';
   _canvas.style.height = vh + 'px';
   _VW = vw;
   _VH = vh;
-  window._VW = _VW;
-  window._VH = _VH;
   _clampCamTarget();
   _clampCamCurrent();
 });
