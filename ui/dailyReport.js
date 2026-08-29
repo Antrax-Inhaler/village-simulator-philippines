@@ -15,7 +15,7 @@ function playDayCompleteSound() {
   } else {
     // Fallback: direct audio element
     var el = document.getElementById('sfx-day-complete');
-    if (el && SOUNDS_ENABLED !== false) {
+    if (el && window.SOUNDS_ENABLED !== false) {
       el.currentTime = 0;
       el.play().catch(function(e) {
         console.warn('[DailyReport] Could not play day-complete sound:', e.message);
@@ -31,7 +31,7 @@ function startScoreCountSound() {
   } else {
     // Fallback: direct audio element
     var el = document.getElementById('sfx-score-count');
-    if (el && SOUNDS_ENABLED !== false) {
+    if (el && window.SOUNDS_ENABLED !== false) {
       el.loop = true;
       el.currentTime = 0;
       el.play().catch(function(e) {

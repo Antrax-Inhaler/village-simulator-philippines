@@ -3,33 +3,31 @@
    Version 7 - Added Missile Warfare, Scout System, War State
 ═══════════════════════════════════════════════════════════════ */
 
-import { ZONE_DEFS, getZoneAt, isZoneUnlocked, purchaseZone, drawZoneGrid, canBuildInZone, getZoneProductionMult } from './world/zones.js';
-import { clamp, dist, randRange, randInt } from './utils/perspective.js';
-import { advanceTime, getTimeStr, getTimeOfDay, setTimeSpeed } from './utils/time.js';
-import { saveGame, loadGame, updateAutoSave } from './utils/storage.js';
+import { getZoneAt, drawZoneGrid, canBuildInZone, getZoneProductionMult } from './world/zones.js';
+import { clamp, randRange, randInt } from './utils/perspective.js';
+import { advanceTime, getTimeStr, getTimeOfDay } from './utils/time.js';
+import { updateAutoSave } from './utils/storage.js';
 import { preloadAll as preloadSprites } from './utils/sprites.js';
 import { getAverageHappiness, getWasteTotal, getResourcePercent, canAfford, deductCost, formatResourceNumber } from './utils/economyHelpers.js';
 import { formatTime, formatTimeLong, getColorByPercent, truncateText, capitalizeFirst, getStarRating, createElementWithClass, setElementText, showElement } from './utils/uiHelpers.js';
 
-import { ResourceNode, createDefaultResourceNodes, tickFoodConsumption } from './resources/resource.js';
-import { 
-  tickEconomy, onNewDay as economyOnNewDay, setTaxRate, getTaxRate,
-  initDebt, takeLoan, makeDebtPayment, getDebtSummary, getMaxLoanAmount, getInterestRate,
-  deductMissileCost, useMissileFromInventory, calculateWarLoot, applyWarLoot, applySpamPenalty,
-  getMissileInventorySummary, canAffordMissileLaunch, getMissileTypeInfo, MISSILE_COSTS
+import { createDefaultResourceNodes, tickFoodConsumption } from './resources/resource.js';
+import {
+  tickEconomy, onNewDay as economyOnNewDay,
+  initDebt, calculateWarLoot, applyWarLoot, applySpamPenalty,
+  getMissileInventorySummary, getMissileTypeInfo
 } from './resources/economy.js';
 import { tickTrade } from './resources/trade.js';
-import { Building, createDefaultBuildings, rebuildFromSave, BUILDING_DEFS, getMainHallLevel, getMainHallRules, canPlaceBuilding, getShopCatalogue, recalcResourceCaps } from './buildings/building.js';
+import { Building, createDefaultBuildings, BUILDING_DEFS, getMainHallLevel, getMainHallRules, canPlaceBuilding, getShopCatalogue, recalcResourceCaps } from './buildings/building.js';
 import { applyQualityEffect } from './buildings/buildingUpgrade.js';
-import { getRepairCost } from './buildings/wreckBuildings.js';
 
-import { VILLAGER_TYPES, TRAINING_MAP, createVillager, updateVillager, rebuildVillagersFromSave, chooseNextWaypoint, assignHomes, assignWork, getBedtime, updateNightBehaviour, updateReproduction, updateGrowth, updateTraining, startTraining, tickQuips } from './villagers/villager.js';
-import { checkVillagerInteractions, triggerPlayerGreeting, triggerBirthAnnouncement, triggerProtestGathering } from './villagers/aiInteraction.js';
+import { VILLAGER_TYPES, TRAINING_MAP, createVillager, updateVillager, chooseNextWaypoint, assignHomes, assignWork, getBedtime, updateNightBehaviour, updateReproduction, updateGrowth, updateTraining, startTraining, tickQuips } from './villagers/villager.js';
+import { checkVillagerInteractions, triggerPlayerGreeting, triggerBirthAnnouncement } from './villagers/aiInteraction.js';
 import { tickNeeds, clearResolvedRequests, checkAndEmit } from './villagers/citizenNeeds.js';
 import { tickPolitics, updateLeaders } from './villagers/politics.js';
 
 import { cam, initCamera, camRecentre, updateCamera, zoomTo, zoomOut, softPan, WORLD_W, WORLD_H, expandWorld } from './render/camera.js';
-import { renderFrame, addMissileLaunch, addMissileImpact, clearMissileEffects } from './render/renderer.js';
+import { renderFrame, addMissileImpact } from './render/renderer.js';
 
 import { initInput, getDragState, getMousePos } from './input/input.js';
 
@@ -37,29 +35,17 @@ import { initDrawer, openDrawer, closeDrawer, renderDrawer, isDrawerVisible, get
 import { initToasts, showMsg } from './ui/notifToast.js';
 import { initDashboard, updateDashboard } from './ui/dashboard.js';
 import { initRequestPanel, refreshRequests } from './ui/requestPanel.js';
-import { initExpansionPanel, openExpansionPanel } from './ui/expansionPanel.js';
+import { initExpansionPanel } from './ui/expansionPanel.js';
 import { initTradePanel, refreshTradePanel } from './ui/tradePanel.js';
 
 import { tickCorruption } from './government/corruption.js';
-import { applyPolicies, getPolicyState, activatePolicy, deactivatePolicy } from './government/policy.js';
+import { applyPolicies } from './government/policy.js';
 import { tickElection, getElectionState } from './government/election.js';
 import { tickEvents, setEventDayCount, getActiveCalamity } from './government/events.js';
-import { initPersonalFinance, serializePersonalFinance, resetPersonalFinance } from './government/personalFinance.js';
-import { openRankModal } from './ui/rankModal.js';
+import { initPersonalFinance, resetPersonalFinance } from './government/personalFinance.js';
 
 import { RANKS, getRankFromScore, getNextRank, calculateDailyScore, showRankUpBanner } from './ranking/rankingSystem.js';
 import { showDayCount, showDailyReport } from './ui/dailyReport.js';
-
-/* ═══════════════════════════════════════════════════════════════
-   MISSILE WARFARE IMPORTS
-══════════════════════════════════════════════════════════════ */
-import {
-  cancelMissile,
-  processOfflineImpacts,
-  getMissileTrackingData,
-  canAttackTarget,
-  recordAttackMade,
-} from './attack/missileWarfare.js';
 
 import {
   initMissilePanel,
@@ -68,6 +54,9 @@ import {
 import {
   initScoutPanel,
 } from './ui/scoutPanel.js';
+
+import { createInitialState, BASE_RES_CAP } from './main/gameState.js';
+import { installWindowApi } from './main/windowApi.js';
 
 /* ── SOUND TOGGLE ─────────────────────────────────────────── */
 var SOUNDS_ENABLED = true;
@@ -88,67 +77,14 @@ var _pendingBuildType = null;
 var _reqRefreshTimer = 0;
 var _initialized = false;
 
-var BASE_RES_CAP = { gold: 2000, rice: 1500, langis: 800 };
-
 var _UI_TICK = 0;
 var _UI_INTERVAL = 1 / 10; // update DOM UI at 10fps max
 
 /* ═══════════════════════════════════════════════════════════════
    GAME STATE with Missile Warfare additions (Version 7)
+   Shape defined in main/gameState.js — this is the one live instance.
 ═══════════════════════════════════════════════════════════════ */
-var VS = {
-  villagers: [],
-  buildings: [],
-  resourceNodes: [],
-  waypoints: { all: [], mines: [], buildings: [] },
-  res: { gold: 800, rice: 500, langis: 1000 },
-  resCap: { gold: 2000, rice: 1500, langis: 800 },
-  pop: { cur: 0, max: 30 },
-  time: 12,
-  corruption: null,
-  policies: null,
-  election: null,
-  events: null,
-  needs: null,
-  politics: null,
-  trade: null,
-  economy: null,
-  unlockedZones: [],
-  food: { pool: 200, consumption: 0, buffer: 0 },
-  debt: null,
-  rank: {
-    score: 0,
-    history: [],
-    lastRankId: 1,
-    previousDayStats: null
-  },
-  // Missile Warfare System (NEW v7)
-  missiles: {
-    outgoing: [],    // Active outgoing missiles
-    incoming: [],    // Active incoming missiles (simulated attacks)
-    history: []      // Last 50 missile events
-  },
-  warState: {
-    attacksMade: [],           // Track attacks for spam detection
-    attacksReceived: [],       // Track received attacks
-    lastAttackTime: 0,         // Timestamp of last attack made
-    lastRetaliationTime: 0,    // Timestamp of last retaliation
-    trustPenalties: 0,         // Accumulated trust penalties
-    rankPenalties: 0,          // Accumulated rank penalties
-    dailyAttackCount: 0,       // Attacks made today
-    dailyAttackReset: 0,       // Day when daily count resets
-    weeklyAttacks: [],         // Attacks this week for weekly limit
-    lastLoginTime: Date.now()  // For offline protection
-  },
-  missileInventory: {          // Player's missile stock
-    basic: 0,
-    precision: 0,
-    ballistic: 0,
-    mirv: 0,
-    interceptor: 0
-  },
-  scoutHistory: []             // Scanned enemy coordinates
-};
+var VS = createInitialState();
 
 var _drawer = {
   get visible() { return isDrawerVisible(); },
@@ -327,7 +263,7 @@ function update(dt) {
   _recalcCaps();
 
   tickFoodConsumption(dt, VS);
-  tickEconomy(dt, VS);
+  tickEconomy(dt, VS, dayCount);
   tickTrade(dt, VS, showMsg);
 
   // ── Throttle non-visual background processes to 1s intervals ──
@@ -458,7 +394,7 @@ function _onNewDay() {
   assignHomes(VS.villagers, VS.buildings);
   assignWork(VS.villagers, VS.buildings);
   updateLeaders(VS);
-  economyOnNewDay(VS, showMsg);
+  economyOnNewDay(VS, showMsg, dayCount);
   setEventDayCount(dayCount, VS);
   
   // Update war state for new day (spam protection resets)
@@ -553,291 +489,6 @@ function _updateElectionBar() {
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Missile Warfare Window Functions
-═══════════════════════════════════════════════════════════════ */
-
-// Launch a missile at target coordinates
-window._launchMissile = function(missileType, targetX, targetY, targetZone, targetName, count) {
-  count = count || 1;
-  
-  // Check spam protection
-  var canAttack = canAttackTarget(VS.warState, targetName, Date.now(), dayCount);
-  if (!canAttack.ok) {
-    return { ok: false, msg: canAttack.reason };
-  }
-  
-  // Check resources and inventory
-  if (!canAffordMissileLaunch(missileType, count, VS)) {
-    return { ok: false, msg: 'Kulang ang resources para sa missile na ito.' };
-  }
-  
-  // Check missile stock
-  var inv = VS.missileInventory || {};
-  if ((inv[missileType] || 0) < count) {
-    return { ok: false, msg: 'Kulang ang missile sa inventory!' };
-  }
-  
-  // Deduct cost and use from inventory
-  if (!deductMissileCost(missileType, count, VS, showMsg)) {
-    return { ok: false, msg: 'Failed to deduct missile cost.' };
-  }
-  for (var i = 0; i < count; i++) {
-    useMissileFromInventory(missileType, VS, showMsg);
-  }
-  
-  // Find launch position (Missile Silo)
-  var silo = VS.buildings.find(function(b) { return b.type === 'missilesilo' && b.hp > 0; });
-  var startX = silo ? silo.x : (WORLD_W / 2);
-  var startY = silo ? silo.y : (WORLD_H / 2);
-  
-  // Calculate travel time based on distance
-  var distance = dist(startX, startY, targetX, targetY);
-  var missileDef = MISSILE_COSTS[missileType];
-  var travelTime = randRange(missileDef.travelMin, missileDef.travelMax);
-  var launchTime = Date.now();
-  var impactTime = launchTime + travelTime * 1000;
-  
-  // Create missile record
-  var missile = {
-    id: 'm_' + Date.now() + '_' + randInt(1000, 9999),
-    type: missileType,
-    targetX: targetX,
-    targetY: targetY,
-    targetZone: targetZone,
-    targetName: targetName,
-    launchTime: launchTime,
-    impactTime: impactTime,
-    eta: travelTime,
-    status: 'traveling',
-    damage: 0,
-    buildingHit: null,
-    lootGained: 0,
-    cancelled: false,
-    startX: startX,
-    startY: startY,
-    progress: 0
-  };
-  
-  VS.missiles.outgoing.push(missile);
-  
-  // Record attack for spam protection
-  recordAttackMade(VS.warState, targetName, launchTime, dayCount);
-  
-  // Show launch effect on map
-  if (silo) {
-    addMissileLaunch(silo.x, silo.y, missileType);
-  }
-  
-  // Play launch sound
-  _playSound('sfx-missile-launch');
-  
-  // Show confirmation
-  showMsg(`🚀 Inilunsad ang ${missileType.toUpperCase()} missile papunta sa ${targetName}! ETA: ${travelTime}s`, 'info');
-  
-  return { ok: true, missile: missile };
-};
-
-// Cancel outgoing missile (within first 10 seconds)
-window._cancelMissile = function(missileId) {
-  var result = cancelMissile(missileId, VS, Date.now(), showMsg);
-  if (result.ok) {
-    // Remove from visual tracking
-    clearMissileEffects();
-  }
-  return result;
-};
-
-// Get missile tracking data for UI
-window._getMissileTracking = function() {
-  return getMissileTrackingData(VS, Date.now());
-};
-
-// Process offline missile impacts (called on game load)
-window._processMissileImpacts = function() {
-  var result = processOfflineImpacts(VS, Date.now(), showMsg);
-  if (result.processed > 0) {
-    showMsg(`💥 ${result.processed} missile(s) impacted while you were away!`, 'info');
-  }
-  return result;
-};
-
-// Debt system functions (existing)
-window._makeDebtPayment = function(amount) {
-  if (makeDebtPayment) {
-    return makeDebtPayment(amount, VS, showMsg);
-  } else {
-    if (VS.res.gold < amount) {
-      showMsg('Kulang ang ginto!', 'danger');
-      return false;
-    }
-    if (!VS.debt) VS.debt = { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] };
-    var payment = Math.min(amount, VS.debt.principal);
-    VS.res.gold -= payment;
-    VS.debt.principal -= payment;
-    VS.debt.paymentHistory.unshift({ amount: payment, day: dayCount });
-    if (VS.debt.paymentHistory.length > 30) VS.debt.paymentHistory.pop();
-    VS.debt.missedPayments = 0;
-    showMsg(`Nagbayad ng ${payment} 🪙. Natitirang utang: ${VS.debt.principal} 🪙`, 'success');
-    return true;
-  }
-};
-
-window._takeLoan = function(amount) {
-  if (takeLoan) {
-    return takeLoan(amount, VS, showMsg);
-  } else {
-    if (VS.debt && VS.debt.defaulted) {
-      showMsg('Hindi ka na pwedeng umutang dahil sa nakaraang hindi pagbabayad.', 'danger');
-      return false;
-    }
-    var maxLoan = getMaxLoanAmount(VS);
-    if (amount > maxLoan) {
-      showMsg(`Ang maximum na pwedeng utangin ay ${maxLoan} 🪙 batay sa credit score.`, 'warning');
-      return false;
-    }
-    if (!VS.debt) VS.debt = { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] };
-    VS.debt.principal += amount;
-    VS.res.gold += amount;
-    showMsg(`Nakautang ng ${amount} 🪙. Kabuuang utang: ${VS.debt.principal} 🪙`, 'info');
-    return true;
-  }
-};
-
-window._getMaxLoanAmount = function(vs) { return getMaxLoanAmount ? getMaxLoanAmount(vs || VS) : 1000; };
-window._getInterestRate = function(vs) { return getInterestRate ? getInterestRate(vs || VS) : 0.05; };
-window._getDebtSummary = function(vs) { return getDebtSummary ? getDebtSummary(vs || VS) : { principal: 0, creditScore: 60, defaulted: false, missedPayments: 0, paymentHistory: [] }; };
-
-// Expose other window functions
-window.spawnVillager = function() { _spawnVillager(undefined, false); };
-window.showMsg = showMsg;
-window._VS = VS;
-window.setMode = function(m) { gameMode = m; canvas.className = 'mode-' + m; };
-window.setSpeed = function(s) {
-  setTimeSpeed(s);
-  document.querySelectorAll('.speed-btn').forEach(function(b) { b.classList.remove('active'); });
-  var el = document.getElementById('spd' + s);
-  if (el) el.classList.add('active');
-  showMsg('Bilis: ' + s + 'x');
-};
-window.openShop = function() { openDrawer(null, '_shop'); };
-window.softPan = function(wx, wy, dur) { softPan(wx, wy, dur); };
-window.triggerProtest = function() { triggerProtestGathering(VS); };
-window.openExpand = openExpansionPanel;
-window.purchaseZone = function(key) {
-  var r = purchaseZone(key, VS, showMsg, WORLD_W, WORLD_H);
-  if (!r.ok) showMsg(r.msg);
-};
-window._getRepairCost = getRepairCost;
-window.ZONE_DEFS = ZONE_DEFS;
-window.isZoneUnlocked = function(key) { return isZoneUnlocked(key, VS); };
-window.getPolicyState = function() { return getPolicyState(VS); };
-window.activatePolicy = function(key) {
-  var r = activatePolicy(key, VS, showMsg);
-  showMsg(r.msg);
-  if (r.ok && window.openSidePanel) window.openSidePanel('policy');
-};
-window.deactivatePolicy = function(key) {
-  var r = deactivatePolicy(key, VS, showMsg);
-  showMsg(r.msg);
-  if (window.openSidePanel) window.openSidePanel('policy');
-};
-window.setTaxRate = function(rate) { setTaxRate(rate, VS, showMsg); };
-window.getTaxRate = function() { return getTaxRate(VS); };
-window.triggerSave = function() {
-  var _pf = serializePersonalFinance();
-  showMsg(saveGame(VS, dayCount, null, _pf) ? 'Naligtas! Araw ' + dayCount : 'Save error.');
-};
-window.triggerLoad = function() {
-  var savedState = loadGame();
-  if (!savedState) { showMsg('Walang na-save.'); return; }
-  closeDrawer();
-  VS.res = savedState.res || VS.res;
-  VS.resCap = savedState.resCap || VS.resCap;
-  VS.pop = savedState.pop || VS.pop;
-  VS.time = savedState.time !== undefined ? savedState.time : VS.time;
-  dayCount = savedState.dayCount || 1;
-  VS.unlockedZones = savedState.unlockedZones || [];
-  if (savedState.corruption) VS.corruption = savedState.corruption;
-  if (savedState.policies) VS.policies = savedState.policies;
-  if (savedState.election) VS.election = savedState.election;
-  if (savedState.food) VS.food = savedState.food;
-  if (savedState.debt) VS.debt = savedState.debt;
-  if (savedState.trade) VS.trade = savedState.trade;
-  if (savedState.needs) VS.needs = savedState.needs;
-  if (savedState.rank) VS.rank = savedState.rank;
-  // Load missile warfare state (NEW v7)
-  if (savedState.missiles) VS.missiles = savedState.missiles;
-  if (savedState.warState) VS.warState = savedState.warState;
-  if (savedState.missileInventory) VS.missileInventory = savedState.missileInventory;
-  if (savedState.scoutHistory) VS.scoutHistory = savedState.scoutHistory;
-  if (savedState.villagers && savedState.villagers.length) VS.villagers = rebuildVillagersFromSave(savedState.villagers);
-  if (savedState.buildings && savedState.buildings.length) VS.buildings = rebuildFromSave(savedState.buildings);
-  if (savedState.resourceNodes && savedState.resourceNodes.length) {
-    VS.resourceNodes = savedState.resourceNodes.map(function(d) {
-      var n = new ResourceNode(d.type, d.x, d.y);
-      n.id = d.id;
-      n.amount = d.amount !== undefined ? d.amount : n.capacity;
-      return n;
-    });
-  }
-  initWaypoints();
-  assignHomes(VS.villagers, VS.buildings);
-  assignWork(VS.villagers, VS.buildings);
-  _recalcCaps();
-  if (savedState.playerGold !== undefined) {
-    initPersonalFinance({
-      VS: VS,
-      showMsg: showMsg,
-      savedPlayerGold: savedState.playerGold || 0,
-      savedPlayerRice: savedState.playerRice || 0,
-      savedCorruptionHistory: savedState.corruptionHistory || [],
-    });
-  }
-  // Process any missile impacts that occurred while offline
-  _processMissileImpacts();
-  showMsg('Na-load! Araw ' + dayCount);
-};
-window.openRankModal = openRankModal;
-
-// Debug helpers
-window.debugShowReport = function() {
-  const oldRank = getRankFromScore(VS.rank.score);
-  const nextRank = getNextRank(VS.rank.score);
-  const mockResult = {
-    dailyScore: 18,
-    breakdown: {
-      positive: [
-        { label: 'Kasiyahan', change: 3.5, detail: '65% → 72%' },
-        { label: 'Populasyon', change: 16, detail: '+8 bagong mamamayan' },
-        { label: 'Bagong Gusali', change: 8, detail: '2 farms, 1 palengke' },
-        { label: 'Kalakalan', change: 5, detail: '+500🪙 profit' }
-      ],
-      negative: [
-        { label: 'Korapsyon', change: -12, detail: 'exposure +24%' },
-        { label: 'Nasayang', change: -3, detail: '1,500 resources' }
-      ]
-    }
-  };
-  showDayCount(dayCount).then(() => {
-    return showDailyReport(VS, dayCount, mockResult, VS.rank.score, VS.rank.score + 18, oldRank, nextRank);
-  });
-};
-
-window.debugShowDayCount = function() {
-  return showDayCount(dayCount);
-};
-
-// Debug: Add missiles to inventory
-window.debugAddMissiles = function(type, count) {
-  VS.missileInventory = VS.missileInventory || { basic: 0, precision: 0, ballistic: 0, mirv: 0, interceptor: 0 };
-  VS.missileInventory[type] = (VS.missileInventory[type] || 0) + (count || 1);
-  showMsg(`Added ${count || 1} ${type} missile(s) to inventory`, 'info');
-};
-
-console.log('✅ Mini Bayan loaded. Debug: debugShowReport(), debugShowDayCount(), debugAddMissiles(type, count)');
-console.log('Tip: Set _VS.time = 23.9 to trigger day change');
-
 function updateCanvasSizeForDevice() {
   if (!canvas) return;
   canvas.width = WORLD_W;
@@ -878,6 +529,18 @@ function adjustContainerLayout() {
 function init() {
   canvas = document.getElementById('gameCanvas');
   ctx = canvas.getContext('2d');
+
+  installWindowApi({
+    VS: VS,
+    getDayCount: function() { return dayCount; },
+    setDayCount: function(n) { dayCount = n; },
+    getGameMode: function() { return gameMode; },
+    setGameMode: function(m) { gameMode = m; },
+    getCanvas: function() { return canvas; },
+    spawnVillager: _spawnVillager,
+    recalcCaps: _recalcCaps,
+    initWaypoints: initWaypoints,
+  });
 
   canvas.width = WORLD_W;
   canvas.height = WORLD_H;

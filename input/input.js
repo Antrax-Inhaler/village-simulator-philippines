@@ -167,6 +167,11 @@ export function initInput(canvas, deps) {
 }
 
 export function getMousePos()        { return { x: _mouseX, y: _mouseY }; }
+// Used when entering move-building mode from the drawer's "Ilipat ang Gusali"
+// button (a DOM click, not a canvas mousemove) — without this, the move-guide
+// would render at whatever stale canvas position the mouse was last at,
+// which is often nowhere near the building actually being moved.
+export function setMousePos(x, y)     { _mouseX = x; _mouseY = y; }
 export function getHoveredVillager() { return _hoveredVillager; }
 export function getDragState()       { return _drag; }
 export function getMissileInputState() { return _missileInput; }

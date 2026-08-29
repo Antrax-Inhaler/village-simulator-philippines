@@ -3,7 +3,7 @@ Mini Bayan — render/renderer.js  (with Missile Warfare Support)
 ══════════════════════════════════════════════════════════════ */
 import { perspScale, clamp, lerp }  from '../utils/perspective.js';
 import { getTimeStr, getTimeOfDay, getOverlayColor, getSunMoonState } from '../utils/time.js';
-import { drawGroundSprite }         from '../utils/sprites.js';
+import { drawGroundSprite, isGroundSpriteReady } from '../utils/sprites.js';
 import { getMainHallLevel, getMainHallRules } from '../buildings/building.js';
 import { drawVillager }             from '../villagers/villager.js';
 import { cam, camApply, camReset, w2s, WORLD_W, WORLD_H } from './camera.js';
@@ -72,9 +72,7 @@ export function renderFrame(canvas, ctx, state) {
   if (state.shakeX || state.shakeY) {
     ctx.translate(state.shakeX || 0, state.shakeY || 0);
   }
-  drawGround(ctx, VW, VH);
-  drawRoads(ctx);
-  if (state.drawZoneGrid)   state.drawZoneGrid(ctx, VW, VH, state.VS);
+  ctx.drawImage(_getTerrainCache(state), 0, 0);
   drawZoneArrows(ctx, VW, VH, state.VS);
   drawEntitiesSorted(ctx, state);
   drawBuildPreview(ctx, state);
@@ -91,7 +89,6 @@ export function renderFrame(canvas, ctx, state) {
   drawTimeOverlay(ctx, VW, VH, state.VS.time);
   drawHUD(ctx, state.VS, VW);
   drawZoomBadge(ctx, VW, VH);
-  drawRankBadge(ctx, VW, VH, state.VS);
   drawMissileStatusBadge(ctx, VW, VH, state.VS);
   updateBarUI(state.VS, state.dayCount);
   updateBubblePositions(canvas, state.activeBubbles, state.VW, state.VH);
@@ -226,6 +223,37 @@ export function updateWasteDisplay(VS) {
   if (!VS) return;
   var w = getWasteStats(VS);
   window.updateWasteDisplay(w);
+}
+
+/* ══════════════════════════════════════════════════════════════
+Static terrain cache — ground + roads + zone ownership grid never
+change on their own between frames (only when the world is expanded
+or a zone is purchased), but were previously being fully repainted
+~30x/sec: a gradient, two bezier fills, a dozen ellipses, a tiled
+sprite, and dozens of dashed-stroke road segments. Bake them into an
+offscreen canvas once and blit it — cheap even every frame — instead.
+══════════════════════════════════════════════════════════════ */
+var _terrainCache = null;
+var _terrainCacheKey = null;
+
+function _getTerrainCache(state) {
+  var VS = state.VS;
+  var zonesOwned = (VS.unlockedZones && VS.unlockedZones.length) || 0;
+  var key = WORLD_W + 'x' + WORLD_H + '_z' + zonesOwned + '_g' + isGroundSpriteReady('grass');
+
+  if (_terrainCache && _terrainCacheKey === key) return _terrainCache;
+
+  if (!_terrainCache) _terrainCache = document.createElement('canvas');
+  _terrainCache.width  = WORLD_W;
+  _terrainCache.height = WORLD_H;
+  var tctx = _terrainCache.getContext('2d');
+  tctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawGround(tctx, WORLD_W, WORLD_H);
+  drawRoads(tctx);
+  if (state.drawZoneGrid) state.drawZoneGrid(tctx, WORLD_W, WORLD_H, VS);
+
+  _terrainCacheKey = key;
+  return _terrainCache;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -375,13 +403,19 @@ export function drawEntitiesSorted(ctx, state) {
           ctx.fillText(label, b.x, b.y - maxH - 5*sc);
           ctx.restore();
           
-          /* Current size outline */
+          /* Current size outline — matches the same bottom-anchored,
+             centered footprint used for the max-upgrade box above and
+             for the real overlap check in input.js (_checkBuildingOverlap),
+             just without the 2x multiplier. It used to use unrelated
+             0.6/1.2/1.2/1.4 offsets that didn't line up with the building's
+             actual sprite or footprint, which is what made this guide
+             confusing/inaccurate. */
           ctx.save();
           ctx.strokeStyle = footprintColor;
           ctx.lineWidth   = 2 / cam.zoom;
           ctx.setLineDash([6 / cam.zoom, 4 / cam.zoom]);
           ctx.globalAlpha = 0.85;
-          ctx.strokeRect(b.x - b.w*sc*0.6, b.y - b.h*sc*1.2, b.w*sc*1.2, b.h*sc*1.4);
+          ctx.strokeRect(b.x - b.w*sc*0.5, b.y - b.h*sc, b.w*sc, b.h*sc);
           ctx.setLineDash([]);
           ctx.restore();
         }
@@ -474,25 +508,30 @@ export function drawBuildPreview(ctx, state) {
     ctx.fillText(label, wp0.x, wp0.y - maxH - 5*sc0);
     ctx.restore();
 
-    /* Current size outline */
+    /* Current size outline — same bottom-anchored, centered footprint as
+       the max-upgrade box above (just without the 2x multiplier), matching
+       the real overlap check in input.js (_checkBuildingOverlap). This used
+       to use unrelated 0.6/1.2/1.2/1.4 offsets that didn't line up with the
+       building's actual sprite or footprint, which is what made this guide
+       confusing/inaccurate. */
     ctx.save();
     ctx.shadowBlur  = 0;
     ctx.strokeStyle = footprintColor;
     ctx.lineWidth   = 2 / cam.zoom;
     ctx.globalAlpha = 0.7;
     ctx.setLineDash([6/cam.zoom, 4/cam.zoom]);
-    ctx.strokeRect(wp0.x - bm.w*sc0*0.6, wp0.y - bm.h*sc0*1.2, bm.w*sc0*1.2, bm.h*sc0*1.4);
+    ctx.strokeRect(wp0.x - bm.w*sc0*0.5, wp0.y - bm.h*sc0, bm.w*sc0, bm.h*sc0);
     ctx.setLineDash([]);
     ctx.globalAlpha = 0.6;
     ctx.fillStyle   = fillColor;
-    ctx.fillRect(wp0.x - bm.w*sc0*0.6, wp0.y - bm.h*sc0*1.2, bm.w*sc0*1.2, bm.h*sc0*1.4);
+    ctx.fillRect(wp0.x - bm.w*sc0*0.5, wp0.y - bm.h*sc0, bm.w*sc0, bm.h*sc0);
     ctx.fillStyle   = footprintColor;
     ctx.globalAlpha = 0.9;
     ctx.font        = (9*sc0) + 'px "Oldenburg",serif';
     ctx.textAlign   = 'center';
     ctx.textBaseline = 'alphabetic';
     var dropLabel = isInvalid ? 'Hindi pwede!' : 'I-drop dito';
-    ctx.fillText(dropLabel, wp0.x, wp0.y - bm.h*sc0*1.3);
+    ctx.fillText(dropLabel, wp0.x, wp0.y - bm.h*sc0 - 5*sc0);
     ctx.restore();
     return;
   }
@@ -624,12 +663,15 @@ export function drawZoomBadge(ctx, VW, VH) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.shadowBlur = 0;
   var isMobile = VW < 768;
-  var bottomMargin = isMobile ? 70 : 80;
+  // Top-left, below the dashboard handle's open position — the bottom-left
+  // corner is where LUSUBIN and the dashboard sidebar's own content live,
+  // and this badge used to sit right on top of them.
+  var topMargin = isMobile ? 54 : 60;
   var leftMargin = 12;
   var badgeWidth = 110;
   var badgeHeight = 28;
   var x = leftMargin;
-  var y = VH - bottomMargin;
+  var y = topMargin;
   ctx.fillStyle = 'rgba(13,8,4,0.82)';
   rrect(ctx, x, y, badgeWidth, badgeHeight, 5);
   ctx.fill();
@@ -645,43 +687,9 @@ export function drawZoomBadge(ctx, VW, VH) {
   ctx.restore();
 }
 
-/* ══════════════════════════════════════════════════════════════
-drawRankBadge
-══════════════════════════════════════════════════════════════ */
-/* ══════════════════════════════════════════════════════════════
-drawRankBadge — cached module to avoid per-frame dynamic import
-══════════════════════════════════════════════════════════════ */
-var _rankModule = null;
-import('../ranking/rankingSystem.js').then(function(m) { _rankModule = m; }).catch(function() {});
-
-function drawRankBadge(ctx, VW, VH, VS) {
-  if (!VS || !VS.rank || !_rankModule) return;
-  var rank = _rankModule.getRankFromScore(VS.rank.score);
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.shadowBlur = 0;
-  var isMobile = VW < 768;
-  var bottomMargin = isMobile ? 60 : 70;
-  var x = (VW / 2) - 65;
-  var y = VH - bottomMargin;
-  var badgeWidth = 130;
-  var badgeHeight = 28;
-  ctx.fillStyle = 'rgba(26, 18, 8, 0.85)';
-  ctx.strokeStyle = '#c49a4e';
-  ctx.lineWidth = 1;
-  rrect(ctx, x, y, badgeWidth, badgeHeight, 20);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = '#f5c842';
-  ctx.font = 'bold 11px "Oldenburg",serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(rank.badge + ' ' + rank.title, x + 8, y + badgeHeight/2);
-  ctx.fillStyle = '#88dd88';
-  ctx.font = 'bold 9px monospace';
-  ctx.fillText(Math.floor(VS.rank.score) + ' pts', x + badgeWidth - 38, y + badgeHeight/2);
-  ctx.restore();
-}
+/* Rank display moved to a DOM element (#rank-hud in index.html, updated by
+   ui/dashboard.js) so it can show a real progress bar and stay legible at
+   any viewport size — a tiny canvas-drawn pill couldn't do either well. */
 
 /* ══════════════════════════════════════════════════════════════
 drawMissileStatusBadge

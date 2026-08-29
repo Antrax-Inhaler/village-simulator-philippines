@@ -350,9 +350,24 @@ function _updateRankDisplay(VS) {
   
   var rankSum = document.getElementById('sb-rank-sum');
   if (rankSum) rankSum.textContent = rank.badge + ' ' + rank.title;
-  
+
   // Update the badge canvas
   _updateRankBadgeCanvas();
+
+  /* ── Bottom-center rank HUD (compact, always-visible pill) ─── */
+  var hudBadge = document.getElementById('rank-hud-badge');
+  var hudTitle = document.getElementById('rank-hud-title');
+  var hudPts   = document.getElementById('rank-hud-pts');
+  var hudFill  = document.getElementById('rank-hud-bar-fill');
+  if (hudBadge) hudBadge.textContent = rank.badge;
+  if (hudTitle) hudTitle.textContent = rank.title;
+  if (hudPts)   hudPts.textContent = Math.floor(VS.rank.score) + ' pts';
+  if (hudFill) {
+    var hudPercent = nextRank
+      ? Math.min(100, Math.max(0, ((VS.rank.score - rank.scoreRequired) / (nextRank.scoreRequired - rank.scoreRequired)) * 100))
+      : 100;
+    hudFill.style.width = hudPercent + '%';
+  }
 }
 /* ══════════════════════════════════════════════════════════════
    DOM builder
@@ -620,7 +635,11 @@ function _injectStyles() {
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  padding: 2px 12px 8px 12px;
+  /* Bottom padding reserves room for the fixed attack/shop button row
+     (~68px tall) so the last section (RANK) never scrolls in behind it —
+     that overlap used to make LUSUBIN and the rank progress unreadable
+     whenever the dashboard was open. */
+  padding: 2px 12px 84px 12px;
   scrollbar-width: thin;
   scrollbar-color: #c49a4e #2a1808;
 }

@@ -1,0 +1,10 @@
+{
+  "name": "village-simulator-philippines",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Mini Bayan - a Philippine village life-simulator (vanilla JS, Canvas2D, no build step)",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

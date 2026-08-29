@@ -584,6 +584,9 @@ canvas.mode-view  { cursor: default; }
   align-items: center;
   justify-content: center;
   pointer-events: all;
+  overflow-y: auto; /* safety net on very short screens */
+  padding: 12px 0;
+  box-sizing: border-box;
 }
 
 #settings-panel.open {
@@ -647,8 +650,21 @@ canvas.mode-view  { cursor: default; }
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-height: 200px;
+  /* Scales with the actual viewport instead of a fixed height that was
+     cramped on desktop and still overflowed on short phone screens.
+     80px reserves room for the header; only scrolls if content genuinely
+     doesn't fit. */
+  max-height: min(60vh, 460px);
   overflow: auto;
+}
+
+/* Short landscape phones need a tighter modal, not a permanently tiny one */
+@media (max-height: 480px) and (orientation: landscape) {
+  .settings-modal-content { margin: 8px; }
+  .settings-modal-header  { padding: 10px 14px; }
+  .settings-modal-body    { padding: 12px; gap: 8px; max-height: min(70vh, 320px); }
+  .settings-action-btn    { padding: 8px; min-height: 36px; font-size: 12px; }
+  .settings-sound-row     { padding: 8px; font-size: 12px; gap: 8px; }
 }
 
 .settings-action-btn {
@@ -3539,6 +3555,100 @@ canvas.mode-view  { cursor: default; }
   }
 }
 /* ═══════════════════════════════════════════════════════════
+   RANK HUD — compact bottom-center pill with a real progress bar.
+   Sits just above the attack/shop button row so the two never overlap.
+══════════════════════════════════════════════════════════════ */
+#rank-hud {
+  position: fixed;
+  bottom: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 22;
+  width: min(220px, 60vw);
+  padding: 6px 12px 8px;
+  background: rgba(26, 18, 8, 0.85);
+  border: 1px solid #c49a4e;
+  border-radius: 14px;
+  cursor: pointer;
+  pointer-events: all;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+#rank-hud:hover {
+  transform: translateX(-50%) scale(1.03);
+  border-color: #f5c842;
+}
+
+#rank-hud-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Oldenburg', serif;
+  white-space: nowrap;
+}
+
+#rank-hud-badge { font-size: 14px; flex: none; }
+
+#rank-hud-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: bold;
+  color: #f5c842;
+}
+
+#rank-hud-pts {
+  flex: none;
+  font-size: 9px;
+  font-family: var(--font-mono, monospace);
+  color: #88dd88;
+}
+
+#rank-hud-bar-bg {
+  margin-top: 5px;
+  height: 7px;
+  background: rgba(245, 200, 66, 0.12);
+  border: 1px solid rgba(196, 154, 78, 0.5);
+  border-radius: 10px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+#rank-hud-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #f5c842, #ffdd88);
+  border-radius: 10px;
+  transition: width 0.5s ease;
+}
+
+@media (max-width: 768px) {
+  #rank-hud {
+    bottom: 70px;
+    width: min(180px, 62vw);
+    padding: 5px 10px 7px;
+  }
+  #rank-hud-title { font-size: 10px; }
+  #rank-hud-pts   { font-size: 8px; }
+}
+
+/* Short landscape phones (the game's primary mobile orientation) — the
+   bottom button row shrinks too (see below), so the HUD can sit a little
+   lower and stay compact instead of eating into the play area. */
+@media (max-height: 480px) and (orientation: landscape) {
+  #rank-hud {
+    bottom: 56px;
+    width: min(170px, 46vw);
+    padding: 4px 9px 6px;
+  }
+  #rank-hud-badge { font-size: 12px; }
+  #rank-hud-title { font-size: 9px; }
+  #rank-hud-pts   { font-size: 7px; }
+  #rank-hud-bar-bg { height: 6px; margin-top: 3px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
    ATTACK SYSTEM STYLES
 ══════════════════════════════════════════════════════════ */
 
@@ -3808,6 +3918,16 @@ canvas.mode-view  { cursor: default; }
   #atk-village-name { font-size: 12px; }
   .atk-pill { font-size: 10px; padding: 2px 7px; }
   .troop-slot { min-width: 72px; padding: 6px 7px; }
+}
+
+/* Short landscape phones — this is the game's primary mobile orientation
+   (portrait is blocked), so the bottom row needs to stay small on short
+   screens rather than eating into the play area. */
+@media (max-height: 480px) and (orientation: landscape) {
+  #bottom-btn-row { bottom: 8px; }
+  .bottom-game-btn, .shop-btn { padding: 5px 11px; gap: 4px; }
+  .bgb-icon, .shop-btn-icon { font-size: 16px; }
+  .bgb-text, .shop-btn-text { font-size: 9px; }
 }
 .troop-slot-active {
   box-shadow: 0 0 0 2px #f5c842, 0 0 16px rgba(245,200,66,0.5);

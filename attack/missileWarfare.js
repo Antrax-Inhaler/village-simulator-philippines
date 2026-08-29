@@ -557,7 +557,7 @@ export function updateMissiles(VS, currentTime, showMsgFn) {
  * @param {function} showMsgFn - Message function
  * @returns {Object} Impact result
  */
-export function resolveOutgoingImpact(missile, attackerVS, simulatedDefender, showMsgFn) {
+export function resolveOutgoingImpact(missile, attackerVS, simulatedDefender, showMsgFn, dayCount) {
   var def = MISSILE_COSTS[missile.type];
   if (!def) return { error: 'Unknown missile type' };
   
@@ -591,9 +591,9 @@ export function resolveOutgoingImpact(missile, attackerVS, simulatedDefender, sh
     buildingsHit: buildingsHit,
     loot: loot,
     timestamp: Date.now(),
-    day: window.dayCount || 1
+    day: dayCount || 1
   };
-  
+
   attackerVS.missiles = attackerVS.missiles || { history: [] };
   attackerVS.missiles.history.unshift(historyEntry);
   if (attackerVS.missiles.history.length > MISSILE_CONFIG.HISTORY_MAX_ENTRIES) {
@@ -620,7 +620,7 @@ export function resolveOutgoingImpact(missile, attackerVS, simulatedDefender, sh
  * @param {function} showMsgFn - Message function
  * @returns {Object} Impact result
  */
-export function resolveIncomingImpact(missile, defenderVS, showMsgFn) {
+export function resolveIncomingImpact(missile, defenderVS, showMsgFn, dayCount) {
   var def = MISSILE_COSTS[missile.type];
   if (!def) return { error: 'Unknown missile type' };
   
@@ -659,15 +659,15 @@ export function resolveIncomingImpact(missile, defenderVS, showMsgFn) {
     damage: damaged,
     lootLost: { gold: lootGold, rice: lootRice },
     timestamp: Date.now(),
-    day: window.dayCount || 1
+    day: dayCount || 1
   };
-  
+
   defenderVS.missiles = defenderVS.missiles || { history: [] };
   defenderVS.missiles.history.unshift(historyEntry);
   if (defenderVS.missiles.history.length > MISSILE_CONFIG.HISTORY_MAX_ENTRIES) {
     defenderVS.missiles.history.pop();
   }
-  
+
   // Show warning
   if (showMsgFn && damaged.length > 0) {
     showMsgFn('⚠️ Tinamaan ng ' + missile.type.toUpperCase() + ' missile! ' + damaged.length + ' gusali nasira.', 'danger');
@@ -689,7 +689,7 @@ export function resolveIncomingImpact(missile, defenderVS, showMsgFn) {
  * @param {function} showMsgFn - Message function
  * @returns {Object} Intercept result
  */
-export function resolveInterception(missile, defenderVS, interceptChance, showMsgFn) {
+export function resolveInterception(missile, defenderVS, interceptChance, showMsgFn, dayCount) {
   // Record in history
   var historyEntry = {
     id: missile.id,
@@ -699,7 +699,7 @@ export function resolveInterception(missile, defenderVS, interceptChance, showMs
     result: 'intercepted',
     interceptChance: interceptChance,
     timestamp: Date.now(),
-    day: window.dayCount || 1
+    day: dayCount || 1
   };
   
   defenderVS.missiles = defenderVS.missiles || { history: [] };
@@ -746,7 +746,7 @@ export function saveMissileState(VS, dayCount) {
  * @param {function} showMsgFn - Message function
  * @returns {Object} { processed: number, results: [] }
  */
-export function processOfflineImpacts(VS, currentTime, showMsgFn) {
+export function processOfflineImpacts(VS, currentTime, showMsgFn, dayCount) {
   var processed = 0;
   var results = [];
   
@@ -766,7 +766,7 @@ export function processOfflineImpacts(VS, currentTime, showMsgFn) {
           }
         };
         
-        var result = resolveOutgoingImpact(missile, VS, simulatedDefender, showMsgFn);
+        var result = resolveOutgoingImpact(missile, VS, simulatedDefender, showMsgFn, dayCount);
         results.push({ type: 'outgoing', missile: missile, result: result });
         processed++;
         return false; // Remove from active queue
@@ -783,10 +783,10 @@ export function processOfflineImpacts(VS, currentTime, showMsgFn) {
         var intercepted = Math.random() * 100 < interceptInfo.chance;
         
         if (intercepted) {
-          resolveInterception(missile, VS, interceptInfo.chance, showMsgFn);
+          resolveInterception(missile, VS, interceptInfo.chance, showMsgFn, dayCount);
           results.push({ type: 'incoming', missile: missile, intercepted: true });
         } else {
-          resolveIncomingImpact(missile, VS, showMsgFn);
+          resolveIncomingImpact(missile, VS, showMsgFn, dayCount);
           results.push({ type: 'incoming', missile: missile, intercepted: false });
         }
         processed++;

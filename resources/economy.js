@@ -65,7 +65,8 @@ export function initDebt(VS) {
       creditScore: DEFAULT_CREDIT_SCORE,
       defaulted: false,                // Has defaulted before
       lastPaymentDay: 0,               // Track when last payment was made
-      missedPayments: 0                // Consecutive missed payments
+      missedPayments: 0,               // Consecutive missed payments
+      lastMissedCheckDay: 0            // Last day processMissedPayments evaluated (once/day gate)
     };
   }
   return VS.debt;
@@ -87,7 +88,7 @@ export function calculateDebtInterest(VS) {
 }
 
 // Make debt payment
-export function makeDebtPayment(amount, VS, showMsgFn) {
+export function makeDebtPayment(amount, VS, showMsgFn, dayCount) {
   if (!VS.debt) initDebt(VS);
   
   if (amount <= 0) {
@@ -100,16 +101,17 @@ export function makeDebtPayment(amount, VS, showMsgFn) {
     return false;
   }
   
-  // Deduct payment
-  VS.res.gold -= amount;
+  // Deduct only what actually applies to the debt (an overpayment above the
+  // outstanding principal must not be charged — it would vanish for nothing)
   var actualPayment = Math.min(amount, VS.debt.principal);
+  VS.res.gold -= actualPayment;
   VS.debt.principal -= actualPayment;
   
   // Track payment
   VS.debt.paymentHistory.unshift({
     amount: actualPayment,
     date: Date.now(),
-    day: window.dayCount || 1
+    day: dayCount || 1
   });
   
   // Keep only last 30 payments
@@ -118,7 +120,7 @@ export function makeDebtPayment(amount, VS, showMsgFn) {
   // Update credit score for making payments
   updateCreditScore(VS, true, actualPayment);
   
-  VS.debt.lastPaymentDay = window.dayCount || 1;
+  VS.debt.lastPaymentDay = dayCount || 1;
   VS.debt.missedPayments = 0;
   
   if (showMsgFn) showMsgFn(`Nagbayad ng ${actualPayment} 🪙 sa utang. Natitira: ${VS.debt.principal} 🪙`, 'success');
@@ -201,13 +203,19 @@ export function getInterestRate(VS) {
 }
 
 // Process missed payments and default
+// tickEconomy calls this every simulation tick (many times per in-game day),
+// so this must only *evaluate* the day's outcome once per day — otherwise
+// missedPayments racks up dozens of times per second and any debt at all
+// defaults almost instantly.
 export function processMissedPayments(VS, dayCount) {
   if (!VS.debt) return;
-  
+  if (VS.debt.lastMissedCheckDay === dayCount) return; // already evaluated today
+  VS.debt.lastMissedCheckDay = dayCount;
+
   // Check if payment was missed this day
   if (VS.debt.principal > 0 && VS.debt.lastPaymentDay !== dayCount) {
     VS.debt.missedPayments++;
-    
+
     // Update interest rate based on missed payments
     if (VS.debt.missedPayments >= 10 && !VS.debt.defaulted) {
       VS.debt.defaulted = true;
@@ -574,7 +582,7 @@ export function calculateCitizenIncome(villager, VS) {
    Call this from main.js every tick
 ══════════════════════════════════════════════════════════════ */
 
-export function tickEconomy(dt, VS) {
+export function tickEconomy(dt, VS, dayCount) {
   // Initialize debt if needed
   if (!VS.debt) initDebt(VS);
   
@@ -589,8 +597,8 @@ export function tickEconomy(dt, VS) {
     };
   }
   
-  var currentDay = window.dayCount || 1;
-  
+  var currentDay = dayCount || 1;
+
   // Apply interest only once per day (when day changes)
   if (VS.debt.lastInterestDay !== currentDay && VS.debt.principal > 0) {
     VS.debt.lastInterestDay = currentDay;
@@ -657,8 +665,8 @@ export function tickEconomy(dt, VS) {
    ON NEW DAY - Called from main.js when day advances
 ══════════════════════════════════════════════════════════════ */
 
-export function onNewDay(VS, showMsgFn) {
-  var currentDay = window.dayCount || 1;
+export function onNewDay(VS, showMsgFn, dayCount) {
+  var currentDay = dayCount || 1;
   
   // Reset any daily counters
   // (Add any daily economy resets here)

@@ -319,6 +319,19 @@ export function drawGroundSprite(ctx, key, x, y, w, h) {
   return true;
 }
 
+/**
+ * isGroundSpriteReady(key) — true once the named ground texture has
+ * finished loading (no side effects; doesn't trigger a load itself).
+ * Used by the renderer to know when a cached static layer that baked
+ * in this sprite needs to be redrawn.
+ */
+export function isGroundSpriteReady(key) {
+  var path = GROUND_SPRITES[key];
+  if (!path) return false;
+  var entry = _cache[path];
+  return entry instanceof Image && entry.complete && entry.naturalWidth > 0;
+}
+
 export function preloadAll() {
   // Only preload if sprites are enabled
   if (!ENABLE_SPRITES) return;

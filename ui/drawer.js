@@ -22,6 +22,8 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { showProcurementModal } from './procurementModal.js';
+import { w2s } from '../render/camera.js';
+import { setMousePos } from '../input/input.js';
 
 var _d = null;
 
@@ -487,6 +489,14 @@ function _wireButtons() {
     moveBtn.addEventListener('click', function() {
       drawer.movingBuilding = !drawer.movingBuilding;
       _d.setGameMode(drawer.movingBuilding ? 'move_building' : 'view');
+      if (drawer.movingBuilding) {
+        // Anchor the move-guide to the building's actual current position
+        // instead of wherever the mouse last was on the canvas (this button
+        // is a DOM click, not a canvas mousemove, so the input module's
+        // tracked mouse position would otherwise be stale/unrelated).
+        var sp = w2s(drawer.target.x, drawer.target.y);
+        setMousePos(sp.x, sp.y);
+      }
       _d.showMsg(drawer.movingBuilding
         ? 'Ilipat ang ' + drawer.target.getDef().label + '. Click para i-drop.'
         : drawer.target.getDef().label + ' nanatili.');
